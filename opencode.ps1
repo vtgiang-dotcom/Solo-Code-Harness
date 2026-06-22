@@ -20,6 +20,28 @@ Write-Host "    - Background subagents" -ForegroundColor Gray
 Write-Host "    - Event system" -ForegroundColor Gray
 Write-Host ""
 
+# ── CommandCode Provider (2 protocols, 1 API key) ──────────────────
+$envFile = Join-Path $PSScriptRoot ".env"
+if (Test-Path $envFile) {
+    Get-Content $envFile | ForEach-Object {
+        $line = $_.Trim()
+        if ($line -and -not $line.StartsWith("#")) {
+            $parts = $line.Split('=', 2)
+            if ($parts.Length -eq 2) {
+                $key = $parts[0].Trim()
+                $value = $parts[1].Trim()
+                if ($key -eq "COMMANDCODE_API_KEY" -and $value) {
+                    $env:OPENAI_BASE_URL = "https://api.commandcode.ai/provider/v1"
+                    $env:OPENAI_API_KEY = $value
+                    $env:ANTHROPIC_BASE_URL = "https://api.commandcode.ai/provider"
+                    $env:ANTHROPIC_API_KEY = $value
+                    Write-Host "  CommandCode: enabled (2 protocols)" -ForegroundColor Green
+                }
+            }
+        }
+    }
+}
+
 # ── Model ───────────────────────────────────────────────────────────
 $model = if ($args[0]) { $args[0] } else { "deepseek/deepseek-v4-pro" }
 Write-Host "  Model: $model" -ForegroundColor Yellow
