@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Solo-Code Harness Feature List",
+  "description": "Machine-readable scope boundary. The agent picks exactly ONE in-progress feature per session and may not mark it done without verification evidence.",
+  "type": "object",
+  "properties": {
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique feature identifier (e.g., feat-001)",
+            "pattern": "^feat-\\d+$"
+          },
+          "name": {
+            "type": "string",
+            "description": "Short feature name"
+          },
+          "description": {
+            "type": "string",
+            "description": "What this feature does and its definition of done"
+          },
+          "dependencies": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Feature IDs that must be done before this one"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["not-started", "in-progress", "blocked", "done"],
+            "description": "Current implementation state"
+          },
+          "evidence": {
+            "type": "string",
+            "description": "Verification evidence required when status is 'done' (commands run + result). Empty string is invalid for a done feature."
+          }
+        },
+        "required": ["id", "name", "description", "status", "evidence"]
+      }
+    }
+  },
+  "required": ["features"]
+}

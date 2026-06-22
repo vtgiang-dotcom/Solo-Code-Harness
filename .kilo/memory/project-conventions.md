@@ -1,0 +1,61 @@
+---
+type: project
+created: 2026-06-01
+updated: 2026-06-01
+---
+
+# Project Conventions
+
+## Git Workflow
+
+- Always create a new dedicated branch for major code changes.
+- Branch name format: `feature/[task-slug]` or `fix/[bug-slug]`.
+- Never force-push to `main`/`master`.
+
+## Code Style
+
+- Follow existing patterns in the codebase exactly.
+- Prefer named exports over default exports.
+- Comment WHY, not WHAT.
+- No emojis in code or commit messages unless user requests.
+
+## Security
+
+- Never commit `.env` files, credentials, or API keys.
+- Use environment variables for all secrets.
+- Run `python .github/scripts/security_scan.py .` before deployment.
+
+**Why:** Consistent conventions prevent drift and reduce cognitive load.
+
+---
+
+## Feature Gate (ENFORCED)
+
+Before implementing ANY new feature, plugin, or capability:
+
+### Filter 1 — DNA fit
+Must belong to one of 4 categories (per SPEC §0):
+- **cấu hình** (json/jsonc/yaml/toml config files)
+- **rule** (behavioral rules in AGENTS.md, CLAUDE.md, instruction/*.md)
+- **skill** (SKILL.md files teaching agents how to perform tasks)
+- **script** (hooks, security scans, verification scripts — zero external deps beyond stdlib)
+
+If the feature is infrastructure (Docker, servers, protocols, external runtimes,
+benchmark containers, package registries, network services):
+→ **DROP immediately**. Solo-Code is a harness, not a platform.
+
+### Filter 2 — Complexity budget
+- Must NOT add new external dependencies (beyond python3.8+, node18+, git)
+- Must NOT create new top-level directories (source/plugins/ is the single extension point)
+- Must NOT require the user to install or configure anything extra
+
+### Enforcement protocol
+1. Re-read SPEC.md §0 before proposing any new feature
+2. Answer both filters in writing
+3. If either fails → reply `DROP: [reason]` and stop
+4. If both pass → present plan, wait for user approval, then implement
+
+### External catalogs
+Awesome lists, benchmarks, and competitor analyses (e.g., awesome-agent-harness-main)
+are **maps for navigation**, not checklists for implementation.
+The fact that a pattern exists in the ecosystem does not mean Solo-Code should adopt it.

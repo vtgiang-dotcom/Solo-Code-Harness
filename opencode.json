@@ -1,0 +1,54 @@
+{
+  "permission": {
+    "*": "ask",
+    "bash": {
+      "*": "allow",
+      "rm -rf ./*": "deny",
+      "rm -r ./*": "deny",
+      "rm -r -f ./*": "deny",
+      "git clean -fd*": "deny",
+      "git clean -fx*": "deny",
+      "git clean -f *": "deny",
+      "rd /s*": "deny",
+      "del /q*": "deny",
+      "del /s*": "deny",
+      "rmdir /s*": "deny"
+    },
+    "read": {
+      "*": "allow",
+      "*.env": "ask",
+      "*.env.*": "ask",
+      "*.env.example": "allow"
+    },
+    "glob": "allow",
+    "grep": "allow",
+    "todowrite": "allow",
+    "question": "allow",
+    "websearch": "allow",
+    "skill": "allow",
+    "external_directory": {
+      "*": "ask"
+    }
+  },
+  "shell": "powershell",
+  "references": {
+    "effect": {
+      "repository": "Effect-TS/effect",
+      "branch": "main",
+      "description": "Use for Effect-TS implementation details"
+    }
+  },
+  "mcp": {
+    "context7": {
+      "type": "local",
+      "command": ["npx", "-y", "@upstash/context7-mcp"],
+      "description": "Latest library documentation lookup"
+    },
+    "playwright": {
+      "type": "local",
+      "command": ["npx", "-y", "@playwright/mcp"],
+      "disabled": true,
+      "description": "Browser testing (enable when needed)"
+    }
+  }
+}

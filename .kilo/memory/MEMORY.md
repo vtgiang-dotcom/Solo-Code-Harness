@@ -1,0 +1,26 @@
+# Memory Index
+
+> Persistent cross-session memory for this project. The AI reads this at session start and writes to it via `/remember`.
+
+## Project
+- [project] Follow branch naming: `feature/[task-slug]` or `fix/[bug-slug]` → [[project-conventions]]
+
+## Rules
+- [rules] Load AGENTS.md for all behavior rules → [[AGENTS.md]]
+- [rules] load permission-guard before destructive operations → [[skill/permission-guard/SKILL.md]]
+
+## Tech Stack
+- [tech] Python 3.10+ — tools/ and .github/scripts/ are stdlib-only (zero external deps)
+- [tech] Node.js 18+ — .kilo/hooks/ (Kilo Code hooks), .github/hooks/scripts/ (guard tests)
+- [tech] Bash — init.sh, verify.sh, Makefile (Git Bash on Windows)
+- [tech] Ruff — Python linter (config in .ruff.toml, NOT pyproject.toml)
+- [tech] Gitleaks — secret scanner (.gitleaks.toml with allowlist)
+- [tech] pytest — test runner (not in pyproject.toml; manual `pip install pytest` into .venv)
+
+## Gotchas
+- [gotcha] Python PATH on Git Bash: init.sh and Makefile use fallback python3 → python → py
+- [gotcha] WSL detection bug: verify.sh `grep -qi microsoft /proc/version` matches Git Bash
+- [gotcha] ruff config single source: .ruff.toml only; pyproject.toml has NO [tool.ruff]
+- [gotcha] E501 globally ignored in .ruff.toml [lint]; no per-file E501 needed
+- [gotcha] Dead dir refs: ECC-main, agents-main, hermes-agent-main, etc. are stale — never restore
+- [gotcha] jsonschema not in .venv; schema validation via tools/validate_schemas.py

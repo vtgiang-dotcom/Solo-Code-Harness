@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json.schemastore.org/kilo-hooks.json",
+  "version": "1.0.0",
+  "description": "Solo-Code-Harness hook system — lifecycle hooks for agent safety and quality",
+  "profiles": {
+    "minimal": ["pre:gate-guard"],
+    "standard": ["pre:gate-guard", "pre:hookify-bash", "pre:hookify-file", "pre:secret-scan", "pre:config-protection", "post:quality-gate", "post:console-log-check", "post:context-monitor", "post:edit-accumulator", "post:memory-manager", "post:continual-learning", "post:check-output", "post:security-check", "session:start", "session:continual-learning", "session:end", "session:continual-learning-end", "stop:ralph-loop", "stop:verify-gates"],
+    "strict": ["pre:gate-guard", "pre:hookify-bash", "pre:hookify-file", "pre:secret-scan", "pre:config-protection", "pre:governance-capture", "post:quality-gate", "post:console-log-check", "post:context-monitor", "post:edit-accumulator", "post:memory-manager", "post:continual-learning", "post:check-output", "post:security-check", "session:start", "session:continual-learning", "session:end", "session:continual-learning-end", "stop:ralph-loop", "stop:verify-gates"]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "id": "pre:gate-guard",
+        "matcher": "Bash",
+        "hook": "node .kilo/hooks/pre-tool-use/gate-guard.js",
+        "description": "Block destructive bash commands (rm -rf, git push --force, DROP TABLE, etc.)"
+      },
+      {
+        "id": "pre:hookify-bash",
+        "matcher": "Bash",
+        "hook": "node .kilo/hooks/hookify/hookify-engine.js bash",
+        "description": "Hookify MD-config engine for bash commands (custom rules via .kilo/hookify/*.md)"
+      },
+      {
+        "id": "pre:hookify-file",
+        "matcher": "Write|Edit|MultiEdit",
+        "hook": "node .kilo/hooks/hookify/hookify-engine.js file",
+        "description": "Hookify MD-config engine for file operations (custom rules via .kilo/hookify/*.md)"
+      },
+      {
+        "id": "pre:secret-scan",
+        "matcher": "Write|Edit|MultiEdit",
+        "hook": "node .kilo/hooks/pre-tool-use/secret-scan.js",
+        "description": "Scan content for hardcoded secrets before writing files"
+      },
+      {
+        "id": "pre:config-protection",
+        "matcher": "Write|Edit|MultiEdit",
+        "hook": "node .kilo/hooks/pre-tool-use/config-protection.js",
+        "description": "Block modifications to linter/formatter config files"
+      },
+      {
+        "id": "pre:governance-capture",
+        "matcher": "Bash|Write|Edit|MultiEdit",
+        "hook": "node .kilo/hooks/pre-tool-use/governance-capture.js",
+        "description": "Capture governance events (secrets, policy violations, approval requests)"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "id": "post:quality-gate",
+        "matcher": "Edit|Write|MultiEdit",
+        "hook": "node .kilo/hooks/post-tool-use/quality-gate.js",
+        "description": "Run formatter/linter checks after file edits"
+      },
+      {
+        "id": "post:console-log-check",
+        "matcher": "Edit|Write|MultiEdit",
+        "hook": "node .kilo/hooks/post-tool-use/console-log-check.js",
+        "description": "Detect leftover console.log/debug statements after edits"
+      },
+      {
+        "id": "post:context-monitor",
+        "matcher": "*",
+        "hook": "node .kilo/hooks/post-tool-use/context-monitor.js",
+        "description": "Monitor context usage and warn about exhaustion"
+      },
+      {
+        "id": "post:edit-accumulator",
+        "matcher": "Edit|Write|MultiEdit",
+        "hook": "node .kilo/hooks/post-tool-use/edit-accumulator.js",
+        "description": "Record edited file paths for batch operations"
+      },
+      {
+        "id": "post:memory-manager",
+        "matcher": "Write|Edit|MultiEdit",
+        "hook": "node .kilo/hooks/post-tool-use/memory-manager.js",
+        "description": "Enforce character limits on .kilo/memory/ files to prevent context exhaustion"
+      },
+      {
+        "id": "post:continual-learning",
+        "matcher": "*",
+        "hook": "node .kilo/hooks/learnings/learn.js postToolUse",
+        "description": "Log tool outcomes for cross-session learning (~1ms overhead)"
+      },
+      {
+        "id": "post:check-output",
+        "matcher": "Bash",
+        "hook": "node .kilo/hooks/post-tool-use/check-output.js",
+        "description": "Detect error patterns in Bash command output (missing modules, syntax errors)"
+      },
+      {
+        "id": "post:security-check",
+        "matcher": "Bash(git commit:*)",
+        "hook": "node .kilo/hooks/post-tool-use/security-check-post.js",
+        "description": "Scan git diff for secrets after commit/push"
+      }
+    ],
+    "SessionStart": [
+      {
+        "id": "session:start",
+        "matcher": "*",
+        "hook": "node .kilo/hooks/session/session-start.js",
+        "description": "Bootstrap session state, detect package manager, load context"
+      },
+      {
+        "id": "session:continual-learning",
+        "matcher": "*",
+        "hook": "node .kilo/hooks/learnings/learn.js sessionStart",
+        "description": "Load prior cross-session learnings into context"
+      }
+    ],
+    "SessionEnd": [
+      {
+        "id": "session:end",
+        "matcher": "*",
+        "hook": "node .kilo/hooks/session/session-end.js",
+        "description": "Persist session state, track cost, emit summary"
+      },
+      {
+        "id": "session:continual-learning-end",
+        "matcher": "*",
+        "hook": "node .kilo/hooks/learnings/learn.js sessionEnd",
+        "description": "Analyze failure patterns, persist insights, compact memory"
+      }
+    ],
+    "Stop": [
+      {
+        "id": "stop:ralph-loop",
+        "matcher": "*",
+        "hook": "node .kilo/hooks/ralph/ralph-loop.js",
+        "description": "Ralph Wiggum iterative improvement loop — blocks exit, re-feeds prompt"
+      },
+      {
+        "id": "stop:verify-gates",
+        "matcher": "*",
+        "hook": "node .kilo/hooks/ralph/verify-gates.js",
+        "description": "Verify gates were run before session ends — checks transcript for security/lint/test evidence"
+      }
+    ]
+  }
+}

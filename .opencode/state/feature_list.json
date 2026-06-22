@@ -1,0 +1,148 @@
+{
+  "features": [
+    {
+      "id": "feat-001",
+      "name": "Instructions subsystem",
+      "description": "Behavior rules, anti-hallucination, prose quality, security, permission model. Definition of done: CLAUDE.md + AGENTS.md + SPEC.md present and all 7 gates green.",
+      "dependencies": [],
+      "status": "done",
+      "evidence": ".claude/CLAUDE.md (322 lines), AGENTS.md (198 lines), SPEC.md (118 lines) present; design intent documented in .kilo/memory/harness-design-intent.md."
+    },
+    {
+      "id": "feat-002",
+      "name": "Verification subsystem",
+      "description": "7-gate pipeline: security scan, ruff, garden, integration, harness tests, eval. Definition of done: `make check` and `verify.sh` run clean.",
+      "dependencies": ["feat-001"],
+      "status": "done",
+      "evidence": "Makefile `check` target chains ruff + validate_schemas + garden + pytest + integration + eval(min-score 60); verify.sh structure checks present."
+    },
+    {
+      "id": "feat-003",
+      "name": "Memory subsystem",
+      "description": "Cross-session convention persistence. Definition of done: .claude/memory/ and .kilo/memory/ with MEMORY.md index + fact files.",
+      "dependencies": ["feat-001"],
+      "status": "done",
+      "evidence": ".claude/memory/ (MEMORY.md, project-conventions.md) and .kilo/memory/ (MEMORY.md, project-conventions.md, harness-design-intent.md) present."
+    },
+    {
+      "id": "feat-004",
+      "name": "State tracking",
+      "description": "Machine-readable scope + per-session progress log so work survives across sessions. Definition of done: feature_list.json (this file) + progress.md present and referenced from CLAUDE.md startup flow.",
+      "dependencies": ["feat-001"],
+      "status": "done",
+      "evidence": ".claude/state/{feature_list.json,feature_list.schema.json,progress.md} created; CLAUDE.md 'State & Session Lifecycle' section references them; `bash init.sh` reads and prints active features."
+    },
+    {
+      "id": "feat-005",
+      "name": "Session lifecycle",
+      "description": "Bootstrap at start + clean handoff at end. Definition of done: init.sh wraps existing verify tooling; session-handoff.md template present; both referenced from CLAUDE.md.",
+      "dependencies": ["feat-004"],
+      "status": "done",
+      "evidence": "init.sh created and run: health check OK (Python 3.12.9, all dirs/files present), prints active features. `--verify` falls back to checklist.py when make absent. session-handoff.md template present."
+    },
+    {
+      "id": "feat-006",
+      "name": "Scope definition of done",
+      "description": "Explicit completion criteria (implementation + verification + evidence) wired into CLAUDE.md so the agent cannot declare victory early. Definition of done: 'Definition of Done' section added to CLAUDE.md, gates still green.",
+      "dependencies": ["feat-004"],
+      "status": "done",
+      "evidence": "CLAUDE.md 'Definition of Done' subsection added (additive, no rule shortened). All 7 gates green: ruff clean, schemas pass, garden 0 errors, integration 220/0, pytest test_harness 33 passed, eval 49/49 (avg 93), security 0 findings."
+    },
+    {
+      "id": "feat-007",
+      "name": "Config debt cleanup",
+      "description": "Remove stale exclude entries from .ruff.toml, pyproject.toml, .gitleaks.toml, and .gitignore. Sync agent.yaml with actual skill/agent counts. Fix self-verification handshake strings. Makefile PY fallback cascade. Definition of done: ruff config is single-source (.ruff.toml only), 0 stale entries across all configs, agent.yaml lists all 38 skills + 12 agents.",
+      "dependencies": ["feat-006"],
+      "status": "done",
+      "evidence": "11 files changed: .ruff.toml (2 exclude only, E501 in [lint], per-file only SIM114+I001), pyproject.toml (rewritten with [project] metadata, [tool.ruff] removed), AGENTS.md handshake \"10 skills\"→\"38 skills, 12 agents\", CLAUDE.md handshake \"11 skills\"→\"38 skills, 12 agents\", agent.yaml (9→38 skills, 10→12 agents, alphabetical), Makefile (PY fallback python3→python→py), .gitleaks.toml (stale ECC-main+agents-main removed), .gitignore (stale section removed, learn-harness-engineering-main added). Gates: ruff All checks passed, security_scan 473 files 0 issues, garden 0 errors/0 warnings, checklist.py 4/4 PASS, init.sh Bootstrap OK, schemas All passed."
+    },
+    {
+      "id": "feat-008",
+      "name": "Memory population",
+      "description": "Populate .claude/memory/ and .kilo/memory/ with real data: tech stack, known gotchas, debugging tips, deployment notes. Replace placeholder comments. Definition of done: MEMORY.md in both locations has Tech Stack and at least 3 gotcha entries.",
+      "dependencies": ["feat-003"],
+      "status": "not-started",
+      "evidence": ""
+    },
+    {
+      "id": "feat-009",
+      "name": "Cross-platform init.sh",
+      "description": "Make init.sh work for all harness platforms (Claude, Copilot, Gemini, Kilo) by detecting available rulebooks and state dirs. Currently hardcoded to .claude/ paths. Definition of done: init.sh works from any harness platform directory and correctly reports active feature from that platform's state.",
+      "dependencies": ["feat-005"],
+      "status": "not-started",
+      "evidence": ""
+    },
+    {
+      "id": "feat-010",
+      "name": "Automated manifest sync",
+      "description": "Script or garden check that validates agent.yaml skills/agents match actual .claude/skills/*.md and .kilo/agents/*.md file counts. Prevent drift between manifest and reality. Definition of done: garden BOUNDARY check or new validation catches agent.yaml drift; field in feature_list.json stays correct without manual updates.",
+      "dependencies": ["feat-007"],
+      "status": "not-started",
+      "evidence": ""
+    },
+    {
+      "id": "feat-011",
+      "name": "CI gate on push",
+      "description": "GitHub Actions workflow that runs verify.sh (or checklist.py) on every push and PR. Currently no CI — all gates run locally only. Definition of done: .github/workflows/ci.yml exists, runs security_scan + ruff + eval on push, passes on this branch.",
+      "dependencies": ["feat-002"],
+      "status": "not-started",
+      "evidence": ""
+    },
+    {
+      "id": "feat-012",
+      "name": "writing-great-skills skill",
+      "description": "Reference skill for authoring skills in the harness. Covers invocation types, information hierarchy, completion criteria, leading words, failure modes. Definition of done: source/plugins/solo-code/skills/writing-great-skills/SKILL.md created, registered in plugin.json + agent.yaml, linked from using-agent-skills router, make generate passes.",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "SKILL.md created (6.7KB), solo-code/plugin.json + agent.yaml registered, using-agent-skills router linked, make generate produces .claude/skills/writing-great-skills.md + 3 other harnesses."
+    },
+    {
+      "id": "feat-013",
+      "name": "codebase-design skill",
+      "description": "Shared vocabulary for deep-module design. Glossary (module/interface/depth/seam/adapter/leverage/locality), deep-vs-shallow diagrams, testability rules with TS+Python examples. Definition of done: source/plugins/refactor/skills/codebase-design/SKILL.md created, registered in plugin.json, cross-linked from simplify-code.",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "SKILL.md created (5.8KB), refactor/plugin.json registered, simplify-code cross-linked, make generate passes."
+    },
+    {
+      "id": "feat-014",
+      "name": "interview-me grilling cadence",
+      "description": "Add 3-discipline grilling cadence to interview-me skill: one question at a time, every question carries GUESS: with recommended answer, explore codebase before asking. Definition of done: interview-me/SKILL.md updated, size < 12288B cap.",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "Grilling Cadence section added to interview-me/SKILL.md, trimmed redundant text to fit within 12KB cap (11519B), make generate passes."
+    },
+    {
+      "id": "feat-015",
+      "name": "systematic-debugging Phase 0 feedback loop",
+      "description": "Add Phase 0 — Build a feedback loop as the first step before root cause investigation. Includes loop construction strategies, tightening guidance, completion criteria (red-capable/deterministic/fast/agent-runnable). Definition of done: systematic-debugging/SKILL.md updated, cross-link to improve-codebase-architecture added.",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "Phase 0 section added before Phase 1, Quick Reference table updated with Phase 0 row, cross-link to improve-codebase-architecture added at bottom."
+    },
+    {
+      "id": "feat-016",
+      "name": "domain-modeling skill",
+      "description": "Skill for maintaining CONTEXT.md shared glossary. Covers file structure, CONTEXT.md format, inline update discipline, relationship with memory/ADR. Definition of done: source/plugins/code-quality/skills/domain-modeling/SKILL.md created, registered in plugin.json, linked from documentation-and-adrs + using-agent-skills router.",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "SKILL.md created (4.3KB), code-quality/plugin.json registered, documentation-and-adrs cross-linked, using-agent-skills router linked, make generate passes."
+    },
+    {
+      "id": "feat-017",
+      "name": "handoff skill",
+      "description": "Skill for compacting conversation into session-handoff.md. Covers document structure template (6 sections), storage in .claude/state/session-handoff.md, redaction rules, relationship with progress.md. Definition of done: source/plugins/solo-code/skills/handoff/SKILL.md created, registered in plugin.json.",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "SKILL.md created (1.8KB), solo-code/plugin.json registered, make generate passes."
+    },
+    {
+      "id": "feat-018",
+      "name": "improve-codebase-architecture skill",
+      "description": "Skill for scanning codebase for deepening opportunities. 3-phase process: Explore (deletion test), Present candidates (Markdown report, no HTML), Grilling loop (uses interview-me). Uses codebase-design vocabulary. Definition of done: source/plugins/refactor/skills/improve-codebase-architecture/SKILL.md created, registered in plugin.json, linked from using-agent-skills router.",
+      "dependencies": ["feat-013"],
+      "status": "done",
+      "evidence": "SKILL.md created (3.7KB), refactor/plugin.json registered, using-agent-skills router linked, systematic-debugging cross-linked, make generate passes."
+    }
+  ]
+}

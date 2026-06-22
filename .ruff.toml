@@ -1,0 +1,17 @@
+# Ruff configuration for Solo-Code-Harness
+extend-exclude = [
+    ".kilo/node_modules",
+    ".venv",
+]
+
+# Target Python version
+target-version = "py310"
+
+[lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "C4"]
+ignore = ["E501"]
+
+[lint.per-file-ignores]
+"scripts/*" = ["T201"]  # Allow print() in scripts
+"tools/generate_harness.py" = ["SIM114"]  # Branch combine would reduce readability
+"tools/setup-global-config.py" = ["I001"]  # Cross-tool import requires sys.path.insert before import

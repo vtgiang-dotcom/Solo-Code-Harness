@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/solo-code-extensions-config.json",
+  "version": "1.0.0",
+  "description": "Extension configuration for Solo-Code-Harness — feature flags for experimental capabilities. Mặc định TẮT; bật enabled: true sau khi người duyệt đồng ý.",
+
+  "skill_evolution": {
+    "enabled": false,
+    "staging_dir": "skills/custom/",
+    "source_dir": "source/plugins/custom/skills/",
+    "min_eval_score": 60,
+    "max_custom_skills": 10,
+    "allow_force_quality": true,
+    "allow_force_security": false,
+    "require_review": true
+  }
+}

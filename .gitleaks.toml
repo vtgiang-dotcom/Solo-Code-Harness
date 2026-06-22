@@ -1,0 +1,15 @@
+[extend]
+useDefault = true
+
+[allowlist]
+paths = [
+    '''\.venv''',
+    '''node_modules''',
+    '''gitleaks-report\.json''',
+    '''dist''',
+    '''build''',
+    '''\.ruff_cache''',
+    '''package-lock\.json''',
+    '''\.env''',
+    '''tools/eval_harness\.py''',
+]

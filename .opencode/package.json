@@ -1,0 +1,7 @@
+{
+  "type": "module",
+  "dependencies": {
+    "@kilocode/plugin": "7.3.50",
+    "@opencode-ai/plugin": "1.17.9"
+  }
+}

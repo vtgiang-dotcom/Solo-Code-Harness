@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schemastore.org/solo-code-subagent-contract.json",
+  "version": "1.0.0",
+  "description": "Sub-agent status contract for Solo-Code-Harness — governs status transitions and resource allocation for spawned sub-agents.",
+  "source": "Adapted from DeerFlow 2.0 sub-agent contract (ByteDance).",
+
+  "valid_status_values": [
+    "completed",
+    "failed",
+    "cancelled",
+    "timed_out"
+  ],
+
+  "status_transitions": {
+    "pending": ["running"],
+    "running": ["completed", "failed", "cancelled", "timed_out"],
+    "completed": [],
+    "failed": [],
+    "cancelled": [],
+    "timed_out": []
+  },
+
+  "resource_contract": {
+    "max_turns_per_task": 20,
+    "max_model_cost_ratio": 0.3,
+    "default_timeout_seconds": 300
+  },
+
+  "governance_rules": {
+    "lead_agent_responsibility": "Read status, classify result, synthesize findings. Do NOT copy sub-agent output verbatim.",
+    "failure_recovery": "On 'failed' or 'timed_out' — retry with reduced scope once. If retry fails, escalate to user.",
+    "context_isolation": "Each sub-agent receives only the task-relevant context, not the full session."
+  }
+}
