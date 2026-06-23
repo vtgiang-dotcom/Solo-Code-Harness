@@ -143,6 +143,14 @@
       "dependencies": ["feat-013"],
       "status": "done",
       "evidence": "SKILL.md created (3.7KB), refactor/plugin.json registered, using-agent-skills router linked, systematic-debugging cross-linked, make generate passes."
+    },
+    {
+      "id": "feat-019",
+      "name": "Deploy.py scaffold mode — tạo dự án mới từ harness",
+      "description": "Mở rộng tools/deploy.py thêm chế độ scaffold: tạo project mới từ đầu với full harness (Gemini + Kilo + OpenCode), git init, README template, auto-detect mode (scaffold nếu target chưa tồn tại, deploy nếu đã có), interactive mode. Definition of done: python tools/deploy.py scaffold /tmp/test —dry-run hiển thị ~329 files, python tools/deploy.py deploy . —dry-run hiển thị ~105 files (opencode engine), auto-detect hoạt động với path.",
+      "dependencies": ["feat-002"],
+      "status": "done",
+      "evidence": "tools/deploy.py extended from 245→658 lines. Scaffold: tạo thư mục, copy root files + engine dirs, sinh README.md, git init + initial commit. Deploy: giữ nguyên backward compatible. Auto-detect + interactive mode. README.md updated với 'Scaffold & Deploy' section. Security scan PASS."
     }
   ]
 }

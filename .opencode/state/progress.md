@@ -4,6 +4,46 @@
 
 ---
 
+## 2026-06-23 — Mở rộng deploy.py: thêm scaffold mode + README + đồng bộ GitHub
+
+**Active Feature:** feat-019 (deploy.py scaffold mode)
+
+### What's Done
+
+- [x] **feat-019: deploy.py scaffold mode** — Mở rộng `tools/deploy.py` từ 245 → 658 dòng với 3 chế độ:
+  - `scaffold` — Tạo dự án mới từ đầu: tạo thư mục, copy toàn bộ harness (Gemini + Kilo + OpenCode), sinh README.md từ template, git init + initial commit, in hướng dẫn post-setup
+  - `deploy` — Giữ nguyên backward-compatible cho dự án có sẵn
+  - Auto-detect — Nếu target không tồn tại → scaffold, nếu có → deploy
+  - Interactive — `python tools/deploy.py` (không args) → hỏi đáp từng bước
+- [x] **README.md** — Thêm section "Scaffold & Deploy" với ví dụ đầy đủ
+- [x] **feature_list.json** — Thêm feat-019
+- [x] **progress.md** — Ghi lại session này
+
+### Verification
+
+- [x] `python tools/deploy.py --help` — Hiển thị đúng usage, epilog
+- [x] `python tools/deploy.py scaffold /tmp/test --dry-run` — 329 files, git init, README
+- [x] `python tools/deploy.py deploy . --engine opencode --dry-run` — 105 files
+- [x] `python tools/deploy.py . --dry-run` — Auto-detect: deploy to existing dir
+- [x] `python tools/deploy.py scaffold /tmp/solo-test-new --dry-run` — Auto-detect: scaffold new project
+- [x] `python .github/scripts/security_scan.py tools/deploy.py` — PASS, 0 issues
+
+### What's Next
+
+1. Feat-008 (Memory population) — mở rộng memory với debugging tips + deployment notes
+2. Feat-009 (Cross-platform init.sh) — hỗ trợ đa nền tảng
+3. Feat-010 (Automated manifest sync) — garden check agent.yaml drift
+4. Feat-011 (CI gate on push) — GitHub Actions workflow
+
+### Decisions Made
+
+- **Giữ nguyên backward compatibility**: `deploy` subcommand hoạt động y hệt như trước, không phá vỡ workflow cũ
+- **Auto-detect theo tồn tại của thư mục**: Đơn giản, predict, đúng với kỳ vọng
+- **README template**: Scaffold chỉ sinh README.md nếu file chưa tồn tại (không ghi đè)
+- **`.gitignore` thêm vào ROOT_FILES**: Đảm bảo file .gitignore được copy trong cả scaffold lẫn deploy
+
+---
+
 ## 2026-06-19 — Nâng cấp harness: 7 skills từ Matt Pocock (HYBRID style)
 
 **Active Feature:** feat-012 → feat-018 (7 new/upgraded skills from skills-main)

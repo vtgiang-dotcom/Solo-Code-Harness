@@ -7,8 +7,8 @@ Triple-engine support: **OpenCode** (`.opencode/`, primary), **Kilo Code** (`.ki
 ## Quick Start
 
 ```bash
-# Launch OpenCode with all features enabled
-.\opencode.ps1
+# Launch OpenCode
+opencode
 
 # Generate harness artifacts
 make generate
@@ -28,6 +28,51 @@ python tools/test_integration.py
 # Guard plugin tests (63 cases)
 node .opencode/tests/test-guard.mjs
 ```
+
+## Scaffold & Deploy
+
+Use `tools/deploy.py` to replicate this harness into new or existing projects.
+
+### Scaffold a new project
+
+```bash
+# Create a new project from scratch with full harness
+python tools/deploy.py scaffold /path/to/new-project
+
+# Custom project name and description
+python tools/deploy.py scaffold /path/to/new-project --name my-app --description "My app"
+
+# OpenCode-only engine
+python tools/deploy.py scaffold /path/to/new-project --engine opencode
+```
+
+Scaffold creates the directory, copies all engine configs (OpenCode + Kilo + Gemini), generates `.gitignore` and `README.md`, runs `git init`, and prints post-setup instructions.
+
+### Deploy to an existing project
+
+```bash
+# Copy harness into an existing project directory
+python tools/deploy.py deploy /path/to/existing-project
+
+# Dry run — preview changes without copying
+python tools/deploy.py deploy . --dry-run
+```
+
+### Auto-detect
+
+```bash
+# Auto-detect: scaffold if target missing, deploy if exists
+python tools/deploy.py /path/to/target
+```
+
+### Interactive mode
+
+```bash
+# No arguments → interactive setup wizard
+python tools/deploy.py
+```
+
+---
 
 ## Structure
 
@@ -69,6 +114,47 @@ node .opencode/tests/test-guard.mjs
 - **Normalize stage** — strips `sudo`, `bash -c`, whitespace to defeat bypasses
 - **`tool.execute.after`** — catches secrets leaked in bash output
 - **`chat.message`** — auto-injects session state on startup
+
+## CommandCode Provider
+
+Connects to [Command Code](https://commandcode.ai) — single API key for Claude, GPT, Gemini, DeepSeek, Qwen, Kimi, GLM, MiniMax, Step, and other models.
+
+### Setup (1-time)
+
+```powershell
+# 1. Install the provider plugin
+opencode plugin commandcode-go-opencode-provider
+
+# 2. Save API key as Windows User environment variable
+[Environment]::SetEnvironmentVariable("COMMANDCODE_API_KEY", "your-key", "User")
+
+# 3. Open new PowerShell → launch OpenCode
+opencode
+```
+
+### Cấu hình (trong `opencode.json` — đã có)
+
+```json
+"plugin": ["commandcode-go-opencode-provider/server"],
+"provider": {
+    "commandcode": {
+        "npm": "commandcode-go-opencode-provider",
+        "name": "Command Code",
+        "env": ["COMMANDCODE_API_KEY"]
+    }
+}
+```
+
+Plugin tự động đăng ký tất cả models từ `models.json` (bundled trong npm package).
+Dùng `/models` trong OpenCode để chọn model.
+
+### Khi key hết hạn
+
+```powershell
+[Environment]::SetEnvironmentVariable("COMMANDCODE_API_KEY", "key-mới", "User")
+```
+
+Mở PowerShell mới → `opencode`. Không cần sửa file nào.
 
 ## MCP Servers
 
