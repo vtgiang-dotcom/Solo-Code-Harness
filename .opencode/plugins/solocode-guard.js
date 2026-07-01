@@ -350,34 +350,12 @@ function readStateFile(dir, name) {
 
 export const SoloCodeGuard = async ({ project, client, $, directory, worktree }) => {
   return {
-    // v2.5: Auto-inject session state on first message
-    'chat.message': async (input, output) => {
-      try {
-        const sid = input.sessionID;
-        if (!sid || stateInjectedSessions.has(sid)) return;
-        stateInjectedSessions.add(sid);
-
-        const handoff = readStateFile(directory, 'session-handoff.md');
-        const features = readStateFile(directory, 'feature_list.json');
-
-        if (!handoff && !features) return;
-
-        let text = '[SoloCode] Current project state:\n\n';
-        if (handoff) text += '### Session Handoff\n' + handoff + '\n\n';
-        if (features) {
-          try {
-            const list = JSON.parse(features);
-            const active = list.filter(function(f) { return f.status === 'in-progress'; });
-            const pending = list.filter(function(f) { return f.status === 'not-started'; });
-            text += '### Feature Status\n';
-            text += '- In progress: ' + (active.length || 'none') + '\n';
-            text += '- Pending: ' + pending.length + '\n';
-            if (active.length) text += '- Active: ' + active.map(function(f) { return f.name; }).join(', ') + '\n';
-          } catch (_) { text += features.substring(0, 200) + '\n'; }
-        }
-        output.parts.push({ text: text });
-      } catch (_) { /* fail open */ }
-    },
+    // COMPAT: chat.message hook disabled (v2.5) — pushing incomplete Part
+    // objects (missing id/sessionID/messageID) causes InvalidSyncEvent in
+    // the extension. Session state injection disabled pending a proper Part
+    // construction mechanism from the SDK. The guard (tool hooks below) is
+    // unaffected.
+    // 'chat.message': async (input, output) => { ... },
     'tool.execute.before': async (input, output) => {
       try {
         const tool = input.tool;

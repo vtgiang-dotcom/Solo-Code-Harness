@@ -63,6 +63,7 @@ DIRS_ALL = [
     ".gemini",
     ".github",
     ".contracts",
+    "tools",
     "docs/specs",
 ]
 
@@ -70,6 +71,7 @@ DIRS_OPENCODE = [
     ".opencode",
     ".github",
     ".contracts",
+    "tools",
     "docs/specs",
 ]
 
@@ -149,18 +151,28 @@ def should_copy(path: Path) -> bool:
     return not (path.is_file() and name.endswith(".pyc"))
 
 
-def copy_file(src: Path, dst: Path, dry_run: bool) -> str:
-    """Copy a single file. Returns status string."""
+def copy_file(src: Path, dst: Path, dry_run: bool, base: Path | None = None) -> str:
+    """Copy a single file. Returns status string.
+
+    Args:
+        src: Source file to copy.
+        dst: Destination path.
+        dry_run: If True, only print what would be done.
+        base: Base path for display (defaults to dst.parent).
+    """
+    display = base or dst.parent
+    rel = dst.relative_to(display) if display else dst.name
+
     if dry_run:
-        return "  [DRY] " + str(dst.relative_to(dst.anchor))
+        return f"  [DRY] {rel}"
 
     dst.parent.mkdir(parents=True, exist_ok=True)
     if dst.exists():
         shutil.copy2(src, dst)
-        return "  [UPD] " + str(dst.relative_to(dst.anchor))
+        return f"  [UPD] {rel}"
     else:
         shutil.copy2(src, dst)
-        return "  [NEW] " + str(dst.relative_to(dst.anchor))
+        return f"  [NEW] {rel}"
 
 
 def copy_tree(src: Path, dst: Path, dry_run: bool) -> tuple[int, int, list[str]]:
@@ -276,7 +288,7 @@ def scaffold(
             print(f"  [SKIP] {f} — not found (source)")
             total_skip += 1
             continue
-        status = copy_file(src, target_path / f, dry_run)
+        status = copy_file(src, target_path / f, dry_run, base=target_path)
         print(status)
         if "[NEW]" in status or "[DRY]" in status:
             total_new += 1
@@ -313,10 +325,10 @@ def scaffold(
             description=description,
         )
         readme_path.write_text(readme_content, encoding="utf-8")
-        print(f"\n  [NEW] README.md — generated")
+        print("\n  [NEW] README.md — generated")
         total_new += 1
     elif dry_run and not readme_path.exists():
-        print(f"\n  [DRY] Would generate: README.md")
+        print("\n  [DRY] Would generate: README.md")
 
     # ── Step 4: Create tools/ directory for harness scripts ──────
     # The script itself is already copied via .github/ but we also
@@ -438,7 +450,7 @@ def deploy(target: str, *, engine: str = "all", dry_run: bool = False) -> int:
             print(f"  [SKIP] {f} — not found")
             total_skip += 1
             continue
-        status = copy_file(src, target_path / f, dry_run)
+        status = copy_file(src, target_path / f, dry_run, base=target_path)
         print(status)
         if "[NEW]" in status or "[DRY]" in status:
             total_new += 1
@@ -557,9 +569,7 @@ def _looks_like_path(value: str) -> bool:
     # Contains path separators, or is a dot-relative path, or exists on disk
     if "/" in value or "\\" in value or value in (".", ".."):
         return True
-    if Path(value).exists():
-        return True
-    return False
+    return bool(Path(value).exists())
 
 
 def main() -> int:

@@ -19,7 +19,13 @@
     "playwright": {
       "command": "npx",
       "args": ["-y", "@playwright/mcp"],
-      "description": "Browser automation for E2E testing and web scraping. Free, no API key needed. Requires: npx playwright install chromium"
+      "description": "Browser automation for E2E testing and web scraping. Free, no API key required. Requires: npx playwright install chromium"
+    },
+    "notebooks": {
+      "disabled": true,
+      "command": "",
+      "args": [],
+      "description": "Antigravity IDE notebooks (disabled — not used)"
     }
   },
   "_comments": {

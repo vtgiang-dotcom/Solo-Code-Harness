@@ -136,7 +136,7 @@ def test_state() -> None:
             is_valid = isinstance(data, dict) and isinstance(data.get("features"), list)
             check("  feature_list.json: valid JSON", is_valid, "not dict with features array")
             if is_valid:
-                check("  feature_list.json: 18 features", len(data["features"]) == 18, f"got {len(data['features'])}")
+                check("  feature_list.json: 19 features", len(data["features"]) == 19, f"got {len(data['features'])}")
         except json.JSONDecodeError:
             check("  feature_list.json: valid JSON", False, "parse error")
 

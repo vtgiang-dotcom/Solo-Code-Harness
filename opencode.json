@@ -1,4 +1,5 @@
 {
+  "$schema": "https://opencode.ai/config.json",
   "permission": {
     "*": "ask",
     "bash": {
@@ -31,24 +32,16 @@
     }
   },
   "shell": "powershell",
-  "references": {
-    "effect": {
-      "repository": "Effect-TS/effect",
-      "branch": "main",
-      "description": "Use for Effect-TS implementation details"
-    }
-  },
+  "references": {},
   "mcp": {
     "context7": {
       "type": "local",
-      "command": ["npx", "-y", "@upstash/context7-mcp"],
-      "description": "Latest library documentation lookup"
+      "command": ["npx", "-y", "@upstash/context7-mcp"]
     },
     "playwright": {
       "type": "local",
       "command": ["npx", "-y", "@playwright/mcp"],
-      "disabled": true,
-      "description": "Browser testing (enable when needed)"
+      "enabled": false
     }
   }
 }
