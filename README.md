@@ -1,24 +1,24 @@
 # Solo-Code CLI
 
-AI coding agent harness — rules, skills, hooks, and verification gates for disciplined Solo-Code engineering.
+Bộ harness (dây cương) cho AI coding agent — rules, skills, hooks và verification gates dành cho kỹ thuật Solo-Code có kỷ luật.
 
-Triple-engine support: **OpenCode** (`.opencode/`, primary), **Kilo Code** (`.kilo/`), **Gemini/Antigravity** (`.gemini/`).
+Hỗ trợ 3 engine: **OpenCode** (`.opencode/`, chính), **Kilo Code** (`.kilo/`), **Gemini/Antigravity** (`.gemini/`).
 
 ## Quick Start
 
 ```bash
-# Launch OpenCode
+# Mở OpenCode
 opencode
 
-# Generate harness artifacts
+# Sinh các artifact của harness
 make generate
 
-# Run all quality gates
+# Chạy tất cả quality gates
 make check
 
-# Single gates
+# Gates riêng lẻ
 make test              # Harness tests (15 tests)
-make security-scan     # Secret detection
+make security-scan     # Phát hiện secret trong code
 make validate          # Schema validation
 make garden            # Drift detection (.kilo vs .opencode)
 
@@ -31,108 +31,108 @@ node .opencode/tests/test-guard.mjs
 
 ## Scaffold & Deploy
 
-Use `tools/deploy.py` to replicate this harness into new or existing projects.
+Dùng `tools/deploy.py` để nhân bản harness này vào dự án mới hoặc dự án có sẵn.
 
-### Scaffold a new project
+### Scaffold — tạo dự án mới
 
 ```bash
-# Create a new project from scratch with full harness
+# Tạo dự án mới kèm full harness
 python tools/deploy.py scaffold /path/to/new-project
 
-# Custom project name and description
+# Tuỳ chỉnh tên và mô tả
 python tools/deploy.py scaffold /path/to/new-project --name my-app --description "My app"
 
-# OpenCode-only engine
+# Chỉ engine OpenCode
 python tools/deploy.py scaffold /path/to/new-project --engine opencode
 ```
 
-Scaffold creates the directory, copies all engine configs (OpenCode + Kilo + Gemini), generates `.gitignore` and `README.md`, runs `git init`, and prints post-setup instructions.
+Scaffold tạo thư mục, copy config cho tất cả engine (OpenCode + Kilo + Gemini), sinh `.gitignore` và `README.md`, chạy `git init`, và in hướng dẫn post-setup.
 
-### Deploy to an existing project
+### Deploy — copy harness vào dự án có sẵn
 
 ```bash
-# Copy harness into an existing project directory
+# Copy harness vào dự án có sẵn
 python tools/deploy.py deploy /path/to/existing-project
 
-# Dry run — preview changes without copying
+# Dry run — xem trước thay đổi mà không copy thật
 python tools/deploy.py deploy . --dry-run
 ```
 
 ### Auto-detect
 
 ```bash
-# Auto-detect: scaffold if target missing, deploy if exists
+# Tự động scaffold nếu target chưa tồn tại, deploy nếu đã tồn tại
 python tools/deploy.py /path/to/target
 ```
 
 ### Interactive mode
 
 ```bash
-# No arguments → interactive setup wizard
+# Không đối số → mở wizard thiết lập tương tác
 python tools/deploy.py
 ```
 
 ---
 
-## Structure
+## Cấu trúc thư mục
 
-| Directory | Purpose |
-|-----------|---------|
-| `.opencode/` | **Primary** — OpenCode: agents (14), skills (39), plugin v2.5, commands (4), tools (2), state (5) |
+| Thư mục | Mục đích |
+|---|---|
+| `.opencode/` | **Chính** — OpenCode: agents (14), skills (39), plugin v2.5, commands (4), tools (2), state (5) |
 | `.kilo/` | Kilo Code: agents (14), skills (44), hooks, memory, instruction |
 | `.gemini/` | Gemini/Antigravity: agents (14), skills (44), commands (12), knowledge |
-| `.github/` | Shared scripts: `security_scan.py`, `checklist.py`, `eval_harness.py` |
+| `.github/` | Script dùng chung: `security_scan.py`, `checklist.py`, `eval_harness.py` |
 | `tools/` | Generator, validator, drift detector, integration tests |
 | `docs/specs/` | Architecture specs, migration plans, historical docs |
 
-## Gates
+## Verification Gates
 
-| Gate | Command | What it checks |
-|------|---------|----------------|
+| Gate | Lệnh | Kiểm tra |
+|---|---|---|
 | Lint | `ruff check .` | Python code style |
 | Schema | `make validate` | Frontmatter validity (53 files) |
-| Drift | `make garden` | .kilo ↔ .opencode parity |
+| Drift | `make garden` | Cân bằng .kilo ↔ .opencode |
 | Harness Tests | `make test` | Generator (15 tests) |
-| Integration | `python tools/test_integration.py` | Full .opencode/ structure (182 checks) |
-| Security | `make security-scan` | Hardcoded secrets (337 files) |
-| Guard | `node .opencode/tests/test-guard.mjs` | Destructive command patterns (63 tests) |
+| Integration | `python tools/test_integration.py` | Cấu trúc .opencode/ đầy đủ (182 checks) |
+| Security | `make security-scan` | Secret hardcode (337 files) |
+| Guard | `node .opencode/tests/test-guard.mjs` | Mẫu lệnh phá hoại (63 tests) |
 
 ## OpenCode Commands
 
-| Command | Purpose |
-|---------|---------|
-| `/verify` | Run all 6 verification gates |
-| `/plan` | Delegate to planner agent |
-| `/decide` | Delegate to architect agent |
+| Lệnh | Chức năng |
+|---|---|
+| `/verify` | Chạy tất cả 6 verification gates |
+| `/plan` | Giao việc cho planner agent |
+| `/decide` | Giao việc cho architect agent |
 | `/ship` | Pre-launch checklist |
 
 ## Guard Plugin (`solocode-guard.js` v2.5)
 
-- **33 destructive command patterns** (rm, git reset, dd, format, shutdown, chmod/chown system dirs, temp-dir destruction)
-- **15 secret detection patterns** (AWS keys, JWT, GitHub tokens, DB URIs, webhooks)
-- **19 protected config files** (ESLint, Prettier, Biome, Ruff, etc.)
-- **Normalize stage** — strips `sudo`, `bash -c`, whitespace to defeat bypasses
-- **`tool.execute.after`** — catches secrets leaked in bash output
-- **`chat.message`** — auto-injects session state on startup
+- **33 mẫu lệnh nguy hiểm** (rm, git reset, dd, format, shutdown, chmod/chown thư mục hệ thống, phá huỷ temp-dir)
+- **15 mẫu phát hiện secret** (AWS keys, JWT, GitHub tokens, DB URIs, webhooks)
+- **19 file config được bảo vệ** (ESLint, Prettier, Biome, Ruff, v.v.)
+- **Normalize stage** — loại bỏ `sudo`, `bash -c`, khoảng trắng để chống bypass
+- **`tool.execute.after`** — bắt secret rò rỉ trong output bash
+- **`chat.message`** — tự động inject session state khi khởi động
 
 ## CommandCode Provider
 
-Connects to [Command Code](https://commandcode.ai) — single API key for Claude, GPT, Gemini, DeepSeek, Qwen, Kimi, GLM, MiniMax, Step, and other models.
+Kết nối tới [Command Code](https://commandcode.ai) — một API key dùng được Claude, GPT, Gemini, DeepSeek, Qwen, Kimi, GLM, MiniMax, Step và nhiều model khác.
 
-### Setup (1-time)
+### Thiết lập (1 lần)
 
 ```powershell
-# 1. Install the provider plugin
+# 1. Cài plugin provider
 opencode plugin commandcode-go-opencode-provider
 
-# 2. Save API key as Windows User environment variable
-[Environment]::SetEnvironmentVariable("COMMANDCODE_API_KEY", "your-key", "User")
+# 2. Lưu API key vào biến môi trường Windows User
+[Environment]::SetEnvironmentVariable("COMMANDCODE_API_KEY", "key-của-bạn", "User")
 
-# 3. Open new PowerShell → launch OpenCode
+# 3. Mở PowerShell mới → chạy OpenCode
 opencode
 ```
 
-### Cấu hình (trong `opencode.json` — đã có)
+### Cấu hình (trong `opencode.json` — đã có sẵn)
 
 ```json
 "plugin": ["commandcode-go-opencode-provider/server"],
@@ -145,7 +145,7 @@ opencode
 }
 ```
 
-Plugin tự động đăng ký tất cả models từ `models.json` (bundled trong npm package).
+Plugin tự động đăng ký tất cả model từ `models.json` (bundled trong npm package).
 Dùng `/models` trong OpenCode để chọn model.
 
 ### Khi key hết hạn
@@ -158,7 +158,7 @@ Mở PowerShell mới → `opencode`. Không cần sửa file nào.
 
 ## MCP Servers
 
-| Server | Status | Purpose |
-|--------|--------|---------|
-| `context7` | Active | Live library documentation lookup |
-| `playwright` | Disabled | Browser E2E testing |
+| Server | Trạng thái | Chức năng |
+|---|---|---|
+| `context7` | Đang chạy | Tra cứu tài liệu thư viện trực tiếp |
+| `playwright` | Tắt | Browser E2E testing |
