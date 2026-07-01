@@ -190,7 +190,7 @@ The guard plugin auto-injects current state at session start. State files live a
 
 ## Git Commit Convention
 
-End commit message with: `Co-Authored-By: Kilo <noreply@kilo.ai>`
+End commit message with: `Co-Authored-By: Solo-Code <admin@solo-code.com>`
 
 See `.kilo/skill/git-workflow-master/SKILL.md` for full commit format, types, and style rules.
 

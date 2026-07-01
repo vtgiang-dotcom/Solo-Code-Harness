@@ -25,7 +25,7 @@ Create a well-formed git commit from staged and unstaged changes.
    - Types: feat, fix, refactor, docs, test, chore, perf, style
    - Description: imperative mood, ≤72 chars, explains WHY not WHAT
    - Body (optional): bullet points for significant changes
-   - Footer: `Co-Authored-By: Kilo <noreply@kilo.ai>`
+   - Footer: `Co-Authored-By: Solo-Code <admin@solo-code.com>`
 
 4. **Present for confirmation**
    - Show the drafted message
@@ -53,7 +53,7 @@ Fixes agent forgetting everything between sessions. Uses two-tier
 SQLite memory: global (~/.kilo/learnings/) and local (.kilo/learnings/db/).
 Auto-detects failure patterns and compacts old data.
 
-Co-Authored-By: Kilo <noreply@kilo.ai>
+Co-Authored-By: Solo-Code <admin@solo-code.com>
 ```
 
 ```
@@ -62,5 +62,5 @@ fix(gate-guard): prevent false blocks on large stdin payloads
 Changed exit code from 2 (block) to 0 (allow) when hook input
 exceeds 1MB. Large Write/Edit tools were being blocked incorrectly.
 
-Co-Authored-By: Kilo <noreply@kilo.ai>
+Co-Authored-By: Solo-Code <admin@solo-code.com>
 ```

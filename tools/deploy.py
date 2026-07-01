@@ -370,7 +370,7 @@ def scaffold(
                 dry_run=False,
             )
             _run_command(
-                ["git", "commit", "-m", f"Initial scaffold: Solo-Code Harness ({engine} engine)\n\nCo-Authored-By: Solo-Code <noreply@solo-code.dev>"],
+                ["git", "commit", "-m", f"Initial scaffold: Solo-Code Harness ({engine} engine)\n\nCo-Authored-By: Solo-Code <admin@solo-code.com>"],
                 cwd=target_path,
                 label="GIT",
                 dry_run=False,

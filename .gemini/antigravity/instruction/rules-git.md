@@ -7,7 +7,7 @@
 ```
 <type>: <short description>
 
-Co-Authored-By: Kilo <noreply@kilo.ai>
+Co-Authored-By: Solo-Code <admin@solo-code.com>
 ```
 
 Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`, `style`, `security`
