@@ -64,7 +64,6 @@ DIRS_ALL = [
     ".github",
     ".contracts",
     "tools",
-    "docs/specs",
 ]
 
 DIRS_OPENCODE = [
@@ -72,7 +71,6 @@ DIRS_OPENCODE = [
     ".github",
     ".contracts",
     "tools",
-    "docs/specs",
 ]
 
 # Patterns to exclude from copy
