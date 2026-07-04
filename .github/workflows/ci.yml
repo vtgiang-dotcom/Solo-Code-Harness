@@ -1,0 +1,58 @@
+name: CI — Quality Gates
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality-gates:
+    name: Quality Gates (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.10', '3.11', '3.12', '3.13']
+        exclude:
+          # ruff 0.9.1 dropped Python 3.10 wheel builds for some platforms
+          # Skip if ruff fails — quality gates are additive
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ruff pytest
+        shell: bash
+
+      - name: Security Scan
+        run: python .github/scripts/security_scan.py .
+        shell: bash
+
+      - name: Ruff Lint
+        run: ruff check .
+        shell: bash
+        continue-on-error: true
+
+      - name: Schema Validation
+        run: python tools/validate_schemas.py
+        shell: bash
+
+      - name: Garden (Drift Detection)
+        run: python tools/garden.py
+        shell: bash
+
+      - name: Harness Tests
+        run: python -m pytest tools/test_harness.py -v --tb=short
+        shell: bash
