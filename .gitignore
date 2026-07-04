@@ -9,6 +9,7 @@ venv/
 *.egg-info/
 dist/
 build/
+tools/_version.py
 
 # Node
 node_modules/

@@ -1,11 +1,16 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
 [project]
 name = "solo-code-harness"
-version = "3.1.0"
+dynamic = ["version"]
 description = "AI coding agent harness — rules, skills, hooks, and verification gates for disciplined Solo-Code engineering"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Solo-Code Team" }]
 requires-python = ">=3.10"
+keywords = ["ai-agent", "coding-harness", "skills", "hooks", "verification", "code-quality"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
@@ -14,8 +19,27 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Quality Assurance",
     "Topic :: Software Development :: Testing",
 ]
+
+[project.urls]
+Homepage = "https://github.com/solo-code-io/solo-code-cli"
+Repository = "https://github.com/solo-code-io/solo-code-cli"
+Issues = "https://github.com/solo-code-io/solo-code-cli/issues"
+
+[tool.hatch.version]
+source = "vcs"
+fallback-version = "3.1.0"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "tools/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["tools"]
+
+[tool.hatch.build.targets.sdist]
+include = ["/tools", "/.kilo", "/.opencode", "/.github", "/README.md", "/LICENSE", "/AGENTS.md", "/SPEC.md"]
 
 
