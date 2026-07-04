@@ -259,8 +259,8 @@ class HarnessConfig:
 
     def debug_print_sources(self) -> None:
         """Print config layering for debugging."""
-        print(f"Config layers (highest priority first):")
-        for i, (name, data) in enumerate(reversed(self._sources)):
+        print("Config layers (highest priority first):")
+        for i, (name, _data) in enumerate(reversed(self._sources)):
             print(f"  {i + 1}. {name}")
         print(f"\nProject root: {self.project_root}")
         print(f"Global dir:   {self.global_dir}")
