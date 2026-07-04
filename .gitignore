@@ -19,6 +19,9 @@ node_modules/
 .env.*
 !.env.example
 
+# Harness per-project config (generated locally, not committed)
+.solocode/
+
 # OS
 .DS_Store
 Thumbs.db
