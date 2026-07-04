@@ -53,3 +53,21 @@ jobs:
       - name: Harness Tests
         run: python -m pytest tools/test_harness.py -v --tb=short
         shell: bash
+
+  ci-ok:
+    name: CI — All Gates Passed
+    needs: [quality-gates]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate Results
+        run: |
+          python -c "
+          import json, sys
+          needs = json.loads('''${{ toJSON(needs) }}''')
+          failed = [k for k,v in needs.items() if v.get('result') != 'success']
+          if failed:
+              print(f'FAILED: {failed}')
+              sys.exit(1)
+          print('All gates passed')
+          "

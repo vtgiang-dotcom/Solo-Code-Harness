@@ -1,0 +1,28 @@
+# Security Allow-List
+# ==================
+# Pattern ported from codebase-memory-mcp (scripts/security-allowlist.txt).
+#
+# Format: filepath:function:justification
+# Every "dangerous" call in the codebase must appear here with a
+# justification, OR the security scan will flag it.
+#
+# This replaces hardcoded exceptions in security_scan.py and serves
+# as auditable documentation of every risky call site.
+
+# ── Subprocess execution ──────────────────────────────────────
+tools/deploy.py:_run_command:git init/scaffold/deploy operations are the intended purpose of the deploy tool
+tools/deploy.py:subprocess.run:scaffold mode runs git init, git add, git commit to bootstrap new projects
+tools/generate_harness.py:subprocess.run:runs ruff format and ruff check via subprocess after file generation
+
+# ── Environment variable access ───────────────────────────────
+tools/harness_config.py:os.environ:config loader reads SOLOCODE_* env vars for config override layer
+tools/solocode_config.py:os.environ:reads DEEPSEEK_API_KEY and model env vars for AI model launcher
+
+# ── File system operations on command-line paths ──────────────
+tools/deploy.py:shutil.copy2:core function of deploy.py — copying harness files to target project
+tools/deploy.py:shutil.copytree:recursive directory copy for harness scaffold
+tools/generate_harness.py:shutil.copy2:generates .opencode/ artifacts from .kilo/ templates
+
+# ── Shell command execution for verification ──────────────────
+.github/scripts/checklist.py:subprocess.run:orchestrates ruff check, pytest, node test suites — all harness tools
+.github/scripts/eval_harness.py:subprocess.run:runs harness evaluation tests in subprocess for isolation

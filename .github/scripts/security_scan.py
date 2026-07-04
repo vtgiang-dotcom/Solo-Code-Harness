@@ -79,6 +79,8 @@ SKIP_DIRS = {
     "deer-flow-main",             # Reference project — DeerFlow 2.0 patterns
     "opencode-dev",               # OpenCode source — third-party, not harness code
     "Solo-Code-Harness",          # SoloC-Harness worktree — third-party, not harness code
+    "codebase-memory-mcp-main",   # Reference project — C MCP server for codebase memory
+    "cocoindex-code-main",        # Reference project — Rust-based code indexing tool
 }
 # Files git-ignored in this repo — skip to avoid flagging local dev secrets
 SKIP_NAMES: set[str] = {".env"}

@@ -31,9 +31,12 @@
  *     dd_device_write, win_rd_recursive, win_del_any, win_format_volume,
  *     win_stop_computer, win_restart_computer.
  *
- * KNOWN GAPS (v2.2):
+ * KNOWN GAPS (v2.6):
  *   (a) Fork bomb :(){ :|:& };: — hiếm khi model tự sinh, dễ false.
  *   (b) Obfuscated commands (base64, eval chains, variable indirection).
+ *   (c) Heredoc/command-substitution wrappers (bash <<< "$(echo ...)").
+ *   (d) Null bytes in input break regex matching.
+ *   (e) Unicode homoglyph bypass (fullwidth chars like U+FF4D).
  */
 
 import fs from 'fs';
