@@ -26,6 +26,23 @@ permissions:
 
 This file serves both **Kilo** (reads `.kilo/` for hooks/skills/memory) and **OpenCode** (reads `.opencode/` for plugins/skills/memory). Sections referencing `.kilo/` paths are Kilo-specific; OpenCode ignores them. The `.opencode/` equivalents are maintained separately in the respective `instruction/`, `skill/`, and `memory/` directories.
 
+## Harness Boundaries (READ FIRST)
+
+> **DO NOT CONFUSE harness files with project source code.**
+
+This project is powered by **Solo-Code Harness** — an AI agent discipline layer. When analyzing or modifying ANY file, first classify it:
+
+| If the file path starts with... | Then it is... | Action |
+|----------------------------------|---------------|--------|
+| `.kilo/`, `.opencode/`, `.gemini/` | Harness engine | Rules/skills/hooks for AI behavior — not project logic |
+| `.github/scripts/` | Harness verification | `security_scan.py`, `checklist.py`, `eval_harness.py` |
+| `tools/` | Harness utilities | `deploy.py`, `generate_harness.py`, `garden.py`, `harness_config.py` |
+| `.contracts/` | Harness sub-agent contracts | Status contracts for delegated agents |
+| `AGENTS.md`, `agent.yaml`, `kilo.jsonc`, `opencode.json`, `.mcp.json`, `.ruff.toml`, `.gitleaks.toml`, `Makefile`, `opencode.ps1`, `verify.sh`, `extensions_config.json`, `SPEC.md`, `.harness.lock`, `.solocode/`, `.pre-commit-config.yaml` | Harness config | Agent behavior configuration — not application config |
+| **Everything else** | **Project code** | Your actual application — this is what you modify |
+
+**Key rule:** Never modify harness files to fix a project bug. Never modify project files to fix a harness issue. Read `.harness.lock` for the authoritative boundary list.
+
 ## Self-Verification Handshake
 
 When asked "Is Solo-Code Harness active?" or "What rules apply here?", answer:

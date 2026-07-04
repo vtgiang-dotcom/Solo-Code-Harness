@@ -1,0 +1,48 @@
+# Solo-Code Harness Manifest
+# ===========================
+# File này đánh dấu ranh giới giữa harness infrastructure và code dự án.
+# AI Model: đọc file này trước khi phân tích codebase.
+#
+# MỌI FILE/THƯ MỤC trong [boundaries] là HARNESS — KHÔNG phải code dự án.
+# Không sửa, không phân tích như logic nghiệp vụ.
+
+[harness]
+version = "3.1.0"
+source = "solo-code-io/solo-code-cli"
+generated_at = "2026-07-04T14:30:00Z"
+
+[boundaries]
+# Thư mục harness — KHÔNG chứa code dự án
+dirs = [
+    ".kilo",
+    ".opencode",
+    ".gemini",
+    ".github",
+    ".contracts",
+    "tools",
+]
+
+# File gốc harness — KHÔNG phải code dự án
+files = [
+    "AGENTS.md",
+    "agent.yaml",
+    "kilo.jsonc",
+    "opencode.json",
+    ".mcp.json",
+    ".ruff.toml",
+    ".gitleaks.toml",
+    "Makefile",
+    "pyproject.toml",
+    "opencode.ps1",
+    "verify.sh",
+    "extensions_config.json",
+    "SPEC.md",
+    ".gitignore",
+    ".pre-commit-config.yaml",
+]
+
+# File đánh dấu dành riêng cho harness
+markers = [
+    ".harness.lock",
+    ".solocode",
+]

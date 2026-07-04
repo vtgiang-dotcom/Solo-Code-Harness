@@ -30,6 +30,7 @@ import argparse
 import shutil
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -46,6 +47,8 @@ ROOT_FILES = [
     ".mcp.json",
     ".gitleaks.toml",
     ".ruff.toml",
+    ".pre-commit-config.yaml",
+    "eslint.config.js",
     "pyproject.toml",
     "Makefile",
     "opencode.ps1",
@@ -54,7 +57,13 @@ ROOT_FILES = [
     "agent.yaml",
     "extensions_config.json",
     ".gitignore",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md",
+    "SECURITY.md",
 ]
+
+# `.harness.lock` is NOT in ROOT_FILES — it is generated fresh
+# for each scaffold/deploy with its own timestamp.
 
 # Directories to copy (relative to ROOT)
 DIRS_ALL = [
@@ -77,6 +86,7 @@ DIRS_OPENCODE = [
 EXCLUDE_DIRS = {
     ".pytest_cache", ".ruff_cache", "node_modules", ".git",
     "__pycache__", ".venv", "venv",
+    ".solocode", ".claude-plugin", "cocoindex-code-main", "docs",
 }
 EXCLUDE_FILES = {
     ".env", "usage.log", "usage.jsonl",
@@ -132,6 +142,82 @@ python .github/scripts/checklist.py .
 
 MIT
 """
+
+HARNESS_LOCK_TEMPLATE = """# Solo-Code Harness Manifest
+# ===========================
+# File này đánh dấu ranh giới giữa harness infrastructure và code dự án.
+# AI Model: đọc file này trước khi phân tích codebase.
+#
+# MỌI FILE/THƯ MỤC trong [boundaries] là HARNESS — KHÔNG phải code dự án.
+# Không sửa, không phân tích như logic nghiệp vụ.
+
+[harness]
+version = "{version}"
+source = "solo-code-io/solo-code-cli"
+generated_at = "{timestamp}"
+
+[boundaries]
+# Thư mục harness — KHÔNG chứa code dự án
+dirs = [
+    ".kilo",
+    ".opencode",
+    ".gemini",
+    ".github",
+    ".contracts",
+    "tools",
+]
+
+# File gốc harness — KHÔNG phải code dự án
+files = [
+    "AGENTS.md",
+    "agent.yaml",
+    "kilo.jsonc",
+    "opencode.json",
+    ".mcp.json",
+    ".ruff.toml",
+    ".gitleaks.toml",
+    "Makefile",
+    "pyproject.toml",
+    "opencode.ps1",
+    "verify.sh",
+    "extensions_config.json",
+    "SPEC.md",
+    ".gitignore",
+    ".pre-commit-config.yaml",
+]
+
+# File đánh dấu dành riêng cho harness
+markers = [
+    ".harness.lock",
+    ".solocode",
+]
+"""
+
+
+def _generate_harness_lock(target: Path, dry_run: bool = False) -> None:
+    """Generate .harness.lock with current timestamp and version."""
+    if dry_run:
+        print("  [DRY] Would generate: .harness.lock")
+        return
+
+    # Read version from source pyproject.toml
+    version = "3.1.0"
+    src_pyproject = ROOT / "pyproject.toml"
+    if src_pyproject.is_file():
+        for line in src_pyproject.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if stripped == 'dynamic = ["version"]':
+                # hatch-vcs — use fallback
+                continue
+            if stripped.startswith("fallback-version"):
+                version = stripped.split("=", 1)[1].strip().strip('"')
+                break
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    content = HARNESS_LOCK_TEMPLATE.format(version=version, timestamp=timestamp)
+    lock_path = target / ".harness.lock"
+    lock_path.write_text(content, encoding="utf-8")
+    print(f"  [NEW] .harness.lock — generated (v{version})")
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -315,6 +401,11 @@ def scaffold(
         if not dry_run:
             print(f"  Copied: {n} new, {u} updated")
 
+    # ── Step 2.5: Generate .harness.lock ─────────────────────────
+    print("\n--- .harness.lock ---")
+    _generate_harness_lock(target_path, dry_run)
+    total_new += 1
+
     # ── Step 3: Generate README.md (only if not exists) ──────────
     readme_path = target_path / "README.md"
     if not dry_run and not readme_path.exists():
@@ -473,6 +564,11 @@ def deploy(target: str, *, engine: str = "all", dry_run: bool = False) -> int:
 
         if not dry_run:
             print(f"  Copied: {n} new, {u} updated")
+
+    # ── Generate .harness.lock ──────────────────────────────────
+    print("\n--- .harness.lock ---")
+    _generate_harness_lock(target_path, dry_run)
+    total_new += 1
 
     print()
     print("=" * 60)
