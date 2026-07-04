@@ -24,6 +24,13 @@ updated: 2026-06-01
 - Never commit `.env` files, credentials, or API keys.
 - Use environment variables for all secrets.
 - Run `python .github/scripts/security_scan.py .` before deployment.
+- `security-allowlist.txt` at `.github/scripts/` — every dangerous call must have a justification.
+
+## Pull Requests
+
+- All PRs must use `.github/pull_request_template.md`.
+- All verification gates in the template checklist must pass before merge.
+- Run `python .github/scripts/check_skips.py .opencode/tests/` — no unconditional skips.
 
 ## Config System
 

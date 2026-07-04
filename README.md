@@ -25,8 +25,14 @@ make garden            # Drift detection (.kilo vs .opencode)
 # Integration tests (182 checks)
 python tools/test_integration.py
 
-# Guard plugin tests (63 cases)
+# Guard plugin tests (80 cases, v2.6)
 node .opencode/tests/test-guard.mjs
+
+# Bug reproduction suite (non-gating)
+node .opencode/tests/repro/test-repro.mjs
+
+# No-skips test policy
+python .github/scripts/check_skips.py .opencode/tests/
 ```
 
 ## Scaffold & Deploy
@@ -81,7 +87,7 @@ python tools/deploy.py
 | `.opencode/` | **Primary** — OpenCode: agents (14), skills (39), plugin v2.5, commands (4), tools (2), state (5) |
 | `.kilo/` | Kilo Code: agents (14), skills (44), hooks, memory, instruction |
 | `.gemini/` | Gemini/Antigravity: agents (14), skills (44), commands (12), knowledge |
-| `.github/` | Shared scripts: `security_scan.py`, `checklist.py`, `eval_harness.py` |
+| `.github/` | Shared scripts: `security_scan.py`, `checklist.py`, `check_skips.py`, `eval_harness.py`, `security-allowlist.txt` |
 | `tools/` | Generator, validator, drift detector, integration tests |
 | `docs/specs/` | Architecture specs, migration plans, historical docs |
 
@@ -95,7 +101,9 @@ python tools/deploy.py
 | Harness Tests | `make test` | Generator (15 tests) |
 | Integration | `python tools/test_integration.py` | Full .opencode/ structure (182 checks) |
 | Security | `make security-scan` | Hardcoded secrets (337 files) |
-| Guard | `node .opencode/tests/test-guard.mjs` | Destructive command patterns (63 tests) |
+| Guard | `node .opencode/tests/test-guard.mjs` | Destructive command + fuzz payloads (80 tests, v2.6) |
+| No-Skips | `python .github/scripts/check_skips.py .opencode/tests/` | Unauthorized test skips (skip/skipif without reason) |
+| Repro | `node .opencode/tests/repro/test-repro.mjs` | Bug reproduction suite (RED tests, non-gating) |
 
 ## OpenCode Commands
 
@@ -192,8 +200,14 @@ make garden            # Drift detection (.kilo vs .opencode)
 # Integration tests (182 checks)
 python tools/test_integration.py
 
-# Guard plugin tests (63 cases)
+# Guard plugin tests (80 cases, v2.6)
 node .opencode/tests/test-guard.mjs
+
+# Bug reproduction suite (non-gating)
+node .opencode/tests/repro/test-repro.mjs
+
+# No-skips test policy
+python .github/scripts/check_skips.py .opencode/tests/
 ```
 
 ## Scaffold & Deploy
@@ -262,7 +276,9 @@ python tools/deploy.py
 | Harness Tests | `make test` | Generator (15 tests) |
 | Integration | `python tools/test_integration.py` | Cấu trúc .opencode/ đầy đủ (182 checks) |
 | Security | `make security-scan` | Secret hardcode (337 files) |
-| Guard | `node .opencode/tests/test-guard.mjs` | Mẫu lệnh phá hoại (63 tests) |
+| Guard | `node .opencode/tests/test-guard.mjs` | Mẫu lệnh phá hoại + fuzz payloads (80 tests, v2.6) |
+| No-Skips | `python .github/scripts/check_skips.py .opencode/tests/` | Skip/skipif không lý do |
+| Repro | `node .opencode/tests/repro/test-repro.mjs` | Bug reproduction suite (RED tests, non-gating) |
 
 ## OpenCode Commands
 

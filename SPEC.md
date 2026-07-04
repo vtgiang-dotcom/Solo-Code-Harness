@@ -71,14 +71,14 @@ Phải tồn tại các thư mục: .claude/ .github/ .gemini/ .kilo/ .vscode/
 ## 3. Permission Guard (cơ chế an toàn cốt lõi) [HARD]
 
 - Phải có guard tại .github/hooks/scripts/ chặn thao tác phá hủy.
-- Phải có bộ test guard chạy được và đạt 29/29:
+- Phải có bộ test guard chạy được và đạt 80/80:
   - CHO QUA (ALLOW): đọc file, npm install, git status, git commit,
     tạo file an toàn, tool lạ, JSON sai định dạng.
   - CHẶN/HỎI (ASK): rm -rf, rm -r, rm --force, del /f, rmdir /s,
     DROP TABLE, TRUNCATE TABLE, git push --force, git reset --hard,
     git clean -fdx, mkfs, shred, dd if=, ghi .env, ghi credentials,
     ghi .pem, ghi .key, delete_file, remove_file, deleteFile.
-    > Kiểm chứng: verify.sh [TESTS] guard.test.js 29/29.
+    > Kiểm chứng: verify.sh [TESTS] guard.test.js 80/80.
 
 ## 4. Script automation [HARD]
 

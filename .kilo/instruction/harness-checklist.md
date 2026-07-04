@@ -46,6 +46,8 @@
 - [ ] Scope boundaries (in-scope / out-of-scope) are written down
 - [ ] IMPLEMENT.md captures decisions and deviations as they happen
 - [ ] `/plan`, `/decide`, `/verify` commands are functional
+- [ ] `.github/pull_request_template.md` exists and includes all verification gates
+- [ ] Repro suite (`.opencode/tests/repro/`) tracks known bugs with bug IDs
 
 ## Permissions & sandbox
 
@@ -57,11 +59,13 @@
 
 ## Verification loop
 
-- [ ] Tests exist for the agent's outputs (`test_harness.py`, `eval_harness.py`)
+- [ ] Tests exist for the agent's outputs (`test_harness.py`, `eval_harness.py`, `test-guard.mjs`, `test-repro.mjs`, `check_skips.py`)
 - [ ] The agent can run the verification command itself (`checklist.py`)
 - [ ] Verification runs automatically on task completion, not just on PR
 - [ ] Eval criteria are written down before the task starts, not after
 - [ ] Security scan passes before any commit
+- [ ] No-skips policy enforced: `python .github/scripts/check_skips.py .opencode/tests/`
+- [ ] All "dangerous" calls in `security-allowlist.txt` have current, correct justifications
 
 ## Observability
 
@@ -86,6 +90,8 @@
 | session-end.js | Observability must be captured at session boundary | Runtime provides native telemetry and cost tracking |
 | security_scan.py | CI must independently verify code safety | Model output is guaranteed safe by construction |
 | checklist.py | Manual verification pipeline needed | Integrated CI/CD with agent-native checkpoints |
+| check_skips.py | Model/developer may add skip() markers that silently degrade coverage | All test frameworks enforce skip-justification natively |
+| security-allowlist.txt | Security scanner false-positives need auditable justification trail | All "dangerous" patterns detectable statically without exceptions |
 | eval_harness.py | Harness behavior must be independently tested | Harness is verified by model provider's compliance testing |
 
 ---

@@ -1,5 +1,5 @@
-// solocode-guard test suite (v2.4)
-// Tests all 33 BLOCK_PATTERNS + normalizeCommand
+// solocode-guard test suite (v2.6)
+// Tests all 33 BLOCK_PATTERNS + normalizeCommand + fuzz payloads (80 test cases)
 // Run: node .opencode/tests/test-guard.mjs
 
 const BLOCK_PATTERNS = [

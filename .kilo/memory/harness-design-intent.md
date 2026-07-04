@@ -16,7 +16,8 @@ AGENTS.md        → Behavior rules, anti-hallucination, prose quality, harness 
 .kilo/hookify/   → MD-config rules engine (user-customizable policies)
 .kilo/prompts/   → Structured workflow templates (code review, feature dev...)
 tools/           → Harness utilities (deploy, generate, garden, harness_config)
-.github/scripts/ → Verification gates (security_scan, checklist, eval_harness)
+.opencode/tests/ → Guard tests (80 cases, v2.6) + repro suite (4 known bugs)
+.github/scripts/ → Verification gates (security_scan, checklist, check_skips, eval_harness, security-allowlist)
 .contracts/      → Sub-agent status contracts (DeerFlow pattern)
 kilo.jsonc       → Permission model (bash allow/deny, task allow/deny)
 ```
@@ -36,6 +37,9 @@ kilo.jsonc       → Permission model (bash allow/deny, task allow/deny)
 | 4-agent parallel review | Single-agent review misses bugs |
 | 14 specialized agents | Generalist agent makes mistakes in domain-specific work |
 | Deploy/scaffold (deploy.py) | Manual copy-paste errors when replicating harness to new projects |
+| Security allow-list | "Dangerous" calls (subprocess, os.environ) lack auditable justifications — scan false negatives |
+| No-skips policy (check_skips.py) | Test coverage silently degrades via unconditional skip/skipif markers |
+| Bug-repro suite (tests/repro/) | Known bugs forgotten, never tracked or prioritized |
 
 ## Modification Policy
 
@@ -48,8 +52,11 @@ kilo.jsonc       → Permission model (bash allow/deny, task allow/deny)
 
 | Metric | Target |
 |--------|--------|
-| Secret scan | 0 findings |
+| Security scan | 0 findings |
 | Ruff lint | 0 errors |
+| Check skips | 0 unauthorized skips |
 | Harness eval | 59/59 pass |
+| Guard tests | 80/80 pass (v2.6) |
 | Gate guard | 0 false blocks |
 | Hook uptime | 100% (all stdin.resume present) |
+| Repro suite | 4 known bugs tracked |

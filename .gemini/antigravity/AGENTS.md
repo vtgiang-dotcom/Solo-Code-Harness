@@ -13,10 +13,10 @@ This project is powered by **Solo-Code Harness** — an AI agent discipline laye
 | If the file path starts with... | Then it is... | Action |
 |----------------------------------|---------------|--------|
 | `.gemini/`, `.kilo/`, `.opencode/` | Harness engine | Rules/skills/hooks for AI behavior — not project logic |
-| `.github/scripts/` | Harness verification | `security_scan.py`, `checklist.py` |
+| `.github/scripts/` | Harness verification | `security_scan.py`, `checklist.py`, `check_skips.py`, `eval_harness.py` |
 | `tools/` | Harness utilities | `deploy.py`, `generate_harness.py`, `garden.py`, `harness_config.py` |
 | `.contracts/` | Harness sub-agent contracts | Status contracts for delegated agents |
-| `AGENTS.md`, `agent.yaml`, `kilo.jsonc`, `opencode.json`, `.mcp.json`, `.ruff.toml`, `.gitleaks.toml`, `Makefile`, `opencode.ps1`, `verify.sh`, `extensions_config.json`, `SPEC.md`, `.harness.lock`, `.solocode/`, `.pre-commit-config.yaml` | Harness config | Agent behavior configuration — not application config |
+| `AGENTS.md`, `agent.yaml`, `kilo.jsonc`, `opencode.json`, `.mcp.json`, `.ruff.toml`, `.gitleaks.toml`, `Makefile`, `opencode.ps1`, `verify.sh`, `extensions_config.json`, `SPEC.md`, `.harness.lock`, `.solocode/`, `.pre-commit-config.yaml`, `.github/pull_request_template.md` | Harness config | Agent behavior configuration — not application config |
 | **Everything else** | **Project code** | Your actual application — this is what you modify |
 
 **Key rule:** Never modify harness files to fix a project bug. Never modify project files to fix a harness issue. Read `.harness.lock` for the authoritative boundary list.
@@ -187,6 +187,7 @@ For full details, see `.gemini/antigravity/instruction/security-patterns.md`.
 Before marking any task complete, verify:
 - [ ] `python .github/scripts/security_scan.py .` passes
 - [ ] `python .github/scripts/checklist.py .` passes
+- [ ] `python .github/scripts/check_skips.py .opencode/tests/` passes (0 unauthorized skips)
 - [ ] No console.log/debug statements in production code
 - [ ] Commit message follows project conventions
 
