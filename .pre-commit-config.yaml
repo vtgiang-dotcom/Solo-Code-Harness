@@ -1,0 +1,55 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+        exclude: ^(\.kilo/|\.opencode/|cocoindex-code-main/)
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+        exclude: ^cocoindex-code-main/
+      - id: check-json
+        exclude: ^cocoindex-code-main/
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: check-merge-conflict
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.1
+    hooks:
+      - id: ruff
+        args: [--fix]
+        exclude: ^cocoindex-code-main/
+      - id: ruff-format
+        exclude: ^cocoindex-code-main/
+
+  - repo: local
+    hooks:
+      - id: validate-schemas
+        name: Validate agent/skill schemas
+        entry: python tools/validate_schemas.py
+        language: system
+        types: [text]
+        files: ^(\.kilo/agents/|\.kilo/skill/|\.opencode/agents/|\.opencode/skill/)
+        pass_filenames: false
+
+      - id: garden-drift
+        name: Garden drift detection
+        entry: python tools/garden.py
+        language: system
+        pass_filenames: false
+
+      - id: security-scan
+        name: Security scan
+        entry: python .github/scripts/security_scan.py .
+        language: system
+        pass_filenames: false
+
+      - id: eslint
+        name: ESLint (Node.js plugins)
+        entry: npx eslint --max-warnings 0
+        language: system
+        files: ^\.opencode/plugins/.*\.js$
+        pass_filenames: false
+        # ESLint is optional — gracefully skip if not installed
+        always_run: false
