@@ -7,13 +7,17 @@ Solo-Code Harness is a multi-layer quality and safety system for AI coding agent
 ## Architecture Layers
 
 ```
-AGENTS.md        → Behavior rules, anti-hallucination, prose quality
+AGENTS.md        → Behavior rules, anti-hallucination, prose quality, harness boundaries
+.harness.lock    → Boundary manifest — which files are harness vs project code
 .kilo/instruction/ → Language-specific rules (Python, TS, Git, DB)
-.kilo/skill/     → 10 domain skills (code-review, debugging, testing...)
-.kilo/agents/    → 12 specialized agents with handoff chains
-.kilo/hooks/     → 17 lifecycle hooks (bash validation, secret scan, learning...)
+.kilo/skill/     → 44 domain skills (code-review, debugging, testing...)
+.kilo/agents/    → 14 specialized agents with handoff chains
+.kilo/hooks/     → 20 lifecycle hooks (bash validation, secret scan, learning...)
 .kilo/hookify/   → MD-config rules engine (user-customizable policies)
 .kilo/prompts/   → Structured workflow templates (code review, feature dev...)
+tools/           → Harness utilities (deploy, generate, garden, harness_config)
+.github/scripts/ → Verification gates (security_scan, checklist, eval_harness)
+.contracts/      → Sub-agent status contracts (DeerFlow pattern)
 kilo.jsonc       → Permission model (bash allow/deny, task allow/deny)
 ```
 
@@ -21,14 +25,17 @@ kilo.jsonc       → Permission model (bash allow/deny, task allow/deny)
 
 | Layer | Prevents |
 |-------|----------|
-| Anti-hallucination rules (A1-A5) | Model invents APIs, libraries, non-existent params |
-| Prose quality rules (8-15) | AI-tell patterns: clichés, filler phrases, handwavy claims |
+| Anti-hallucination rules (A1-A6) | Model invents APIs, libraries, non-existent params, loops forever |
+| Harness Boundaries (AGENTS.md + .harness.lock) | AI confuses harness files with project code, modifies rules instead of fixing bugs |
+| Prose quality rules (9-16) | AI-tell patterns: clichés, filler phrases, handwavy claims |
+| Hierarchical config (harness_config.py) | Config scattered across .env, hardcoded values — no per-project overrides |
 | 7-category gate guard | rm -rf, force push, SQL injection, disk destruction |
 | Hookify MD engine | User needs custom policies without editing JS |
 | Continual learning | Agent forgets everything between sessions |
 | Ralph Loop | Agent stops work early, doesn't iterate |
 | 4-agent parallel review | Single-agent review misses bugs |
-| 12 specialized agents | Generalist agent makes mistakes in domain-specific work |
+| 14 specialized agents | Generalist agent makes mistakes in domain-specific work |
+| Deploy/scaffold (deploy.py) | Manual copy-paste errors when replicating harness to new projects |
 
 ## Modification Policy
 

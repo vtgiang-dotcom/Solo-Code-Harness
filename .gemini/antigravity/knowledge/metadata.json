@@ -1,37 +1,37 @@
 {
   "conventions": {
     "summary": "Project coding style, git workflows, and security standards.",
-    "updated_at": "2026-06-07T12:00:00+07:00",
+    "updated_at": "2026-07-04T12:00:00+07:00",
     "references": [
-      "d:\\Project\\Solo-Code-CLI\\.gemini\\antigravity\\knowledge\\artifacts\\project-conventions.md"
+      "knowledge/artifacts/project-conventions.md"
     ]
   },
   "security": {
     "summary": "Security patterns: input validation, SQL injection prevention, credential management, XSS, command injection.",
-    "updated_at": "2026-06-07T12:00:00+07:00",
+    "updated_at": "2026-07-04T12:00:00+07:00",
     "references": [
-      "d:\\Project\\Solo-Code-CLI\\.gemini\\antigravity\\knowledge\\artifacts\\security-patterns.md"
+      "knowledge/artifacts/security-patterns.md"
     ]
   },
   "anti-hallucination": {
-    "summary": "Anti-hallucination rules: verify libraries, no invented signatures, compiling ≠ correct, no restated-code comments.",
-    "updated_at": "2026-06-07T12:00:00+07:00",
+    "summary": "Anti-hallucination rules (A1-A6): verify libraries, no invented signatures, compiling ≠ correct, no restated-code comments, acknowledge uncertainty, loop detection.",
+    "updated_at": "2026-07-04T12:00:00+07:00",
     "references": [
-      "d:\\Project\\Solo-Code-CLI\\.gemini\\antigravity\\knowledge\\artifacts\\anti-hallucination-rules.md"
+      "knowledge/artifacts/anti-hallucination-rules.md"
     ]
   },
   "prose-quality": {
     "summary": "Prose quality rules adapted from The Elements of Agent Style (Zhao, 2026). 8 rules to reduce AI-tell patterns.",
-    "updated_at": "2026-06-07T12:00:00+07:00",
+    "updated_at": "2026-07-04T12:00:00+07:00",
     "references": [
-      "d:\\Project\\Solo-Code-CLI\\.gemini\\antigravity\\knowledge\\artifacts\\prose-quality-rules.md"
+      "knowledge/artifacts/prose-quality-rules.md"
     ]
   },
   "project-architecture": {
-    "summary": "Tài liệu kiến trúc hệ thống, luồng hoạt động dữ liệu và lưu ý (gotchas) của dự án Solo-Code Harness.",
-    "updated_at": "2026-06-07T12:00:00+07:00",
+    "summary": "System architecture, data flow, and gotchas for Solo-Code Harness.",
+    "updated_at": "2026-07-04T12:00:00+07:00",
     "references": [
-      "d:\\Project\\Solo-Code-CLI\\.gemini\\antigravity\\knowledge\\artifacts\\project-architecture.md"
+      "knowledge/artifacts/project-architecture.md"
     ]
   }
 }

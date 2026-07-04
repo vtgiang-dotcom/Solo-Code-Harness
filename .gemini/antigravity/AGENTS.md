@@ -2,12 +2,29 @@
 
 > **CRITICAL:** Read this file fully before taking any action. These rules are NON-NEGOTIABLE.
 
-The Solo-Code Harness loads automatically from `.gemini/antigravity/`. The AI reads `AGENTS.md`, `memory/`, and `skills/` at session start.
+The Solo-Code Harness loads automatically from `.gemini/antigravity/`. The AI reads `AGENTS.md`, `knowledge/`, and `skills/` at session start. For boundary authority, see `.harness.lock` and root `AGENTS.md`.
+
+## Harness Boundaries (READ FIRST)
+
+> **DO NOT CONFUSE harness files with project source code.**
+
+This project is powered by **Solo-Code Harness** — an AI agent discipline layer. When analyzing or modifying ANY file, first classify it:
+
+| If the file path starts with... | Then it is... | Action |
+|----------------------------------|---------------|--------|
+| `.gemini/`, `.kilo/`, `.opencode/` | Harness engine | Rules/skills/hooks for AI behavior — not project logic |
+| `.github/scripts/` | Harness verification | `security_scan.py`, `checklist.py` |
+| `tools/` | Harness utilities | `deploy.py`, `generate_harness.py`, `garden.py`, `harness_config.py` |
+| `.contracts/` | Harness sub-agent contracts | Status contracts for delegated agents |
+| `AGENTS.md`, `agent.yaml`, `kilo.jsonc`, `opencode.json`, `.mcp.json`, `.ruff.toml`, `.gitleaks.toml`, `Makefile`, `opencode.ps1`, `verify.sh`, `extensions_config.json`, `SPEC.md`, `.harness.lock`, `.solocode/`, `.pre-commit-config.yaml` | Harness config | Agent behavior configuration — not application config |
+| **Everything else** | **Project code** | Your actual application — this is what you modify |
+
+**Key rule:** Never modify harness files to fix a project bug. Never modify project files to fix a harness issue. Read `.harness.lock` for the authoritative boundary list.
 
 ## Self-Verification Handshake
 
 When asked "Is Solo-Code Harness active?" or "What rules apply here?", answer:
-`Solo-Code Harness active: behavior rules, security rules, prose quality rules, 10 skills, 10 agents.`
+`Solo-Code Harness active: behavior rules, anti-hallucination rules, security rules, prose quality rules, 32 skills, 15 agents. Use /verify to validate.`
 
 ## Escape Hatch (Meta-Principle)
 
@@ -18,13 +35,33 @@ Rules are guides to quality and safety, not ends in themselves. When a rule figh
 
 ---
 
+## Fresh Information First (ANTI-STALENESS)
+
+**Your training data is a snapshot. SDKs and APIs change after your cutoff.**
+
+Before using ANY library you're not 100% certain about:
+1. **Verify it exists** — Check `package.json`, `requirements.txt`, or existing imports
+2. **Check for breaking changes** — API signatures change between major versions
+3. **Mark uncertainty** — If unverified, tag `// VERIFY: <lib>.<symbol> against version X`
+
+---
+
+## Surgical Changes (TOUCH ONLY WHAT YOU MUST)
+
+- **Don't "improve" adjacent code** — Your job is the requested change, not a style overhaul
+- **Don't refactor things that aren't broken** — Refactoring is a separate task
+- **Match existing style** — Consistency within a file beats your preference
+- **Clean up only your own mess** — Remove only what YOUR changes made unused
+
+---
+
 ## Request Classification (STEP 1 — BEFORE ANY TOOL)
 
 | Type             | Trigger                                   | Action                                              |
 | ---------------- | ----------------------------------------- | --------------------------------------------------- |
 | **QUESTION**     | "what is", "explain", "how does"          | Text only. No tools.                                |
 | **SIMPLE EDIT**  | Single-file fix, typo, small change       | Read → Edit → Verify                                |
-| **COMPLEX TASK** | "build", "create", "refactor", multi-file | Plan → Get approval → Implement                     |
+| **COMPLEX TASK** | "build", "create", "refactor", multi-file | Plan → Get approval → Implement → Verify            |
 | **DESTRUCTIVE**  | "delete", "rm", "drop", "force push"      | **STOP** → Ask explicit permission → Wait for "yes" |
 | **REVIEW**       | "review", "audit", "check this PR"        | Load code-review-expert skill                       |
 
@@ -36,7 +73,7 @@ Rules are guides to quality and safety, not ends in themselves. When a rule figh
 
 1. **BEFORE any destructive operation** (rm, delete, drop table, force push) → STOP. Ask explicit Yes/No.
 2. **BEFORE committing or pushing** → Scan diff for secrets. Refuse to commit if secrets detected.
-3. **Never use destructive git commands** (`push --force`, `reset --hard`) unless user explicitly requests.
+3. **Never use destructive git commands** (`push --force`, `reset --hard`) unless user explicitly requests. Never force-push to main/master.
 4. **Permission Guard**: Load `permission-guard` skill before any delete, credential access, or config change.
 
 ### Code Quality
@@ -46,32 +83,37 @@ Rules are guides to quality and safety, not ends in themselves. When a rule figh
 7. **Preserve existing patterns.** Match code style, naming, and structure.
 8. **Never leave broken code.** Verify syntax after any edit.
 
+### AI Discipline (Anti-Hallucination)
+
+A-1. **Verify library existence before using it.** Check `package.json`, `requirements.txt`, or imports for the actual installed version.
+A-2. **No invented function signatures, parameter names, or return types.** Never guess a library's API.
+A-3. **Compiling does not mean correct.** Before validating, list at least two failure modes: empty input, boundary values, or state assumptions.
+A-4. **No restated-code comments.** Comments must explain WHY, not paraphrase WHAT.
+A-5. **Acknowledge uncertainty explicitly.** If you do not know something, say "I do not know".
+A-6. **Loop detection.** If the same tool is called 3+ times consecutively with the same parameters, change strategy immediately.
+
 ### Prose Quality (MANDATORY)
 
-Inspired by *"The Elements of Agent Style"* (Zhao, 2026). Self-check all technical prose output against these rules:
-
-| # | Rule | Severity | Enforcement |
-|---|------|----------|-------------|
-| 9 | **Cut needless words** — never use "in order to" (→ "to"), "due to the fact that" (→ "because"), "it is important to note that" (→ delete), "may potentially" (→ "may"). | `high` | Self-check |
-| 10 | **Drop dying metaphors** — never use "pushes the boundaries", "paradigm shift", "state of the art", "paves the way". Replace with specific numbers, or delete. | `high` | Self-check |
-| 11 | **Use concrete terms over abstraction** — replace "factors", "aspects", "various metrics" with specific items. | `high` | Self-check |
-| 12 | **Prefer plain English** — "use" over "leverage"/"utilize"; "method" over "methodology". | `medium` | Self-check |
-| 13 | **Do not overuse transition words** — avoid opening sentences with "Additionally", "Furthermore", "Moreover". | `medium` | Self-check |
-| 14 | **Varied sentence starts** — do not open consecutive sentences with the same word. | `medium` | Self-check |
-| 15 | **Support claims with evidence** — never write handwavy attributions without naming the source. Never fabricate citations. | `critical` | Mandatory: verify before writing |
-| 16 | **Split long sentences** — split sentences over 30 words. Vary sentence length. | `high` | Self-check |
+| # | Rule | Severity |
+|---|------|----------|
+| 9 | **Cut needless words** — never "in order to" (→ "to"), "due to the fact that" (→ "because"), "it is important to note that" (→ delete), "may potentially" (→ "may"). | `high` |
+| 10 | **Drop dying metaphors** — never "pushes the boundaries", "paradigm shift", "state of the art", "cutting edge", "paves the way", "unlock the potential", "game changer". | `high` |
+| 11 | **Use concrete terms** — replace "factors", "aspects", "considerations" with specific items. | `high` |
+| 12 | **Prefer plain English** — "use" over "leverage"/"utilize"; "method" over "methodology". | `medium` |
+| 13 | **No transition-word openers** — avoid "Additionally", "Furthermore", "Moreover" at sentence start. | `medium` |
+| 14 | **Varied sentence starts** — never open two consecutive sentences with the same word. | `medium` |
+| 15 | **Support claims with evidence** — never write "prior work shows" without naming the source. Never fabricate citations. | `critical` |
+| 16 | **Split long sentences** — split sentences over 30 words. Vary sentence length. | `high` |
 
 #### BAD → GOOD Examples
 
-- BAD: `This PR makes some minor adjustments in order to fix an issue that was causing failures in certain test cases.`
+- BAD: `This PR makes minor adjustments to fix an issue causing test failures.`
 - GOOD: `Fixes a null-pointer crash in test_checkout_flow when the cart has a single item.`
-
-- BAD: `We leverage state-of-the-art embedding models to unlock the full potential of the retrieval pipeline.`
-- GOOD: `We use OpenAI text-embedding-3-large, raising retrieval recall@10 by 7 points over ada-002.`
+- BAD: `We leverage state-of-the-art embedding models to unlock the retrieval pipeline's potential.`
+- GOOD: `We use text-embedding-3-large, raising recall@10 by 7 points over ada-002.`
 
 ### Skills to Load by Context
 
-The following skills auto-load based on task context:
 | When | Load Skill |
 |------|------------|
 | Reviewing code, PRs, diffs | `code-review-expert` |
@@ -81,11 +123,13 @@ The following skills auto-load based on task context:
 | Debugging, errors, failures | `systematic-debugging` |
 | Brainstorming, designing | `brainstorming` |
 | Writing tests, TDD | `testing-patterns` |
+| Designing APIs, interfaces | `api-patterns` |
+| Harness internals, skills, agents | `solo-code-harness` |
 
 ### Complex Tasks
 
 17. **Socratic Gate:** For complex requests, ask at least 2 clarifying questions before coding.
-18. **Plan before implement:** Present plan → Get approval → Execute (sử dụng `implementation_plan.md`, `task.md` và `walkthrough.md`).
+18. **Plan before implement:** Present plan → Get approval → Execute.
 19. **Synthesize, don't delegate blindly:** When using sub-agents, read findings and write specific implementation instructions.
 
 ---
@@ -96,7 +140,7 @@ The following skills auto-load based on task context:
 | ---------------- | ----------------------------------------------- |
 | Search code      | `grep_search`                                   |
 | Read files       | `view_file`                                     |
-| Edit files       | `replace_file_content` (contigous edit), `multi_replace_file_content` (non-contiguous) |
+| Edit files       | `replace_file_content` (contiguous edit), `multi_replace_file_content` (non-contiguous) |
 | Run commands     | `run_command`                                   |
 | Complex research | Spawn `browser_subagent` if browser interaction is needed |
 
@@ -106,6 +150,10 @@ The following skills auto-load based on task context:
 
 ```
 type: concise summary (max 72 chars)
+
+Optional body: 1-2 sentences explaining WHY.
+
+Co-Authored-By: Solo-Code <admin@solo-code.com>
 ```
 
 **Types:** `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`
@@ -118,7 +166,7 @@ type: concise summary (max 72 chars)
 Persistent memory at `.gemini/antigravity/knowledge/`. The AI reads Knowledge Items (KIs) at session start.
 
 - `knowledge/metadata.json` — Index of all knowledge items
-- `knowledge/artifacts/project-conventions.md` — Git, code style, security rules
+- `knowledge/artifacts/` — Memory files (project-conventions, anti-hallucination, prose-quality, security-patterns, project-architecture)
 
 ---
 
@@ -129,6 +177,18 @@ Key enforcement points:
 - **Use parameterized queries** for SQL — never string interpolation
 - **Never hardcode credentials** — use environment variables
 - **Passwords** must use bcrypt/scrypt/argon2 — never MD5/SHA1
+
+For full details, see `.gemini/antigravity/instruction/security-patterns.md`.
+
+---
+
+## Verification Gates
+
+Before marking any task complete, verify:
+- [ ] `python .github/scripts/security_scan.py .` passes
+- [ ] `python .github/scripts/checklist.py .` passes
+- [ ] No console.log/debug statements in production code
+- [ ] Commit message follows project conventions
 
 ---
 
@@ -149,10 +209,10 @@ Auto-loaded when editing files by extension. See `.gemini/antigravity/instructio
 
 | Language | Rule File | Key Rules |
 |----------|-----------|-----------|
-| Python | `.gemini/antigravity/instruction/rules-python.md` | PEP 8, type hints, parameterized queries, pytest |
-| TypeScript/JS | `.gemini/antigravity/instruction/rules-typescript.md` | No `any`, React keys, XSS prevention |
-| SQL/DB | `.gemini/antigravity/instruction/rules-database.md` | Index FKs, cursor pagination, parameterized queries |
-| Git | `.gemini/antigravity/instruction/rules-git.md` | Conventional commits, branch naming |
+| Python | `instruction/rules-python.md` | PEP 8, type hints, parameterized queries, pytest |
+| TypeScript/JS | `instruction/rules-typescript.md` | No `any`, React keys, XSS prevention |
+| SQL/DB | `instruction/rules-database.md` | Index FKs, cursor pagination, parameterized queries |
+| Git | `instruction/rules-git.md` | Conventional commits, branch naming |
 
 ## Specialized Subagents
 
@@ -160,13 +220,20 @@ Available for domain-specific work. See `.gemini/antigravity/agents/`:
 
 | Agent | Purpose |
 |-------|---------|
-| `planner` | Implementation planning for complex features |
-| `tdd-guide` | Test-driven development enforcement |
-| `python-reviewer` | Python code review |
-| `typescript-reviewer` | TS/JS code review |
+| `architect` | System architecture design, trade-off evaluation |
+| `code-reviewer` | Multi-axis code review (quality, security, performance) |
+| `code-simplifier` | Simplify code for clarity without changing behavior |
+| `code-skeptic` | Adversarial review — stress-test assumptions |
 | `database-reviewer` | DB query/schema/migration review |
-| `architect` | System design decisions |
-| `refactor-cleaner` | Dead code and code smell cleanup |
+| `planner` | Implementation planning for complex features |
+| `python-reviewer` | Python code review — PEP 8, type hints, Pythonic patterns |
+| `refactor-cleaner` | Dead code cleanup, logic simplification |
+| `security-auditor` | Security audit — secrets, vulnerabilities, misconfigurations |
+| `solo-code-engineer` | Primary engineer — rules enforcement, verification gates |
+| `tdd-guide` | Test-driven development enforcement |
+| `test-engineer` | QA — test coverage, test strategy, regression testing |
+| `typescript-reviewer` | TS/JS code review — types, React patterns, XSS, async safety |
+| `web-performance-auditor` | Core Web Vitals, loading, rendering, network performance |
 
 ---
 

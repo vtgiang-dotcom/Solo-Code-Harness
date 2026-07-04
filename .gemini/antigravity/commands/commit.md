@@ -34,7 +34,7 @@ type: concise summary (max 72 chars)
 
 Optional body: 1-2 sentences explaining WHY.
 
-Co-Authored-By: Claude Code <noreply@anthropic.com>
+Co-Authored-By: Solo-Code <admin@solo-code.com>
 ```
 
 **Types:** feat, fix, refactor, docs, test, chore, perf

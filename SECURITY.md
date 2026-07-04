@@ -43,5 +43,5 @@ Key security boundaries:
 | Config protection | 19 protected config files (ESLint, Prettier, Ruff, etc.) |
 | Input validation | All user input treated as untrusted |
 
-For architecture details, see `.kilohack/instruction/security-patterns.md` and
+For architecture details, see `.kilo/instruction/security-patterns.md` and
 `AGENTS.md` Security Rules section.

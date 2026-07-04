@@ -26,8 +26,8 @@ metadata:
 - **user** — who the user is, expertise, preferences
 
 ### Location
-- Project memory: `.claude/memory/` (one file per fact)
-- Index file: `.claude/memory/MEMORY.md` (update this too)
+- Project memory: `.gemini/antigravity/knowledge/` (one file per fact)
+- Index file: `.gemini/antigravity/knowledge/MEMORY.md` (update this too)
 
 ### Before Saving
 - Check if an existing memory file already covers this → update instead of duplicating
