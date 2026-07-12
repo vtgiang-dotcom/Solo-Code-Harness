@@ -2,7 +2,7 @@
 mode: primary
 variant: high
 color: "#F59E0B"
-steps: 60
+steps: 30
 permissions:
     - action: read
       resource: "*"

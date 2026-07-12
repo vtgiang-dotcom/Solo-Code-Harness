@@ -31,7 +31,7 @@ Issues = "https://github.com/solo-code-io/solo-code-cli/issues"
 
 [tool.hatch.version]
 source = "vcs"
-fallback-version = "3.1.0"
+fallback-version = "3.3.0"
 
 [tool.hatch.build.hooks.vcs]
 version-file = "tools/_version.py"

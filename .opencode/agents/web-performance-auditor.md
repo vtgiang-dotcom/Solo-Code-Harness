@@ -1,5 +1,4 @@
 ---
-description: "Web performance auditor — audits Core Web Vitals, loading, rendering, and network performance"
 mode: subagent
 variant: medium
 color: "#F97316"

@@ -27,5 +27,7 @@ node_modules/
 Thumbs.db
 
 # IDE
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/mcp.json
 .idea/

@@ -1,0 +1,276 @@
+{
+  "$schema": "https://raw.githubusercontent.com/github/copilot/main/schemas/settings.schema.json",
+  "github.copilot.chat.codeGeneration.instructions": [
+    {
+      "file": ".github/copilot-instructions.md"
+    }
+  ],
+  "github.copilot.chat.models": [
+    {
+      "name": "DeepSeek V4 Pro",
+      "description": "DeepSeek V4 Pro — flagship, 128K context, deep reasoning, cost-effective",
+      "vendor": "deepseek",
+      "family": "deepseek-v4-pro",
+      "model": "deepseek-v4-pro",
+      "apiKey": "${DEEPSEEK_API_KEY}",
+      "baseUrl": "${DEEPSEEK_BASE_URL}",
+      "version": "deepseek-v4-pro"
+    },
+    {
+      "name": "DeepSeek V4 Flash",
+      "description": "DeepSeek V4 Flash — fast, lightweight, budget-friendly coding",
+      "vendor": "deepseek",
+      "family": "deepseek-v4-flash",
+      "model": "deepseek-v4-flash",
+      "apiKey": "${DEEPSEEK_API_KEY}",
+      "baseUrl": "${DEEPSEEK_BASE_URL}",
+      "version": "deepseek-v4-flash"
+    },
+    {
+      "name": "Claude Haiku 4.5 (via CC)",
+      "description": "Anthropic Claude Haiku — fast, lightweight coding tasks",
+      "vendor": "commandcode",
+      "family": "claude",
+      "model": "claude-haiku-4-5-20251001",
+      "apiKey": "${COMMANDCODE_API_KEY}",
+      "baseUrl": "${COMMANDCODE_BASE_URL}",
+      "version": "claude-haiku-4-5-20251001"
+    },
+    {
+      "name": "Claude Sonnet 4.6 (via CC)",
+      "description": "Anthropic Claude Sonnet — complex reasoning, architecture, code review",
+      "vendor": "commandcode",
+      "family": "claude",
+      "model": "claude-sonnet-4-6",
+      "apiKey": "${COMMANDCODE_API_KEY}",
+      "baseUrl": "${COMMANDCODE_BASE_URL}",
+      "version": "claude-sonnet-4-6"
+    },
+    {
+      "name": "Claude Opus 4.7 (via CC)",
+      "description": "Anthropic Claude Opus 4.7 — most powerful Claude for deep analysis",
+      "vendor": "commandcode",
+      "family": "claude",
+      "model": "claude-opus-4-7",
+      "apiKey": "${COMMANDCODE_API_KEY}",
+      "baseUrl": "${COMMANDCODE_BASE_URL}",
+      "version": "claude-opus-4-7"
+    },
+    {
+      "name": "Claude Opus 4.8 (via CC)",
+      "description": "Anthropic Claude Opus 4.8 — latest flagship, maximum reasoning depth",
+      "vendor": "commandcode",
+      "family": "claude",
+      "model": "claude-opus-4-8",
+      "apiKey": "${COMMANDCODE_API_KEY}",
+      "baseUrl": "${COMMANDCODE_BASE_URL}",
+      "version": "claude-opus-4-8"
+    },
+    {
+      "name": "GPT-5.3 Codex (via CC)",
+      "description": "OpenAI GPT-5.3 Codex — coding specialist, fast and precise",
+      "vendor": "commandcode",
+      "family": "gpt",
+      "model": "gpt-5.3-codex",
+      "apiKey": "${COMMANDCODE_API_KEY}",
+      "baseUrl": "${COMMANDCODE_BASE_URL}",
+      "version": "gpt-5.3-codex"
+    },
+    {
+      "name": "GPT-5.4 (via CC)",
+      "description": "OpenAI GPT-5.4 — general purpose, broad knowledge",
+      "vendor": "commandcode",
+      "family": "gpt",
+      "model": "gpt-5.4",
+      "apiKey": "${COMMANDCODE_API_KEY}",
+      "baseUrl": "${COMMANDCODE_BASE_URL}",
+      "version": "gpt-5.4"
+    },
+    {
+      "name": "GPT-5.4 Mini (via CC)",
+      "description": "OpenAI GPT-5.4 Mini — cost-effective, fast responses",
+      "vendor": "commandcode",
+      "family": "gpt",
+      "model": "gpt-5.4-mini",
+      "apiKey": "${COMMANDCODE_API_KEY}",
+      "baseUrl": "${COMMANDCODE_BASE_URL}",
+      "version": "gpt-5.4-mini"
+    },
+    {
+      "name": "GPT-5.5 (via CC)",
+      "description": "OpenAI GPT-5.5 — latest flagship, maximum capability",
+      "vendor": "commandcode",
+      "family": "gpt",
+      "model": "gpt-5.5",
+      "apiKey": "${COMMANDCODE_API_KEY}",
+      "baseUrl": "${COMMANDCODE_BASE_URL}",
+      "version": "gpt-5.5"
+    },
+    {
+      "name": "Gemini 3.1 Flash Lite (via CC)",
+      "description": "Google Gemini 3.1 Flash Lite — fast, lightweight, huge context",
+      "vendor": "commandcode",
+      "family": "gemini",
+      "model": "google/gemini-3.1-flash-lite",
+      "apiKey": "${COMMANDCODE_API_KEY}",
+      "baseUrl": "${COMMANDCODE_BASE_URL}",
+      "version": "google/gemini-3.1-flash-lite"
+    },
+    {
+      "name": "Gemini 3.5 Flash (via CC)",
+      "description": "Google Gemini 3.5 Flash — latest fast model, 1M+ token context",
+      "vendor": "commandcode",
+      "family": "gemini",
+      "model": "google/gemini-3.5-flash",
+      "apiKey": "${COMMANDCODE_API_KEY}",
+      "baseUrl": "${COMMANDCODE_BASE_URL}",
+      "version": "google/gemini-3.5-flash"
+    },
+    {
+      "name": "DeepSeek V4 Flash (via CC)",
+      "description": "DeepSeek V4 Flash via CommandCode — fast, cost-effective coding",
+      "vendor": "commandcode",
+      "family": "deepseek",
+      "model": "deepseek/deepseek-v4-flash",
+      "apiKey": "${COMMANDCODE_API_KEY}",
+      "baseUrl": "${COMMANDCODE_BASE_URL}",
+      "version": "deepseek/deepseek-v4-flash"
+    },
+    {
+      "name": "DeepSeek V4 Pro (via CC)",
+      "description": "DeepSeek V4 Pro via CommandCode — flagship DeepSeek, deep reasoning",
+      "vendor": "commandcode",
+      "family": "deepseek",
+      "model": "deepseek/deepseek-v4-pro",
+      "apiKey": "${COMMANDCODE_API_KEY}",
+      "baseUrl": "${COMMANDCODE_BASE_URL}",
+      "version": "deepseek/deepseek-v4-pro"
+    },
+    {
+      "name": "Qwen 3.7 Max (via CC)",
+      "description": "Alibaba Qwen 3.7 Max — top Chinese LLM, strong coding + reasoning",
+      "vendor": "commandcode",
+      "family": "qwen",
+      "model": "Qwen/Qwen3.7-Max",
+      "apiKey": "${COMMANDCODE_API_KEY}",
+      "baseUrl": "${COMMANDCODE_BASE_URL}",
+      "version": "Qwen/Qwen3.7-Max"
+    },
+    {
+      "name": "Qwen 3.6 Max Preview (via CC)",
+      "description": "Alibaba Qwen 3.6 Max — solid all-rounder",
+      "vendor": "commandcode",
+      "family": "qwen",
+      "model": "Qwen/Qwen3.6-Max-Preview",
+      "apiKey": "${COMMANDCODE_API_KEY}",
+      "baseUrl": "${COMMANDCODE_BASE_URL}",
+      "version": "Qwen/Qwen3.6-Max-Preview"
+    },
+    {
+      "name": "Kimi K2.6 (via CC)",
+      "description": "Moonshot Kimi K2.6 — strong Chinese/English bilingual coding",
+      "vendor": "commandcode",
+      "family": "kimi",
+      "model": "moonshotai/Kimi-K2.6",
+      "apiKey": "${COMMANDCODE_API_KEY}",
+      "baseUrl": "${COMMANDCODE_BASE_URL}",
+      "version": "moonshotai/Kimi-K2.6"
+    },
+    {
+      "name": "Kimi K2.5 (via CC)",
+      "description": "Moonshot Kimi K2.5 — reliable bilingual model",
+      "vendor": "commandcode",
+      "family": "kimi",
+      "model": "moonshotai/Kimi-K2.5",
+      "apiKey": "${COMMANDCODE_API_KEY}",
+      "baseUrl": "${COMMANDCODE_BASE_URL}",
+      "version": "moonshotai/Kimi-K2.5"
+    },
+    {
+      "name": "MiniMax M3 (via CC)",
+      "description": "MiniMax M3 — latest flagship, strong general performance",
+      "vendor": "commandcode",
+      "family": "minimax",
+      "model": "MiniMaxAI/MiniMax-M3",
+      "apiKey": "${COMMANDCODE_API_KEY}",
+      "baseUrl": "${COMMANDCODE_BASE_URL}",
+      "version": "MiniMaxAI/MiniMax-M3"
+    },
+    {
+      "name": "MiniMax M2.7 (via CC)",
+      "description": "MiniMax M2.7 — solid mid-tier model",
+      "vendor": "commandcode",
+      "family": "minimax",
+      "model": "MiniMaxAI/MiniMax-M2.7",
+      "apiKey": "${COMMANDCODE_API_KEY}",
+      "baseUrl": "${COMMANDCODE_BASE_URL}",
+      "version": "MiniMaxAI/MiniMax-M2.7"
+    },
+    {
+      "name": "GLM-5.1 (via CC)",
+      "description": "Zhipu GLM-5.1 — latest GLM flagship, strong Chinese + coding",
+      "vendor": "commandcode",
+      "family": "glm",
+      "model": "zai-org/GLM-5.1",
+      "apiKey": "${COMMANDCODE_API_KEY}",
+      "baseUrl": "${COMMANDCODE_BASE_URL}",
+      "version": "zai-org/GLM-5.1"
+    },
+    {
+      "name": "GLM-5 (via CC)",
+      "description": "Zhipu GLM-5 — reliable Chinese/English model",
+      "vendor": "commandcode",
+      "family": "glm",
+      "model": "zai-org/GLM-5",
+      "apiKey": "${COMMANDCODE_API_KEY}",
+      "baseUrl": "${COMMANDCODE_BASE_URL}",
+      "version": "zai-org/GLM-5"
+    },
+    {
+      "name": "Step 3.7 Flash (via CC)",
+      "description": "StepFun Step 3.7 Flash — fast, efficient reasoning",
+      "vendor": "commandcode",
+      "family": "stepfun",
+      "model": "stepfun/Step-3.7-Flash",
+      "apiKey": "${COMMANDCODE_API_KEY}",
+      "baseUrl": "${COMMANDCODE_BASE_URL}",
+      "version": "stepfun/Step-3.7-Flash"
+    },
+    {
+      "name": "MiMo V2.5 Pro (via CC)",
+      "description": "Xiaomi MiMo V2.5 Pro — flagship, strong generalist",
+      "vendor": "commandcode",
+      "family": "mimo",
+      "model": "xiaomi/mimo-v2.5-pro",
+      "apiKey": "${COMMANDCODE_API_KEY}",
+      "baseUrl": "${COMMANDCODE_BASE_URL}",
+      "version": "xiaomi/mimo-v2.5-pro"
+    }
+  ],
+  "chat.utilityModel": "mainAgent",
+  "chat.utilitySmallModel": "mainAgent",
+  "github.copilot.chat.promptFiles": {
+    "verify": ".github/prompts/verify.prompt.md",
+    "plan": ".github/prompts/plan.prompt.md",
+    "decide": ".github/prompts/decide.prompt.md",
+    "ship": ".github/prompts/ship.prompt.md",
+    "commit": ".github/prompts/commit.prompt.md",
+    "debug": ".github/prompts/debug.prompt.md"
+  },
+  "github.copilot.chat.localeOverride": "en",
+  "github.copilot.chat.commitMessageGeneration.instructions": [
+    {
+      "text": "Use conventional commits format: <type>: <short description>. Types: feat, fix, refactor, docs, test, chore, perf, style, security. Add footer: Co-Authored-By: Solo-Code <admin@solo-code.com>"
+    }
+  ],
+  "github.copilot.chat.testGeneration.instructions": [
+    {
+      "text": "Use pytest for Python, vitest/jest for TypeScript. Follow TDD: RED → GREEN → REFACTOR. Target 80%+ coverage. Test happy path AND error paths."
+    }
+  ],
+  "github.copilot.chat.reviewSelection.instructions": [
+    {
+      "text": "Review for: security vulnerabilities, hardcoded secrets, missing input validation, error handling gaps, N+1 queries, missing type hints, and code that violates project conventions."
+    }
+  ]
+}

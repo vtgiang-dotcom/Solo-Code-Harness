@@ -7,18 +7,20 @@
 # Không sửa, không phân tích như logic nghiệp vụ.
 
 [harness]
-version = "3.1.0"
+version = "3.2.0"
 source = "solo-code-io/solo-code-cli"
-generated_at = "2026-07-04T14:30:00Z"
+generated_at = "2026-07-12T12:34:00Z"
 
 [boundaries]
 # Thư mục harness — KHÔNG chứa code dự án
 dirs = [
     ".kilo",
     ".opencode",
+    ".copilot",
     ".gemini",
     ".github",
     ".contracts",
+    ".vscode",
     "tools",
 ]
 

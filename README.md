@@ -2,7 +2,7 @@
 
 AI coding agent harness — rules, skills, hooks, and verification gates for disciplined Solo-Code engineering.
 
-Triple-engine support: **OpenCode** (`.opencode/`, primary), **Kilo Code** (`.kilo/`), **Gemini/Antigravity** (`.gemini/`).
+Triple-engine support: **OpenCode** (`.opencode/`, primary), **Kilo Code** (`.kilo/`), **GitHub Copilot** (`.copilot/`), **Gemini/Antigravity** (`.gemini/`).
 
 ## Quick Start
 
@@ -50,6 +50,9 @@ python tools/deploy.py scaffold /path/to/new-project --name my-app --description
 
 # OpenCode-only engine
 python tools/deploy.py scaffold /path/to/new-project --engine opencode
+
+# Copilot-only engine
+python tools/deploy.py scaffold /path/to/new-project --engine copilot
 ```
 
 Scaffold creates the directory, copies all engine configs (OpenCode + Kilo + Gemini), generates `.gitignore` and `README.md`, runs `git init`, and prints post-setup instructions.
@@ -84,11 +87,13 @@ python tools/deploy.py
 
 | Directory | Purpose |
 |---|---|
-| `.opencode/` | **Primary** — OpenCode: agents (14), skills (39), plugin v2.5, commands (4), tools (2), state (5) |
-| `.kilo/` | Kilo Code: agents (14), skills (44), hooks, memory, instruction |
-| `.gemini/` | Gemini/Antigravity: agents (14), skills (44), commands (12), knowledge |
-| `.github/` | Shared scripts: `security_scan.py`, `checklist.py`, `check_skips.py`, `eval_harness.py`, `security-allowlist.txt` |
+| `.opencode/` | **Primary** — OpenCode: agents (14), skills (42), plugin v2.5, commands (4), tools (2), state (5) |
+| `.copilot/` | GitHub Copilot: agents (14), skills (47), commands (13), instruction (7), memory (3) |
+| `.kilo/` | Kilo Code: agents (14), skills (47), hooks, memory, instruction |
+| `.gemini/` | Gemini/Antigravity: agents (14), skills (47), commands (12), knowledge |
+| `.github/` | Shared scripts: `security_scan.py`, `checklist.py`, `check_skips.py`, `eval_harness.py`, `security-allowlist.txt` + `copilot-instructions.md`, `prompts/` |
 | `tools/` | Generator, validator, drift detector, integration tests |
+| `.vscode/` | VS Code settings + MCP config for Copilot |
 | `docs/specs/` | Architecture specs, migration plans, historical docs |
 
 ## Gates
@@ -113,6 +118,27 @@ python tools/deploy.py
 | `/plan` | Delegate to planner agent |
 | `/decide` | Delegate to architect agent |
 | `/ship` | Pre-launch checklist |
+
+## Copilot Setup (VS Code)
+
+```bash
+# Open project in VS Code — Copilot auto-loads:
+#   .github/copilot-instructions.md   (rulebook)
+#   .github/prompts/*.prompt.md       (chat commands)
+#   .vscode/settings.json             (Copilot config)
+#   .vscode/mcp.json                  (MCP servers)
+```
+
+**Copilot Chat Commands** — type `#` in Copilot Chat and select:
+
+| Command | Purpose |
+|---|---|
+| `verify` | Run all verification gates |
+| `plan` | Create an implementation plan |
+| `decide` | Architectural decision record |
+| `ship` | Pre-launch checklist |
+| `commit` | Create conventional commit |
+| `debug` | Systematic debugging workflow |
 
 ## Guard Plugin (`solocode-guard.js` v2.5)
 
@@ -177,7 +203,7 @@ Open new PowerShell → `opencode`. No file changes needed.
 
 Bộ harness (dây cương) cho AI coding agent — rules, skills, hooks và verification gates dành cho kỹ thuật Solo-Code có kỷ luật.
 
-Hỗ trợ 3 engine: **OpenCode** (`.opencode/`, chính), **Kilo Code** (`.kilo/`), **Gemini/Antigravity** (`.gemini/`).
+Hỗ trợ 4 engine: **OpenCode** (`.opencode/`, chính), **Kilo Code** (`.kilo/`), **GitHub Copilot** (`.copilot/`), **Gemini/Antigravity** (`.gemini/`).
 
 ## Quick Start
 
@@ -225,6 +251,9 @@ python tools/deploy.py scaffold /path/to/new-project --name my-app --description
 
 # Chỉ engine OpenCode
 python tools/deploy.py scaffold /path/to/new-project --engine opencode
+
+# Chỉ engine Copilot
+python tools/deploy.py scaffold /path/to/new-project --engine copilot
 ```
 
 Scaffold tạo thư mục, copy config cho tất cả engine (OpenCode + Kilo + Gemini), sinh `.gitignore` và `README.md`, chạy `git init`, và in hướng dẫn post-setup.
@@ -259,11 +288,13 @@ python tools/deploy.py
 
 | Thư mục | Mục đích |
 |---|---|
-| `.opencode/` | **Chính** — OpenCode: agents (14), skills (39), plugin v2.5, commands (4), tools (2), state (5) |
-| `.kilo/` | Kilo Code: agents (14), skills (44), hooks, memory, instruction |
-| `.gemini/` | Gemini/Antigravity: agents (14), skills (44), commands (12), knowledge |
-| `.github/` | Script dùng chung: `security_scan.py`, `checklist.py`, `eval_harness.py` |
+| `.opencode/` | **Chính** — OpenCode: agents (14), skills (42), plugin v2.5, commands (4), tools (2), state (5) |
+| `.copilot/` | GitHub Copilot: agents (14), skills (47), commands (13), instruction (7), memory (3) |
+| `.kilo/` | Kilo Code: agents (14), skills (47), hooks, memory, instruction |
+| `.gemini/` | Gemini/Antigravity: agents (14), skills (47), commands (12), knowledge |
+| `.github/` | Script dùng chung: `security_scan.py`, `checklist.py`, `eval_harness.py` + `copilot-instructions.md`, `prompts/` |
 | `tools/` | Generator, validator, drift detector, integration tests |
+| `.vscode/` | VS Code settings + MCP config cho Copilot |
 | `docs/specs/` | Architecture specs, migration plans, historical docs |
 
 ## Verification Gates

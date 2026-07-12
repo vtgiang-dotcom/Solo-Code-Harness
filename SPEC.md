@@ -1,4 +1,4 @@
-# Solo-Code-Harness — Specification (SPEC)
+# Solo-Code-Harness — Specification (SPEC) v3.3.0
 
 > Tài liệu này mô tả harness CẦN LÀM GÌ. Khi tái tạo, agent chỉ được dùng
 > SPEC này + bộ harness đang hoạt động. KHÔNG được copy file từ repo gốc.
@@ -8,7 +8,7 @@
 
 - Harness là bộ **cấu hình + rule + skill + script** biến AI coding agent thành
   "Solo-Code Engineer có kỷ luật". KHÔNG phải app chạy độc lập.
-- Hỗ trợ: GitHub Copilot, Claude Code, Cursor, Gemini, Kilo Code.
+- Hỗ trợ: GitHub Copilot, Claude Code, Cursor, Gemini, Kilo Code, OpenCode.
 
 ### 0.1 Ranh giới LOẠI TRỪ [HARD]
 
@@ -45,22 +45,23 @@ Nếu plugin bắt đầu chứa code tự dựng lại native capability → v�
 
 ## 1. Cấu trúc thư mục [HARD]
 
-Phải tồn tại các thư mục: .claude/ .github/ .gemini/ .kilo/ .vscode/
+Phải tồn tại các thư mục: .claude/ .copilot/ .github/ .gemini/ .kilo/ .vscode/
 
 > Kiểm chứng: verify.sh [STRUCTURE].
 
-### 1.1 File cấu hình mới
+### 1.1 File cấu hình 
 
 | File | Mục đích | Ghi chú |
 |---|---|---|
-| `contracts/subagent_status_contract.json` | Sub-agent status contract (DeerFlow pattern) | JSON valid; tham chiếu từ `.kilo/agents/*.md` |
-| `docs/parity-ledger.md` | Sổ theo dõi khác biệt Kilo vs Claude Code | Cập nhật mỗi khi thêm tính năng một bên |
-| `docs/plans/` | Kho plan có ngày (`YYYY-MM-DD-slug.md`) | Không commit draft vào gốc |
-| `docs/specs/` | Kho spec/RFC (vd skill-evolution) | Có ngày, có status |
-| `extensions_config.json` | Extension feature flags (mặc định TẮT) | Skill evolution, experimental features |
-| `tools/parity_check.py` | Audit đồng bộ hai nhánh Kilo ↔ Claude Code | Chạy trước mỗi commit |
-| `tools/accept_skill.py` | Moderation gate cho agent-evolved skills | Mặc định TẮT (cần bật flag) |
-| `tools/schemas/skill_triggers.json` | Trigger accuracy test cases (≥15 case) | Dùng với `eval.py --check-triggers` |
+| `.harness.lock` | Ranh giới harness/project | Tự động generate bởi `tools/deploy.py` |
+| `opencode.json` | OpenCode engine config | Permission, shell, MCP servers |
+| `kilo.jsonc` | Kilo engine config | Provider, model, agent, permission |
+| `extensions_config.json` | Extension feature flags | Mặc định TẮT: `enable_code_review_agent`, `enable_harness_guard` |
+| `.mcp.json` | MCP server config dùng chung | context7, sequential-thinking |
+| `.gitleaks.toml` | Git leak detection rules | Allowlist `.venv`, `node_modules` |
+| `.ruff.toml` | Python lint config | PEP 8, type hints |
+| `tools/` | Generator, validator, drift detector, integration tests | `generate_harness.py`, `garden.py`, `test_integration.py`, `deploy.py`, `validate_schemas.py` |
+| `docs/specs/` | Kho spec/RFC | Có ngày, có status |
 
 ## 2. File cấu hình hợp lệ [HARD]
 
@@ -116,18 +117,33 @@ brainstorming, api-design, planning, verify, orchestration.
 
 ### 7.1 Agent resource contract (DeerFlow)
 
-Mọi `.kilo/agents/*.md` phải có frontmatter: `max_turns`, `model`, `skills`, `status_contract`.
+Mọi `.kilo/agents/*.md` phải có frontmatter: `description`, `mode`, và tối thiểu một key permission (ví dụ `permissions:` hoặc `permission:`).
 
-| Loại agent | max_turns | Ví dụ |
+| Loại agent | mode | Ví dụ |
 |---|---|---|
-| Reviewer (code-reviewer, security-auditor...) | 10 | Đọc, phân tích, báo cáo |
-| Builder (solo-code-engineer, planner, architect...) | 20 | Tạo plan, code, kiến trúc |
+| Reviewer (code-reviewer, security-auditor...) | subagent | Đọc, phân tích, báo cáo |
+| Builder (solo-code-engineer, planner, architect...) | all | Tạo plan, code, kiến trúc |
 
-Sub-agent status contract tại `contracts/subagent_status_contract.json`: valid statuses `[completed, failed, cancelled, timed_out]`.
+### 7.2 Skill trigger validation
 
-### 7.2 Trigger accuracy eval
+Skill triggering được kiểm tra bằng `python tools/test_integration.py` — kiểm tra cấu trúc, frontmatter, và count của tất cả skill directories. Không dependency ngoài.
 
-Skill triggering accuracy được đo bằng `python tools/eval.py --check-triggers` với bộ test tại `tools/schemas/skill_triggers.json` (≥15 case tập trung cặp dễ nhầm: plan vs planning, debug vs systematic-debugging, v.v.). Dùng keyword matching, không gọi LLM, không thêm dependency.
+### 7.3 User-invoked vs Model-invoked skill classification
+
+Skills được phân loại rõ ràng:
+- **User-invoked** (`disable-model-invocation: true`): chỉ human gọi, vai trò orchestrator (plan, spec-driven-development, task-delegation, wayfinder, subagent-driven-development, shipping-and-launch, ci-cd-and-automation, permission-guard, requesting-code-review, planning-and-task-breakdown)
+- **Model-invoked**: agent có thể tự động tiếp cận khi task khớp description
+
+### 7.4 v3.3.0 — Changelog
+
+| Thay đổi | Chi tiết |
+|-----------|----------|
+| **Skills mới (3)** | `research` — background agent điều tra docs/source; `resolving-merge-conflicts` — loop giải quyết merge/rebase conflict; `wayfinder` — multi-session planning với fog-of-war + HITL/AFK |
+| **Nâng cấp (2)** | `code-review-expert` — thêm Fowler 12-smell baseline + parallel sub-agent review; `interview-me` — thêm facts vs decisions split từ Matt Pocock grilling |
+| **Phân loại skill (10)** | Gắn `disable-model-invocation: true` cho 10 orchestrator skills |
+| **Deploy nâng cấp** | `deploy.py` — thêm stale file cleanup + runtime state exclude + `.copilot`/`.vscode` boundaries + version bump 3.2.0 |
+| **Engine sync** | `.copilot/` đầy đủ agent/skill/command/instruction/memory; `.opencode/` 42 skills (đã regenerate); `.kilo/` 47 skills; garden 0 drift |
+| **Tài liệu** | SPEC.md cập nhật file thực tế; README.md cập nhật skill count 42/47/47 |
 
 ## 8. Memory xuyên phiên [SOFT — nghiệm thu tay]
 

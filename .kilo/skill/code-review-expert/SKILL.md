@@ -80,6 +80,28 @@ For detailed profiling and optimization, see `performance-optimization`. Does th
 - Any missing pagination on list endpoints?
 - Any large objects created in hot paths?
 
+## Fowler Smell Baseline (Always Applied)
+
+A fixed set of 12 "Bad Smells in Code" (Fowler, *Refactoring*, ch.3) that serves as a baseline even when the repo documents no coding standards. Two binding rules:
+
+- **The repo overrides.** A documented repo standard always wins; where it endorses something the baseline would flag, suppress the smell.
+- **Always a judgement call.** Each smell is a labelled heuristic, never a hard violation. Skip anything tooling already enforces.
+
+| # | Smell | What it is | How to fix |
+|---|-------|-----------|------------|
+| 1 | **Mysterious Name** | A function, variable, or type whose name doesn't reveal what it does | Rename it; if no honest name comes, the design is murky |
+| 2 | **Duplicated Code** | The same logic shape appears in more than one hunk or file in the change | Extract the shared shape, call from both |
+| 3 | **Feature Envy** | A method that reaches into another object's data more than its own | Move the method onto the data it envies |
+| 4 | **Data Clumps** | The same few fields or params keep travelling together | Bundle them into one type, pass that |
+| 5 | **Primitive Obsession** | A primitive or string standing in for a domain concept that deserves its own type | Give the concept its own small type |
+| 6 | **Repeated Switches** | The same `switch`/`if`-cascade on the same type recurs across the change | Replace with polymorphism, or one map both sites share |
+| 7 | **Shotgun Surgery** | One logical change forces scattered edits across many files in the diff | Gather what changes together into one module |
+| 8 | **Divergent Change** | One file or module is edited for several unrelated reasons | Split so each module changes for one reason |
+| 9 | **Speculative Generality** | Abstraction, parameters, or hooks added for needs the spec doesn't have | Delete it; inline back until a real need shows |
+| 10 | **Message Chains** | Long `a.b().c().d()` navigation the caller shouldn't depend on | Hide the walk behind one method on the first object |
+| 11 | **Middle Man** | A class or function that mostly just delegates onward | Cut it, call the real target directly |
+| 12 | **Refused Bequest** | A subclass or implementer that ignores or overrides most of what it inherits | Drop the inheritance, use composition |
+
 ## Change Sizing
 
 Small changes are safer. Target:
@@ -99,6 +121,15 @@ Small changes are safer. Target:
 Every commit needs a standalone description. **First line:** short, imperative ("Delete FizzBuzz RPC" not "Deleting..."). **Body:** what and why — decisions, reasoning, links. Avoid: "Fix bug," "Add patch," "Moving code from A to B."
 
 ## Review Process
+
+### Step 0: Parallel Sub-Agent Review (Recommended for non-trivial changes)
+
+For changes >50 lines, split review into two parallel sub-agents to keep contexts clean:
+
+**Sub-agent A — Standards:** Review code style, naming, architecture, and smells. Include the Fowler Smell Baseline above.
+**Sub-agent B — Spec:** Review correctness against the originating spec/issue/task. Quote the spec line for each finding.
+
+Spawn both via `task` tool simultaneously. Aggregate findings without merging or re-ranking — the two axes are deliberately separate.
 
 ### Step 1: Understand the Context
 

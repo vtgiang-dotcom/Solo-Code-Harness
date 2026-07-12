@@ -69,8 +69,10 @@ ROOT_FILES = [
 DIRS_ALL = [
     ".opencode",
     ".kilo",
+    ".copilot",
     ".gemini",
     ".github",
+    ".vscode",
     ".contracts",
     "tools",
 ]
@@ -82,21 +84,36 @@ DIRS_OPENCODE = [
     "tools",
 ]
 
+DIRS_COPILOT = [
+    ".copilot",
+    ".github",
+    ".contracts",
+    ".vscode",
+    "tools",
+]
+
 # Patterns to exclude from copy
 EXCLUDE_DIRS = {
     ".pytest_cache", ".ruff_cache", "node_modules", ".git",
     "__pycache__", ".venv", "venv",
     ".solocode", ".claude-plugin", "cocoindex-code-main", "docs",
+    # Runtime state directories — never belong in a deploy
+    "sessions",           # .kilo/state/sessions/
+    "logs",               # .kilo/logs/
 }
 EXCLUDE_FILES = {
     ".env", "usage.log", "usage.jsonl",
     ".DS_Store", "Thumbs.db",
+    # Runtime state files — never belong in a deploy
+    "token-log.jsonl",    # .kilo/state/token-log.jsonl
+    "tool-count.json",    # .kilo/state/tool-count.json
+    "edited-files.json",  # .kilo/state/edited-files.json
 }
 
 # Default README template for scaffolded projects
 README_TEMPLATE = """# {project_name}
 
-> Scaffolded from [Solo-Code-CLI](https://github.com/Solo-Code-CLI) — AI agent harness with Kilo + OpenCode + Gemini engines.
+> Scaffolded from [Solo-Code-CLI](https://github.com/Solo-Code-CLI) — AI agent harness with Kilo + OpenCode + Copilot + Gemini engines.
 
 {description}
 
@@ -136,6 +153,7 @@ python .github/scripts/checklist.py .
 
 - **[Kilo](https://kilo.ai)** — hooks, skills, memory, orchestrators
 - **[OpenCode](https://opencode.ai)** — agents, plugins, MCP servers
+- **[Copilot](https://github.com/features/copilot)** — agents, skills, commands, prompts
 - **[Gemini](https://gemini.google.com)** — additional AI assistant config
 
 ## License
@@ -161,9 +179,11 @@ generated_at = "{timestamp}"
 dirs = [
     ".kilo",
     ".opencode",
+    ".copilot",
     ".gemini",
     ".github",
     ".contracts",
+    ".vscode",
     "tools",
 ]
 
@@ -201,7 +221,7 @@ def _generate_harness_lock(target: Path, dry_run: bool = False) -> None:
         return
 
     # Read version from source pyproject.toml
-    version = "3.1.0"
+    version = "3.2.0"
     src_pyproject = ROOT / "pyproject.toml"
     if src_pyproject.is_file():
         for line in src_pyproject.read_text(encoding="utf-8").splitlines():
@@ -361,7 +381,12 @@ def scaffold(
         print(f"  [DRY] Would create: {target_path}")
 
     # ── Step 2: Copy harness files ───────────────────────────────
-    dirs = DIRS_OPENCODE if engine == "opencode" else DIRS_ALL
+    if engine == "opencode":
+        dirs = DIRS_OPENCODE
+    elif engine == "copilot":
+        dirs = DIRS_COPILOT
+    else:
+        dirs = DIRS_ALL
 
     total_new, total_upd, total_skip = 0, 0, 0
 
@@ -509,6 +534,85 @@ def scaffold(
 # Deploy mode — copy harness to existing project
 # ═══════════════════════════════════════════════════════════════════════
 
+def _build_source_manifest(dirs: list[str]) -> set[str]:
+    """Build a set of relative file paths (forward-slash) from source harness dirs."""
+    manifest: set[str] = set()
+    for d in dirs:
+        src = ROOT / d
+        if not src.is_dir():
+            continue
+        for item in src.rglob("*"):
+            if not should_copy(item):
+                continue
+            if item.is_file():
+                rel = item.relative_to(ROOT).as_posix()
+                manifest.add(rel)
+    # Add root files (relative to ROOT)
+    for f in ROOT_FILES:
+        src = ROOT / f
+        if src.is_file():
+            manifest.add(f.replace("\\", "/"))
+    # .harness.lock is always regenerated — never stale
+    manifest.add(".harness.lock")
+    return manifest
+
+
+def _cleanup_stale_files(
+    target_path: Path,
+    dirs: list[str],
+    dry_run: bool,
+) -> int:
+    """Remove files in target harness dirs that are NOT in the source manifest.
+
+    Only cleans inside known harness directories (dirs + root files).
+    Returns number of stale files removed (or would-be-removed in dry_run).
+    """
+    source_manifest = _build_source_manifest(dirs)
+    removed = 0
+
+    # Collect target files inside harness dirs
+    for d in dirs:
+        dst = target_path / d
+        if not dst.is_dir():
+            continue
+        for item in dst.rglob("*"):
+            if item.is_file():
+                rel = item.relative_to(target_path).as_posix()
+                if rel not in source_manifest:
+                    if dry_run:
+                        print(f"  [STALE] Would remove: {d}/{item.relative_to(dst).as_posix()}")
+                    else:
+                        item.unlink()
+                        print(f"  [STALE] Removed: {d}/{item.relative_to(dst).as_posix()}")
+                    removed += 1
+
+    # Check root-level harness files for staleness
+    root_harness_files = {
+        f for f in ROOT_FILES
+        if (ROOT / f).is_file()
+    }
+    # .harness.lock is always current (regenerated)
+    root_harness_files.add(".harness.lock")
+    for f_path in target_path.iterdir():
+        if not f_path.is_file():
+            continue
+        name = f_path.name
+        # Only check files whose name matches a known harness file pattern
+        # or files that live at the root and are harness artifacts
+        if name in root_harness_files or name == ".harness.lock":
+            continue  # expected
+        # Check if it's a harness root file that's no longer in source
+        if name.endswith((".md", ".json", ".jsonc", ".toml", ".yaml", ".yml", ".ps1", ".sh", ".js")) and name not in source_manifest and name not in root_harness_files:
+            if dry_run:
+                print(f"  [STALE] Would remove root file: {name}")
+            else:
+                f_path.unlink()
+                print(f"  [STALE] Removed root file: {name}")
+            removed += 1
+
+    return removed
+
+
 def deploy(target: str, *, engine: str = "all", dry_run: bool = False) -> int:
     """Deploy harness to an existing target directory."""
     target_path = Path(target).resolve()
@@ -521,7 +625,12 @@ def deploy(target: str, *, engine: str = "all", dry_run: bool = False) -> int:
         print(f"[ERROR] Target is not a directory: {target_path}")
         return 1
 
-    dirs = DIRS_OPENCODE if engine == "opencode" else DIRS_ALL
+    if engine == "opencode":
+        dirs = DIRS_OPENCODE
+    elif engine == "copilot":
+        dirs = DIRS_COPILOT
+    else:
+        dirs = DIRS_ALL
 
     mode = "DRY RUN" if dry_run else "LIVE"
     print(f"=== Solo-Code Harness Deploy ({mode}) ===")
@@ -565,6 +674,13 @@ def deploy(target: str, *, engine: str = "all", dry_run: bool = False) -> int:
         if not dry_run:
             print(f"  Copied: {n} new, {u} updated")
 
+    # ── Step 2.5: Cleanup stale files ────────────────────────────
+    print("\n--- Stale Cleanup ---")
+    removed = _cleanup_stale_files(target_path, dirs, dry_run)
+    if removed == 0:
+        print("  No stale files found.")
+    total_removed = removed
+
     # ── Generate .harness.lock ──────────────────────────────────
     print("\n--- .harness.lock ---")
     _generate_harness_lock(target_path, dry_run)
@@ -573,9 +689,9 @@ def deploy(target: str, *, engine: str = "all", dry_run: bool = False) -> int:
     print()
     print("=" * 60)
     if dry_run:
-        print(f"  DRY RUN — would deploy {total_new} files, update {total_upd}")
+        print(f"  DRY RUN — would deploy {total_new} files, update {total_upd}, remove {total_removed} stale")
     else:
-        print(f"  Deployed: {total_new} new, {total_upd} updated, {total_skip} skipped")
+        print(f"  Deployed: {total_new} new, {total_upd} updated, {total_skip} skipped, {total_removed} stale removed")
     print("=" * 60)
 
     if not dry_run:
@@ -616,13 +732,13 @@ def interactive() -> int:
 
     # Ask engine
     while True:
-        engine = input("Engine (all/opencode) [all]: ").strip().lower()
+        engine = input("Engine (all/opencode/copilot) [all]: ").strip().lower()
         if not engine:
             engine = "all"
             break
-        if engine in ("all", "opencode"):
+        if engine in ("all", "opencode", "copilot"):
             break
-        print("  Please enter 'all' or 'opencode'.")
+        print("  Please enter 'all', 'opencode', or 'copilot'.")
 
     # Ask dry-run
     dry_run_input = input("Dry run? (y/N): ").strip().lower()
