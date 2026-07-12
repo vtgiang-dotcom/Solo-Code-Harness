@@ -1,173 +1,210 @@
-NHIỆM VỤ: Đưa OpenCode từ 85% lên 95%+ Kilo — Lấp 3 gap còn lại
-Mục tiêu
-Hoàn thiện OpenCode harness để đạt tương đương Kilo về: skill system (47/47), memory manager tự động, hookify MD engine.
+# OpenCode Gap Closure — Plan v2 (reviewed 2026-07-13)
 
-=============================================================================
-GIAI ĐOẠN 1 — 5 Skill Thiếu (15 phút, 0 rủi ro)
-=============================================================================
-
-Copy 5 file SKILL.md từ `.kilo/skill/` sang `.opencode/skill/`:
-
-| # | Skill | File nguồn | File đích |
-|---|-------|-----------|----------|
-| 1 | `block-no-verify` | `.kilo/skill/block-no-verify/SKILL.md` | `.opencode/skill/block-no-verify/SKILL.md` |
-| 2 | `git-workflow-master` | `.kilo/skill/git-workflow-master/SKILL.md` | `.opencode/skill/git-workflow-master/SKILL.md` |
-| 3 | `permission-guard` | `.kilo/skill/permission-guard/SKILL.md` | `.opencode/skill/permission-guard/SKILL.md` |
-| 4 | `solo-code-harness` | `.kilo/skill/solo-code-harness/SKILL.md` | `.opencode/skill/solo-code-harness/SKILL.md` |
-| 5 | `task-delegation` | `.kilo/skill/task-delegation/SKILL.md` | `.opencode/skill/task-delegation/SKILL.md` |
-
-**Verify:** `Get-ChildItem .opencode/skill/ | Measure-Object | Select-Object Count` → phải ra 47.
-
-**Rủi ro:** Không. Copy file thuần túy.
-
-DỪNG LẠI sau giai đoạn 1, chạy verify 47 skill trước khi tiếp tục.
-
-=============================================================================
-GIAI ĐOẠN 2 — Memory Manager Plugin (1-2 ngày)
-=============================================================================
-
-Tạo `.opencode/plugins/solocode-memory.js` — plugin tự động quản lý memory xuyên phiên.
-
-### 2.1 Khảo sát (read-only)
-
-Đọc các file sau để hiểu pattern:
-- `.opencode/plugins/solocode-guard.js` — template plugin (cấu trúc export, cách dùng hook)
-- `docs/specs/opencode-mechanisms.md` mục B — signature `tool.execute.after`, `session.start`
-- `.kilo/hooks/post-tool-use/memory-manager.js` — logic enforce limit trong Kilo
-- `.kilo/hooks/session/` — session start/end pattern
-
-### 2.2 Thiết kế
-
-Plugin export 3 hooks:
+## Trạng thái hiện tại
 
 ```
-session.start:
-  → đọc .opencode/memory/MEMORY.md
-  → inject vào context (agent biết lịch sử decisions)
-
-tool.execute.after (Write|Edit|MultiEdit):
-  → nếu file được sửa là .opencode/memory/*.md
-  → kiểm tra dung lượng file
-  → nếu > 200 dòng → trim (giữ 50 dòng gần nhất + header)
-
-session.end:
-  → ghi summary decisions vào .opencode/memory/MEMORY.md
-  → format: ### YYYY-MM-DD — Summary + danh sách decisions
+OpenCode feature parity với Kilo:
+  Skills:      47/47  ✅ (G1 done)
+  Instructions: 9/9   ✅
+  Agents:       14/14 ✅
+  Memory:        3/3  ✅ (copy, no manager)
+  Plugin:        1    ✅ (solocode-guard.js v2.5)
+  Hookify:       None ❌ (Kilo has .kilo/hookify/ engine)
+  Memory mgr:    None ❌ (Kilo has .kilo/hooks/post-tool-use/memory-manager.js)
 ```
 
-### 2.3 Ràng buộc cứng
+## Gap phân tích — thực tế vs plan cũ
 
-- KHÔNG bịa pattern mới. Memory limit logic port từ `.kilo/hooks/post-tool-use/memory-manager.js`.
-- Mỗi hàm phải ghi comment truy nguyên: `// Port from .kilo/hooks/post-tool-use/memory-manager.js:XX-YY`
-- Chỉ tạo 1 file `.opencode/plugins/solocode-memory.js`. Không sửa file khác.
-- Đăng ký plugin trong `opencode.json` (thêm vào field `plugins` nếu cần).
+### G2 — Memory Manager: cần thiết kế lại toàn bộ
 
-### 2.4 Verify
+| Vấn đề | Plan cũ sai | Thực tế |
+|--------|-----------|---------|
+| `session.start` / `session.end` hooks | Plan cũ dùng `session.start` để load memory, `session.end` để ghi summary | **OpenCode không có session lifecycle hooks.** Chỉ có `chat.message`, `tool.execute.before`, `tool.execute.after`. |
+| Inject vào context | Plan cũ nói "inject vào context" | Plugin không thể inject trực tiếp vào agent context. Chỉ có thể return `chat.message` metadata hoặc dùng `experimental.*` hooks. |
+| Trim >200 dòng | Hợp lý về mặt logic | Memory file trong Solo-Code là file markdown nhỏ, gần như không bao giờ vượt 200 dòng. Value của tính năng này thấp. |
+| 1-2 ngày estimate | Quá cao | Thực tế: không làm được như plan cũ (thiếu hook). Để làm được cần chấp nhận workaround hoặc đợi OpenCode hỗ trợ. |
 
-```bash
-# Test session.start hook
-node -e "import('./.opencode/plugins/solocode-memory.js').then(m => console.log(Object.keys(m.default)))"
-# Phải ra: ['session.start', 'tool.execute.after', 'session.end']
+**Kết luận G2:** ❌ KHÔNG KHẢ THI với API hiện tại. Cần đợi OpenCode hỗ trợ session hooks. **XÓA G2 khỏi plan.**
+
+### G3 — Hookify MD Engine: giữ lại nhưng giảm phạm vi
+
+| Vấn đề | Plan cũ | Thực tế |
+|--------|---------|---------|
+| Plugin + engine | 2 thành phần tách biệt | Có thể gộp vào `solocode-guard.js` — tránh tạo plugin thứ 2 phải maintain |
+| `generated/hooks.json` cache | 1 file cache riêng | Không cần — rules chỉ thay đổi khi developer edit file `.md`. Load on-demand mỗi session, cache in-memory là đủ. |
+| `gray-matter` dependency | Dùng gray-matter parse YAML | `solocode-guard.js` đã có `fs`, có thể viết parser YAML đơn giản không dependency |
+| 3-5 ngày | Cao do 7+ file mới | Giảm xuống 1-2 ngày sau khi tối ưu |
+| 7+ file mới | `.opencode/hookify/engine.js`, `rules/*.md` x3, `generated/hooks.json`, `README.md` | Chỉ cần: hòa vào `solocode-guard.js` (không tạo file mới) + thư mục `hookify/rules/` chứa rules `.md` |
+
+**Kết luận G3:** ✅ KHẢ THI sau tối ưu. Giảm từ 7+ file xuống còn sửa 1 file (`solocode-guard.js`) + tạo thư mục `hookify/rules/`.
+
+---
+
+## Plan v2 — tối giản
+
+### ✅ ĐÃ HOÀN THÀNH
+
+| Giai đoạn | Nội dung | Kết quả |
+|-----------|----------|---------|
+| G1 | 5 skills skip → copy vào `.opencode/` | 47/47 skills = Kilo |
+| Boundary | 7-layer boundary defense | `.harness.lock` v3.3.0, `harness-boundaries.md`, `boundary_audit.py` |
+
+### 📋 CÒN LẠI — chỉ 1 giai đoạn
+
+### G3 — Hookify MD Engine tích hợp vào solocode-guard.js v3.0
+
+**Mục tiêu:** Tích hợp engine đọc `.md` rule files vào plugin `solocode-guard.js` hiện có. Không tạo file mới.
+
+**Kiến trúc:**
+
+```
+.opencode/
+├── plugins/
+│   └── solocode-guard.js       ← sửa file này (thêm ~100 dòng)
+└── hookify/
+    └── rules/
+        ├── block-rm.md         ← user tự viết: block pattern cho rm
+        ├── deny-env-write.md   ← user tự viết: chặn ghi .env
+        └── custom.md           ← user tự viết: quy tắc tùy chỉnh
 ```
 
-DỪNG LẠI sau giai đoạn 2, verify plugin load được trước khi tiếp tục.
-
-=============================================================================
-GIAI ĐOẠN 3 — Hookify MD Engine (3-5 ngày)
-=============================================================================
-
-Tạo hệ thống config `.opencode/hookify/*.md` cho phép user định nghĩa custom rules
-bằng markdown, tự động sinh hook code.
-
-### 3.1 Khảo sát
-
-- `.kilo/hooks/hookify/hookify-engine.js` — engine gốc của Kilo
-- `.kilo/hooks/hookify/` — format file `.md` config
-- `.kilo/hooks/hooks.json` — cách đăng ký hookify hooks
-
-### 3.2 Thiết kế kiến trúc
+**Logic:**
 
 ```
-.opencode/hookify/
-├── engine.js            ← plugin chính: đọc .md, parse rules, sinh hooks
-├── rules/
-│   ├── bash-safety.md   ← user tự viết: quy tắc an toàn bash
-│   ├── file-patterns.md ← user tự viết: quy tắc file
-│   └── custom.md        ← user tự viết: quy tắc tùy chỉnh
-└── generated/
-    └── hooks.json       ← auto-generated từ engine (cache)
+1. tool.execute.before (đã có sẵn trong guard):
+   → Đọc .opencode/hookify/rules/*.md (nếu thư mục tồn tại)
+   → Parse YAML frontmatter + regex pattern
+   → Nếu command/file_path khớp pattern → BLOCK/WARN theo action
+   → Fall-through vào BLOCK_PATTERNS + SECRET_PATTERNS hiện có
+
+2. Không cần cache file — rules thay đổi chỉ khi dev edit file .md.
+   Load mỗi session, parse in-memory. Thời gian parse <5ms cho <50 rules.
 ```
 
-### 3.3 Format file .md config
+**Format file rule `.md` (port từ Kilo hookify):**
 
 ```markdown
 ---
-tool: bash
-priority: 1
+name: block-dangerous-rm
+enabled: true
+event: bash
+pattern: rm\s+-rf\s+\/
+action: block
 ---
 
-# Bash Safety Rules
-
-## Rule: Block npm cache clean
-- **Pattern**: `npm cache clean --force`
-- **Action**: deny
-- **Message**: "npm cache clean --force destroys local cache. Use npm cache verify instead."
-
-## Rule: Allow pytest
-- **Pattern**: `python -m pytest *`
-- **Action**: allow
+⛔ Deleting root file system is blocked by harness hookify rule.
+Use targeted file deletion instead.
 ```
 
-### 3.4 Engine logic
+- `event`: `bash` | `file` (Write/Edit/MultiEdit)
+- `pattern`: regex string
+- `action`: `block` | `warn` | `allow`
+- `enabled`: `true` | `false`
 
-1. `session.start` → quét `.opencode/hookify/rules/*.md`
-2. Parse frontmatter (`tool`, `priority`) + body (rules dạng markdown table)
-3. Build rule index: `Map<toolName, Rule[]>`
-4. `tool.execute.before` → match command/filePath với rules → allow/deny/ask
-5. Cache vào `.opencode/hookify/generated/hooks.json` để lần sau load nhanh
+**Implementation — vào `solocode-guard.js`:**
 
-### 3.5 Ràng buộc
+```javascript
+// Thêm vào phần đầu của tool.execute.before handler:
 
-- Parse markdown dùng `gray-matter` (đã có trong `@opencode-ai/plugin`)
-- Regex match port từ `.kilo/hooks/hookify/hookify-engine.js`
-- Mỗi rule trong generated code phải truy nguyên được về file `.md` gốc
-- Engine phải tương thích ngược: nếu không có file `.md` nào, engine vẫn load không lỗi
+// --- Hookify MD rules (v3.0) ---
+// Port from .kilo/hooks/hookify/hookify-engine.js
 
-### 3.6 Verify
+const HOOKIFY_DIR = '.opencode/hookify/rules';
+
+function loadHookifyRules() {
+  if (!fs.existsSync(HOOKIFY_DIR)) return [];
+  const rules = [];
+  for (const file of fs.readdirSync(HOOKIFY_DIR)) {
+    if (!file.endsWith('.md')) continue;
+    const content = fs.readFileSync(`${HOOKIFY_DIR}/${file}`, 'utf8');
+    const parsed = parseHookifyRule(content);
+    if (parsed && parsed.enabled) rules.push(parsed);
+  }
+  return rules;
+}
+
+function parseHookifyRule(content) {
+  if (!content.startsWith('---')) return null;
+  const end = content.indexOf('---', 3);
+  if (end === -1) return null;
+  const fm = {};
+  for (const line of content.slice(3, end).trim().split('\n')) {
+    const [k, v] = line.split(':').map(s => s.trim().replace(/^["']|["']$/g, ''));
+    if (k) fm[k] = v === 'true' ? true : v === 'false' ? false : v;
+  }
+  return { ...fm, message: content.slice(end + 3).trim() };
+}
+```
+
+**Rủi ro:**
+- Regex injection: pattern từ file `.md` do developer viết → compile `new RegExp(pattern, 'i')` có thể crash. Wrap trong try/catch + log warning.
+- Performance: mỗi `tool.execute.before` call parse lại toàn bộ rules. Acceptable vì <50 rules × <5ms.
+
+**Verify:**
 
 ```bash
-# Tạo 1 rule test
+# Tạo rule test
+mkdir -p .opencode/hookify/rules
 echo '---
-tool: bash
+name: test-block-echo
+enabled: true
+event: bash
+pattern: echo\s+test
+action: block
 ---
-## Rule: Test
-- **Pattern**: echo test
-- **Action**: allow
-' > .opencode/hookify/rules/test.md
+Test rule: blocks echo test' > .opencode/hookify/rules/test.md
 
-# Chạy engine test
-node .opencode/hookify/engine.js --test
-# Phải thấy: "Loaded 1 rule from test.md"
+# Chạy guard test
+node .opencode/tests/test-guard.mjs
+# Expect: "echo test" bị block bởi hookify rule
 ```
 
-=============================================================================
-DỰ KIẾN THỜI GIAN
-=============================================================================
+**Thời gian:** 1-2 ngày (giảm từ 3-5 ngày của plan cũ)
+**Rủi ro:** Thấp — sửa 1 file, tạo 1 thư mục, port logic từ Kilo
 
-Giai đoạnThời gianĐộ khóRủi ro15 skill copy15 phút★☆☆☆☆Không có2Memory manager1-2 ngày★★☆☆☆Thấp3Hookify engine3-5 ngày★★★☆☆Trung bình**Tổng****~1 tuần**
-=============================================================================
-KẾT QUẢ MONG ĐỢI
-=============================================================================
+---
 
-Sau 3 giai đoạn:
+## Kế hoạch thực hiện
+
+| # | Việc | Thời gian | Dependency |
+|---|-------|-----------|------------|
+| 1 | Sửa `solocode-guard.js` — thêm hookify engine | 3-4 giờ | Không |
+| 2 | Tạo 3 rule mẫu (`block-rm.md`, `deny-env-write.md`, `custom.md`) | 30 phút | #1 |
+| 3 | Cập nhật `test-guard.mjs` — test hookify rules | 1 giờ | #1 |
+| 4 | Verify garden + integration + checklist | 15 phút | #2, #3 |
+| 5 | Commit & push | 15 phút | #4 |
+
+**Tổng:** ~5-6 giờ (1 ngày)
+
+---
+
+## Kết quả mong đợi
 
 ```
-OpenCode: 85% → 95%+ Kilo
-
-Trước                    Sau
-42 skill                  47 skill = Kilo
-Không memory manager      Memory tự động = Kilo
-Không hookify engine      Hookify MD engine = Kilo
+Trước                        Sau
+Plugin: solocode-guard v2.5  → Plugin: solocode-guard v3.0 (có hookify)
+Không có custom rules        → User tự viết rules .md trong .opencode/hookify/rules/
+                               (block pattern, deny file write, allow custom commands)
 ```
 
-Gap 5% còn lại: OpenCode không có `kilo.jsonc` unified config — nhưng không đáng kể.
+OpenCode đạt 90%+ Kilo. Gap còn lại (~10%):
+- Không có unified `kilo.jsonc` config — không đáng kể
+- Không có memory manager — đợi OpenCode hỗ trợ session hooks
+- Không có Kilo hook system đầy đủ (PreToolUse/PostToolUse/SessionStart/SessionEnd/Stop) — OpenCode dùng plugin model khác
+
+---
+
+## Ghi chú dọn dẹp
+
+### File đã xóa khỏi plan (so với plan cũ)
+
+| File plan cũ định tạo | Lý do xóa |
+|----------------------|-----------|
+| `.opencode/plugins/solocode-memory.js` | Không khả thi — OpenCode thiếu session hooks |
+| `.opencode/hookify/engine.js` | Gộp vào `solocode-guard.js` — không cần file riêng |
+| `.opencode/hookify/generated/hooks.json` | Cache in-memory, không cần file |
+| `.opencode/hookify/README.md` | Document trong `SKILL.md` của solo-code-harness skill |
+| `.opencode/hookify/rules/bash-safety.md` | Gộp chung vào `rules/` — user tự đặt tên file |
+| `.opencode/hookify/rules/file-patterns.md` | Gộp chung vào `rules/` — user tự đặt tên file |
+
+**Tổng file rác tránh được:** 6 file (giảm từ 7+ xuống 1 file sửa + 1 thư mục)
