@@ -24,7 +24,7 @@ permissions:
 
 > **CRITICAL:** Read this file fully before taking any action. These rules are NON-NEGOTIABLE.
 
-This file serves both **Kilo** (reads `.kilo/` for hooks/skills/memory) and **OpenCode** (reads `.opencode/` for plugins/skills/memory). Sections referencing `.kilo/` paths are Kilo-specific; OpenCode ignores them. The `.opencode/` equivalents are maintained separately in the respective `instruction/`, `skill/`, and `memory/` directories.
+This file serves both **Kilo** (reads `.kilo/` for hooks/skills/memory), **OpenCode** (reads `.opencode/` for plugins/skills/memory), and **GitHub Copilot** (reads `.copilot/` for agents/skills/commands, `.github/copilot-instructions.md` for rulebook). Sections referencing `.kilo/` paths are Kilo-specific; OpenCode and Copilot ignore them. Engine-specific equivalents are maintained in `.opencode/` and `.copilot/` respectively.
 
 ## Harness Boundaries (READ FIRST)
 
@@ -34,7 +34,8 @@ This project is powered by **Solo-Code Harness** — an AI agent discipline laye
 
 | If the file path starts with... | Then it is... | Action |
 |----------------------------------|---------------|--------|
-| `.kilo/`, `.opencode/`, `.gemini/` | Harness engine | Rules/skills/hooks for AI behavior — not project logic |
+| `.kilo/`, `.opencode/`, `.copilot/`, `.gemini/` | Harness engine | Rules/skills/hooks for AI behavior — not project logic |
+| `.vscode/` | Harness IDE config | VS Code settings + MCP servers — not project source |
 | `.github/scripts/` | Harness verification | `security_scan.py`, `checklist.py`, `check_skips.py`, `eval_harness.py`, `security-allowlist.txt` |
 | `tools/` | Harness utilities | `deploy.py`, `generate_harness.py`, `garden.py`, `harness_config.py` |
 | `.contracts/` | Harness sub-agent contracts | Status contracts for delegated agents |
@@ -46,7 +47,7 @@ This project is powered by **Solo-Code Harness** — an AI agent discipline laye
 ## Self-Verification Handshake
 
 When asked "Is Solo-Code Harness active?" or "What rules apply here?", answer:
-`Solo-Code Harness active: behavior rules, anti-hallucination rules, security rules, prose quality rules, 44 skills, 14 agents, hooks enabled (Kilo) / plugins enabled (OpenCode). Use /verify to validate.`
+`Solo-Code Harness active: behavior rules, anti-hallucination rules, security rules, prose quality rules, 47 skills, 14 agents, hooks enabled (Kilo) / plugins enabled (OpenCode). Use /verify to validate.`
 
 ## OpenCode-Specific Tools
 

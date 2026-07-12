@@ -14,7 +14,8 @@ This project is powered by **Solo-Code Harness** — an AI agent discipline laye
 | `.github/scripts/` | Harness verification | `security_scan.py`, `checklist.py`, `check_skips.py` |
 | `tools/` | Harness utilities | `deploy.py`, `generate_harness.py`, `garden.py` |
 | `.contracts/` | Harness sub-agent contracts | Status contracts for delegated agents |
-| `AGENTS.md`, `kilo.jsonc`, `opencode.json`, `.mcp.json`, `Makefile`, `SPEC.md` | Harness config | Agent behavior configuration — not application config |
+| `.vscode/` | Harness IDE config | VS Code settings + MCP servers — not project source |
+| `AGENTS.md`, `kilo.jsonc`, `opencode.json`, `.mcp.json`, `Makefile`, `SPEC.md`, `.harness.lock` | Harness config | Agent behavior configuration — not application config |
 | **Everything else** | **Project code** | Your actual application |
 
 **Key rule:** Never modify harness files to fix a project bug. Never modify project files to fix a harness issue.

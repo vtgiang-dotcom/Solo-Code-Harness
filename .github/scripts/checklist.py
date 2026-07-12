@@ -181,6 +181,19 @@ def main():
     # P2: Tests
     print_header("P2: TESTS")
 
+    # Boundary Audit — ensure no project code leaked into harness dirs
+    boundary_auditor = project_path / ".github" / "scripts" / "boundary_audit.py"
+    if boundary_auditor.exists():
+        results.append(
+            run_check(
+                "Boundary Audit",
+                [sys.executable, str(boundary_auditor), str(project_path)],
+                timeout=60,
+            )
+        )
+    else:
+        print_warning("boundary_audit.py not found, skipping Boundary Audit")
+
     # Harness eval
     eval_script = project_path / ".github" / "scripts" / "eval_harness.py"
     if eval_script.exists():

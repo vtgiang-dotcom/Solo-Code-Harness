@@ -61,14 +61,14 @@ def test_agents() -> None:
 
 
 def test_skills() -> None:
-    print("\n--- Skills (expect 42) ---")
+    print("\n--- Skills (expect 47) ---")
     skills_dir = OPENCODE / "skill"
     check("skill/ directory exists", skills_dir.is_dir())
     if not skills_dir.is_dir():
         return
 
     skills = sorted([d for d in skills_dir.iterdir() if d.is_dir()])
-    check(f"skill count = {len(skills)}", len(skills) == 42, f"got {len(skills)}")
+    check(f"skill count = {len(skills)}", len(skills) == 47, f"got {len(skills)}")
 
     for d in skills:
         skill_md = d / "SKILL.md"
@@ -87,7 +87,7 @@ def test_instructions() -> None:
         return
 
     files = sorted(inst_dir.glob("*.instructions.md"))
-    check(f"instruction count = {len(files)}", len(files) == 8, f"got {len(files)}")
+    check(f"instruction count = {len(files)}", len(files) == 9, f"got {len(files)}")
 
     for f in files:
         size = f.stat().st_size
@@ -258,7 +258,7 @@ def test_copilot_instructions() -> None:
         return
 
     files = sorted(inst_dir.glob("*.md"))
-    check(f"instruction count = {len(files)}", len(files) == 8, f"got {len(files)}")
+    check(f"instruction count = {len(files)}", len(files) == 9, f"got {len(files)}")
 
     for f in files:
         size = f.stat().st_size

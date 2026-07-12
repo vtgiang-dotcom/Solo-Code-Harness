@@ -156,6 +156,20 @@ python .github/scripts/checklist.py .
 - **[Copilot](https://github.com/features/copilot)** — agents, skills, commands, prompts
 - **[Gemini](https://gemini.google.com)** — additional AI assistant config
 
+## Important: Harness Boundaries
+
+This project was scaffolded with **Solo-Code Harness** — an AI agent discipline layer. Many files and directories in this project are harness infrastructure, NOT project source code. **Do not confuse them.**
+
+| Contains | Purpose |
+|----------|---------|
+| `.kilo/`, `.opencode/`, `.copilot/`, `.gemini/` | AI agent rules, skills, hooks — NOT project logic |
+| `.github/scripts/` | Verification scripts (`security_scan.py`, `checklist.py`) |
+| `tools/` | Harness utilities (`deploy.py`, `garden.py`) |
+| `.vscode/` | Harness IDE config — NOT project config |
+| `AGENTS.md`, `kilo.jsonc`, `opencode.json`, `SPEC.md`, `.harness.lock` | Agent behavior configuration |
+
+> **Read `.harness.lock`** for the authoritative boundary list. Never modify harness files to fix a project bug. Never modify project files to fix a harness issue.
+
 ## License
 
 MIT
@@ -221,7 +235,7 @@ def _generate_harness_lock(target: Path, dry_run: bool = False) -> None:
         return
 
     # Read version from source pyproject.toml
-    version = "3.2.0"
+    version = "3.3.0"
     src_pyproject = ROOT / "pyproject.toml"
     if src_pyproject.is_file():
         for line in src_pyproject.read_text(encoding="utf-8").splitlines():

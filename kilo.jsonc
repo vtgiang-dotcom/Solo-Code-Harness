@@ -2,6 +2,7 @@
   "$schema": "https://app.kilo.ai/config.json",
   "instructions": [
     "AGENTS.md",
+    ".kilo/instruction/harness-boundaries.md",
     ".kilo/instruction/security-patterns.md",
     ".kilo/instruction/custom-framework-rules.md",
     ".kilo/instruction/harness-checklist.md",
