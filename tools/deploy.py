@@ -228,6 +228,189 @@ markers = [
 """
 
 
+def _transform_agent_frontmatter(source_text: str, filename: str) -> str:
+    """Transform OpenCode/Kilo agent YAML frontmatter to Copilot .agent.md format.
+
+    OpenCode format uses: mode, color, permission (allow/deny per tool)
+    Copilot format uses: description, user-invocable, tools (list of allowed tools)
+    """
+    body_parts = source_text.split("---", 2)
+    if len(body_parts) < 3:
+        # No valid YAML frontmatter — return as-is with minimal header
+        return f'---\ndescription: "Agent: {filename}"\n---\n{source_text.strip()}'
+
+    raw_yaml = body_parts[1]
+    body_md = body_parts[2]
+
+    # Parse key fields from OpenCode/Kilo frontmatter
+    description = ""
+    mode = "subagent"
+    permissions: dict[str, str] = {}
+    nested_perms: dict[str, dict[str, str]] = {}
+    task_perms: dict[str, str] = {}
+
+    for line in raw_yaml.strip().splitlines():
+        stripped = line.strip()
+        if stripped.startswith("description:"):
+            description = stripped.split(":", 1)[1].strip().strip('"')
+        elif stripped.startswith("mode:"):
+            mode = stripped.split(":", 1)[1].strip()
+
+    # If no description, derive one from filename
+    if not description:
+        description = " ".join(
+            w.capitalize() if i == 0 else w
+            for i, w in enumerate(filename.replace("-", " ").split())
+        )
+
+    # Parse permission block (OpenCode/Kilo nested structure)
+    lines = raw_yaml.strip().splitlines()
+    in_permission = False
+    current_tool = ""
+    in_task = False
+
+    for _i, line in enumerate(lines):
+        stripped = line.strip()
+        # Detect top-level keys to track scope
+        if stripped.startswith("permission:"):
+            in_permission = True
+            in_task = False
+            continue
+        if not in_permission:
+            continue
+        # Detect when we leave the permission block (new top-level key at column 0)
+        if not stripped.startswith(" ") and ":" in stripped:
+            key = stripped.split(":", 1)[0].strip()
+            if key not in (
+                "edit", "bash", "read", "grep", "codesearch", "glob",
+                "task", "*",
+            ) and not stripped.startswith('"') and not stripped.startswith("'"):
+                in_permission = False
+                continue
+        # Handle task sub-block
+        if stripped.startswith("task:"):
+            in_task = True
+            current_tool = ""
+            continue
+        if in_task:
+            if ":" in stripped and not stripped.startswith('"') and not stripped.startswith("'"):
+                parts = stripped.split(":", 1)
+                task_key = parts[0].strip()
+                task_val = parts[1].strip() if len(parts) > 1 else ""
+                if task_val:
+                    task_perms[task_key] = task_val
+                continue
+            elif ":" in stripped:
+                parts = stripped.split(":", 1)
+                task_val = parts[1].strip() if len(parts) > 1 else ""
+                if task_val:
+                    task_perms[parts[0].strip().strip('"')] = task_val
+                continue
+            else:
+                in_task = False
+                continue
+        # Handle tool: value (simple case, e.g., "  read: allow")
+        if ":" in stripped:
+            parts = stripped.split(":", 1)
+            key = parts[0].strip()
+            val = parts[1].strip() if len(parts) > 1 else ""
+            if key in ("edit", "read", "grep", "bash", "glob", "codesearch"):
+                if val and val in ("allow", "ask"):
+                    nested_perms.setdefault(key, {})["*"] = val
+                    permissions[key] = val
+                elif not val:
+                    current_tool = key
+                continue
+            # Nested rule under a tool (e.g., '  "*": ask')
+            if current_tool:
+                cleaned_key = key.strip('"').strip("'")
+                if val:
+                    nested_perms.setdefault(current_tool, {})[cleaned_key] = val
+                continue
+
+    # Map OpenCode permissions to Copilot tool aliases
+    tool_map = {
+        "edit": "Edit",
+        "read": "Read",
+        "grep": "Grep",
+        "bash": "Bash",
+        "glob": "Glob",
+    }
+    allowed_tools: list[str] = []
+    for perm_key in ("read", "edit", "grep", "bash", "glob"):
+        if perm_key in nested_perms:
+            # Include if any rule allows (or asks) — Copilot doesn't distinguish
+            perms = nested_perms[perm_key]
+            if any(v in ("allow", "ask") for v in perms.values()) and perm_key in tool_map:
+                allowed_tools.append(tool_map[perm_key])
+        elif perm_key in permissions and permissions[perm_key] in ("allow", "ask"):
+            if perm_key in tool_map:
+                allowed_tools.append(tool_map[perm_key])
+
+    # Build Copilot-format frontmatter
+    copilot_frontmatter = f'description: "{description}"\n'
+    if mode == "primary":
+        copilot_frontmatter += "user-invocable: true\n"
+    else:
+        copilot_frontmatter += "user-invocable: false\n"
+    if allowed_tools:
+        tools_str = ", ".join(allowed_tools)
+        copilot_frontmatter += f"tools: [{tools_str}]\n"
+    # Map task permissions to Copilot agents restriction
+    if task_perms:
+        allowed_agents = [k for k, v in task_perms.items() if v == "allow"]
+        if allowed_agents:
+            agents_str = ", ".join(allowed_agents)
+            copilot_frontmatter += f"agents: [{agents_str}]\n"
+
+    return f"---\n{copilot_frontmatter}---\n{body_md.strip()}\n"
+
+
+def _copy_copilot_agents_to_github(
+    target: Path, dry_run: bool = False
+) -> tuple[int, int]:
+    """Copy .copilot/agents/*.md → .github/agents/*.agent.md for Copilot discovery.
+
+    Copilot reads custom agents from .github/agents/*.agent.md, not .copilot/agents/.
+    Returns (new_count, updated_count).
+    """
+    copilot_agents_src = ROOT / ".copilot" / "agents"
+    github_agents_dst = target / ".github" / "agents"
+
+    if not copilot_agents_src.is_dir():
+        return 0, 0
+
+    new_count, updated_count = 0, 0
+    github_agents_dst.mkdir(parents=True, exist_ok=True)
+
+    for src_file in sorted(copilot_agents_src.glob("*.md")):
+        dst_name = src_file.stem + ".agent.md"
+        dst_file = github_agents_dst / dst_name
+
+        if dry_run:
+            exists = "[UPD]" if dst_file.exists() else "[NEW]"
+            print(f"  [DRY] {exists} .github/agents/{dst_name} (from .copilot/agents/{src_file.name})")
+            new_count += 1
+            continue
+
+        source_text = src_file.read_text(encoding="utf-8")
+        transformed = _transform_agent_frontmatter(source_text, src_file.stem)
+
+        old_text = dst_file.read_text(encoding="utf-8") if dst_file.exists() else ""
+
+        if old_text != transformed:
+            dst_file.parent.mkdir(parents=True, exist_ok=True)
+            dst_file.write_text(transformed, encoding="utf-8")
+            if old_text:
+                print(f"  [UPD] .github/agents/{dst_name}")
+                updated_count += 1
+            else:
+                print(f"  [NEW] .github/agents/{dst_name}")
+                new_count += 1
+
+    return new_count, updated_count
+
+
 def _generate_harness_lock(target: Path, dry_run: bool = False) -> None:
     """Generate .harness.lock with current timestamp and version."""
     if dry_run:
@@ -440,6 +623,13 @@ def scaffold(
         if not dry_run:
             print(f"  Copied: {n} new, {u} updated")
 
+    # ── Step 2.4: Generate .github/agents/ for Copilot ───────────
+    if engine in ("all", "copilot"):
+        print("\n--- .github/agents/ (Copilot) ---")
+        cn, cu = _copy_copilot_agents_to_github(target_path, dry_run)
+        total_new += cn
+        total_upd += cu
+
     # ── Step 2.5: Generate .harness.lock ─────────────────────────
     print("\n--- .harness.lock ---")
     _generate_harness_lock(target_path, dry_run)
@@ -592,6 +782,9 @@ def _cleanup_stale_files(
         for item in dst.rglob("*"):
             if item.is_file():
                 rel = item.relative_to(target_path).as_posix()
+                # Skip generated directories (not in source manifest)
+                if rel.startswith(".github/agents/"):
+                    continue
                 if rel not in source_manifest:
                     if dry_run:
                         print(f"  [STALE] Would remove: {d}/{item.relative_to(dst).as_posix()}")
@@ -687,6 +880,30 @@ def deploy(target: str, *, engine: str = "all", dry_run: bool = False) -> int:
 
         if not dry_run:
             print(f"  Copied: {n} new, {u} updated")
+
+    # ── Step 2.4: Generate .github/agents/ for Copilot ───────────
+    if engine in ("all", "copilot"):
+        print("\n--- .github/agents/ (Copilot) ---")
+        cn, cu = _copy_copilot_agents_to_github(target_path, dry_run)
+        total_new += cn
+        total_upd += cu
+
+        # Clean up stale .github/agents/ files not in .copilot/agents/
+        copilot_agents_src = ROOT / ".copilot" / "agents"
+        github_agents_dir = target_path / ".github" / "agents"
+        if copilot_agents_src.is_dir() and github_agents_dir.is_dir():
+            expected_names = {
+                f.stem + ".agent.md" for f in copilot_agents_src.glob("*.md")
+            }
+            stale_removed = 0
+            for existing in sorted(github_agents_dir.glob("*.agent.md")):
+                if existing.name not in expected_names:
+                    if dry_run:
+                        print(f"  [STALE] Would remove: .github/agents/{existing.name}")
+                    else:
+                        existing.unlink()
+                        print(f"  [STALE] Removed: .github/agents/{existing.name}")
+                    stale_removed += 1
 
     # ── Step 2.5: Cleanup stale files ────────────────────────────
     print("\n--- Stale Cleanup ---")
@@ -815,7 +1032,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--engine",
-        choices=["all", "opencode"],
+        choices=["all", "opencode", "copilot"],
         default="all",
         help="Which engine harness to deploy (default: all)",
     )
