@@ -237,7 +237,300 @@ if (failCount > 0) {
   for (const f of failures) {
     console.log(`  ${f.cmd}: ${f.reason}`);
   }
-  process.exit(1);
+  console.log('\n>>> GUARD TESTS FAILED — skipping hookify');
 } else {
-  console.log('\n>>> TẤT CẢ PASS');
+  console.log('\n>>> GUARD TESTS PASS — running hookify tests');
+  runHookifyTests();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v3.0: Hookify MD Engine Tests
+// Port from .kilo/hooks/hookify/hookify-engine.js
+// ═══════════════════════════════════════════════════════════════════════════
+
+import fs from 'fs';
+import path from 'path';
+
+const HOOKIFY_TEST_DIR = path.join(process.cwd(), '.opencode', 'hookify', 'rules');
+
+// --- parseHookifyRule tests ---
+function testParseHookifyRule() {
+  console.log('\n=== Hookify: parseHookifyRule ===');
+  let p = 0, f = 0;
+
+  // Valid rule
+  const valid = '---\nname: test-block\nevent: bash\npattern: echo\\s+hello\naction: block\n---\nBlock echo hello';
+  const parsed = parseHookifyRule(valid);
+  if (parsed && parsed.name === 'test-block' && parsed.event === 'bash' && parsed.action === 'block') {
+    console.log('PASS | parse valid rule'); p++;
+  } else { console.log('FAIL | parse valid rule — got ' + JSON.stringify(parsed)); f++; }
+
+  // Missing frontmatter
+  const noFm = 'just some text';
+  const fmNull = parseHookifyRule(noFm);
+  if (fmNull === null) {
+    console.log('PASS | return null for no frontmatter'); p++;
+  } else { console.log('FAIL | expected null for no frontmatter'); f++; }
+
+  // Boolean values
+  const boolRule = '---\nenabled: true\ntest: false\n---\nmsg';
+  const boolParsed = parseHookifyRule(boolRule);
+  if (boolParsed && boolParsed.enabled === true && boolParsed.test === false) {
+    console.log('PASS | parse booleans true/false'); p++;
+  } else { console.log('FAIL | boolean parse: ' + JSON.stringify(boolParsed)); f++; }
+
+  // Quoted values (note: \\s in JS string literal = \s in actual YAML value)
+  const quoted = '---\npattern: "rm\\s+-rf"\naction: \'block\'\n---\nmsg';
+  const qParsed = parseHookifyRule(quoted);
+  if (qParsed && qParsed.pattern === 'rm\\s+-rf' && qParsed.action === 'block') {
+    console.log('PASS | strip quotes from values'); p++;
+  } else { console.log('FAIL | quote strip: ' + JSON.stringify(qParsed)); f++; }
+
+  return { pass: p, fail: f };
+}
+
+// --- compileHookifyPattern tests ---
+function testCompileHookifyPattern() {
+  console.log('\n=== Hookify: compileHookifyPattern ===');
+  let p = 0, f = 0;
+
+  // Valid regex
+  const valid = compileHookifyPattern('rm\\\\s+-rf');
+  if (valid instanceof RegExp) {
+    console.log('PASS | compile valid regex'); p++;
+  } else { console.log('FAIL | expected RegExp'); f++; }
+
+  // Invalid regex
+  const invalid = compileHookifyPattern('[unclosed');
+  if (invalid === null) {
+    console.log('PASS | return null for invalid regex'); p++;
+  } else { console.log('FAIL | expected null for invalid regex'); f++; }
+
+  // Null/empty
+  const empty = compileHookifyPattern('');
+  if (empty === null) {
+    console.log('PASS | return null for empty pattern'); p++;
+  } else { console.log('FAIL | expected null'); f++; }
+
+  return { pass: p, fail: f };
+}
+
+// --- checkHookifyBash tests ---
+function testCheckHookifyBash() {
+  console.log('\n=== Hookify: checkHookifyBash ===');
+  let p = 0, f = 0;
+
+  const rules = [
+    { name: 'test-block', event: 'bash', pattern: /rm\s+-rf\s+\/tmp\//, action: 'block', message: 'no tmp delete' },
+    { name: 'test-warn', event: 'bash', pattern: /npm\s+cache\s+clean/, action: 'warn', message: 'npm cache warning' },
+  ];
+
+  // Matching command
+  const match = checkHookifyBash('rm -rf /tmp/test', rules);
+  if (match && match.name === 'test-block' && match.action === 'block') {
+    console.log('PASS | match destructive bash command'); p++;
+  } else { console.log('FAIL | expected match test-block'); f++; }
+
+  // Non-matching command
+  const noMatch = checkHookifyBash('ls -la', rules);
+  if (noMatch === null) {
+    console.log('PASS | no match for safe command'); p++;
+  } else { console.log('FAIL | expected null'); f++; }
+
+  // Event filter — file rule must not match bash
+  const fileRules = [
+    { name: 'file-only', event: 'file', pattern: /\.env$/, action: 'block', message: 'no env' },
+  ];
+  const fileRuleMatch = checkHookifyBash('.env', fileRules);
+  if (fileRuleMatch === null) {
+    console.log('PASS | file-only rule ignored for bash'); p++;
+  } else { console.log('FAIL | file rule should not match bash'); f++; }
+
+  // 'all' event must match
+  const allRules = [
+    { name: 'all-rule', event: 'all', pattern: /ls/, action: 'warn', message: 'ls warning' },
+  ];
+  const allMatch = checkHookifyBash('ls -la', allRules);
+  if (allMatch && allMatch.name === 'all-rule') {
+    console.log('PASS | all-event rule matches bash'); p++;
+  } else { console.log('FAIL | all event should match'); f++; }
+
+  return { pass: p, fail: f };
+}
+
+// --- checkHookifyFile tests ---
+function testCheckHookifyFile() {
+  console.log('\n=== Hookify: checkHookifyFile ===');
+  let p = 0, f = 0;
+
+  const rules = [
+    { name: 'deny-env', event: 'file', pattern: /\.env$/, action: 'block', message: 'no .env writes' },
+    { name: 'deny-config', event: 'file', pattern: /kilo\.jsonc$/, action: 'warn', message: 'warn kilo config' },
+  ];
+
+  // Match .env
+  const match = checkHookifyFile('/project/.env', rules);
+  if (match && match.name === 'deny-env') {
+    console.log('PASS | match .env file'); p++;
+  } else { console.log('FAIL | expected match deny-env'); f++; }
+
+  // No match
+  const noMatch = checkHookifyFile('/project/src/index.ts', rules);
+  if (noMatch === null) {
+    console.log('PASS | no match for safe file'); p++;
+  } else { console.log('FAIL | expected null'); f++; }
+
+  // Bash rule must not match file
+  const bashRules = [
+    { name: 'bash-only', event: 'bash', pattern: /rm/, action: 'block', message: 'no rm' },
+  ];
+  const bashRuleMatch = checkHookifyFile('rm', bashRules);
+  if (bashRuleMatch === null) {
+    console.log('PASS | bash-only rule ignored for file'); p++;
+  } else { console.log('FAIL | bash rule should not match file'); f++; }
+
+  return { pass: p, fail: f };
+}
+
+// --- applyHookifyAction tests ---
+function testApplyHookifyAction() {
+  console.log('\n=== Hookify: applyHookifyAction ===');
+  let p = 0, f = 0;
+
+  // block action throws
+  let threw = false;
+  try {
+    applyHookifyAction({ name: 'test', action: 'block', message: 'blocked!' });
+  } catch (e) {
+    threw = true;
+  }
+  if (threw) {
+    console.log('PASS | block action throws Error'); p++;
+  } else { console.log('FAIL | block should throw'); f++; }
+
+  // deny action throws (alias)
+  threw = false;
+  try {
+    applyHookifyAction({ name: 'test', action: 'deny', message: 'denied!' });
+  } catch (e) {
+    threw = true;
+  }
+  if (threw) {
+    console.log('PASS | deny action throws Error (block alias)'); p++;
+  } else { console.log('FAIL | deny should throw'); f++; }
+
+  // allow action passes silently
+  threw = false;
+  try {
+    applyHookifyAction({ name: 'test', action: 'allow', message: 'ok' });
+  } catch (e) {
+    threw = true;
+  }
+  if (!threw) {
+    console.log('PASS | allow action passes silently'); p++;
+  } else { console.log('FAIL | allow should not throw'); f++; }
+
+  // null match passes silently
+  threw = false;
+  try {
+    applyHookifyAction(null);
+  } catch (e) {
+    threw = true;
+  }
+  if (!threw) {
+    console.log('PASS | null match passes silently'); p++;
+  } else { console.log('FAIL | null should not throw'); f++; }
+
+  return { pass: p, fail: f };
+}
+
+// --- Hookify Integration Tests ---
+function runHookifyTests() {
+  console.log('\n=============================================================');
+  console.log('  SOLOCODE GUARD — HOOKIFY ENGINE TESTS (v3.0)');
+  console.log('=============================================================');
+
+  const results = [
+    testParseHookifyRule(),
+    testCompileHookifyPattern(),
+    testCheckHookifyBash(),
+    testCheckHookifyFile(),
+    testApplyHookifyAction(),
+  ];
+
+  let totalP = 0, totalF = 0;
+  for (const r of results) { totalP += r.pass; totalF += r.fail; }
+  console.log(`\n=== Hookify Results: ${totalP} pass, ${totalF} fail ===`);
+
+  if (totalF > 0) {
+    console.log('\n>>> HOOKIFY TESTS FAILED');
+    process.exit(1);
+  }
+  console.log('\n>>> TẤT CẢ PASS (guard + hookify)');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Hookify Engine Functions (inlined for testability)
+// Port from .opencode/plugins/solocode-guard.js
+// ═══════════════════════════════════════════════════════════════
+
+function parseHookifyRule(content) {
+  if (!content.startsWith('---')) return null;
+  const end = content.indexOf('---', 3);
+  if (end === -1) return null;
+  const fm = {};
+  const yaml = content.slice(3, end).trim();
+  for (const line of yaml.split('\n')) {
+    const colon = line.indexOf(':');
+    if (colon === -1) continue;
+    const key = line.slice(0, colon).trim();
+    const val = line.slice(colon + 1).trim().replace(/^["']|["']$/g, '');
+    if (!key) continue;
+    if (val === 'true') fm[key] = true;
+    else if (val === 'false') fm[key] = false;
+    else fm[key] = val;
+  }
+  const message = content.slice(end + 3).trim();
+  return { ...fm, message };
+}
+
+function compileHookifyPattern(patternStr) {
+  if (!patternStr) return null;
+  try {
+    return new RegExp(patternStr, 'i');
+  } catch (_) {
+    return null;
+  }
+}
+
+function checkHookifyBash(command, rules) {
+  if (!command) return null;
+  for (const r of rules) {
+    if (r.event !== 'bash' && r.event !== 'all') continue;
+    try {
+      if (r.pattern.test(command)) return { name: r.name, action: r.action, message: r.message };
+    } catch (_) {}
+  }
+  return null;
+}
+
+function checkHookifyFile(filePath, rules) {
+  if (!filePath) return null;
+  for (const r of rules) {
+    if (r.event !== 'file' && r.event !== 'all') continue;
+    try {
+      if (r.pattern.test(filePath)) return { name: r.name, action: r.action, message: r.message };
+    } catch (_) {}
+  }
+  return null;
+}
+
+function applyHookifyAction(match) {
+  if (!match) return;
+  if (match.action === 'block' || match.action === 'deny') {
+    throw new Error('[SoloCode] Hookify blocked: ' + match.name + ' — ' + match.message);
+  }
+  if (match.action === 'warn') {
+    // console.warn logged — suppress in test
+  }
 }

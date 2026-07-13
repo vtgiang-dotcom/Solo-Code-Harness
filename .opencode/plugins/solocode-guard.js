@@ -1,10 +1,15 @@
 /**
- * solocode-guard.js — OpenCode guard plugin (v2.5)
+ * solocode-guard.js — OpenCode guard plugin (v3.0)
  *
  * Ported from Solo-Code Kilo hooks:
  *   .kilo/hooks/pre-tool-use/gate-guard.js
  *   .kilo/hooks/pre-tool-use/secret-scan.js
  *   .kilo/hooks/pre-tool-use/config-protection.js
+ *   .kilo/hooks/hookify/hookify-engine.js
+ *
+ * v3.0 CHANGES:
+ *   - Added Hookify MD engine: user-definable rules via .opencode/hookify/rules/*.md
+ *     Port from .kilo/hooks/hookify/hookify-engine.js (plan: opencode-gap-closure.md)
  *
  * v2.5 CHANGES:
  *   - Added chat.message hook: auto-injects session state (handoff +
@@ -333,6 +338,140 @@ function extractPatchFilePaths(patchText) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// v3.0: Hookify MD Engine — user-definable rules via .opencode/hookify/rules/
+// Port from .kilo/hooks/hookify/hookify-engine.js
+// ═══════════════════════════════════════════════════════════════════════════
+
+const HOOKIFY_DIR = '.opencode/hookify/rules';
+
+/**
+ * Parse YAML frontmatter from a hookify rule file (.md).
+ * Format: ---\nkey: value\n...\n---\nmessage body
+ * No dependency — inline parser, 20 lines.
+ * @param {string} content
+ * @returns {object | null}
+ */
+function parseHookifyRule(content) {
+  if (!content.startsWith('---')) return null;
+  const end = content.indexOf('---', 3);
+  if (end === -1) return null;
+  const fm = {};
+  const yaml = content.slice(3, end).trim();
+  for (const line of yaml.split('\n')) {
+    const colon = line.indexOf(':');
+    if (colon === -1) continue;
+    const key = line.slice(0, colon).trim();
+    const val = line.slice(colon + 1).trim().replace(/^["']|["']$/g, '');
+    if (!key) continue;
+    if (val === 'true') fm[key] = true;
+    else if (val === 'false') fm[key] = false;
+    else fm[key] = val;
+  }
+  const message = content.slice(end + 3).trim();
+  return { ...fm, message };
+}
+
+/**
+ * Compile a regex pattern string from hookify rule.
+ * Wrapped in try/catch — malformed regexes log warning and skip.
+ * @param {string} patternStr
+ * @returns {RegExp | null}
+ */
+function compileHookifyPattern(patternStr) {
+  if (!patternStr) return null;
+  try {
+    return new RegExp(patternStr, 'i');
+  } catch (_) {
+    console.warn('[SoloCode] Hookify: invalid regex pattern, skipping rule');
+    return null;
+  }
+}
+
+/**
+ * Load enabled hookify rules from .opencode/hookify/rules/*.md.
+ * Skips missing directory, unparseable files, and disabled rules.
+ * Port from .kilo/hooks/hookify/hookify-engine.js:89-117
+ * @returns {Array<{ name: string, event: string, pattern: RegExp, action: string, message: string }>}
+ */
+function loadHookifyRules() {
+  if (!fs.existsSync(HOOKIFY_DIR)) return [];
+  const rules = [];
+  let files;
+  try {
+    files = fs.readdirSync(HOOKIFY_DIR);
+  } catch (_) { return []; }
+  for (const file of files) {
+    if (!file.endsWith('.md')) continue;
+    try {
+      const content = fs.readFileSync(HOOKIFY_DIR + '/' + file, 'utf8');
+      const parsed = parseHookifyRule(content);
+      if (!parsed || !parsed.enabled) continue;
+      const pattern = compileHookifyPattern(parsed.pattern);
+      if (!pattern) continue;
+      rules.push({
+        name: parsed.name || file.replace('.md', ''),
+        event: parsed.event || 'all',
+        pattern,
+        action: parsed.action || 'warn',
+        message: parsed.message || ('Hookify rule: ' + (parsed.name || file)),
+      });
+    } catch (_) {
+      // Silently skip unreadable/corrupt rule files
+    }
+  }
+  return rules;
+}
+
+/**
+ * Check shell command against hookify bash rules.
+ * @param {string} command
+ * @param {Array} rules — pre-loaded rules
+ * @returns {{ name: string, action: string, message: string } | null}
+ */
+function checkHookifyBash(command, rules) {
+  if (!command) return null;
+  for (const r of rules) {
+    if (r.event !== 'bash' && r.event !== 'all') continue;
+    try {
+      if (r.pattern.test(command)) return { name: r.name, action: r.action, message: r.message };
+    } catch (_) { /* skip broken pattern */ }
+  }
+  return null;
+}
+
+/**
+ * Check file path against hookify file rules.
+ * @param {string} filePath
+ * @param {Array} rules — pre-loaded rules
+ * @returns {{ name: string, action: string, message: string } | null}
+ */
+function checkHookifyFile(filePath, rules) {
+  if (!filePath) return null;
+  for (const r of rules) {
+    if (r.event !== 'file' && r.event !== 'all') continue;
+    try {
+      if (r.pattern.test(filePath)) return { name: r.name, action: r.action, message: r.message };
+    } catch (_) { /* skip broken pattern */ }
+  }
+  return null;
+}
+
+/**
+ * Apply hookify rule action: block throws, warn logs, allow passes.
+ * @param {object} match — { name, action, message }
+ */
+function applyHookifyAction(match) {
+  if (!match) return;
+  if (match.action === 'block' || match.action === 'deny') {
+    throw new Error('[SoloCode] Hookify blocked: ' + match.name + ' — ' + match.message);
+  }
+  if (match.action === 'warn') {
+    console.warn('[SoloCode] Hookify warning (' + match.name + '): ' + match.message);
+  }
+  // 'allow' passes silently
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // v2.5: Session State Injection
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -363,6 +502,24 @@ export const SoloCodeGuard = async ({ project, client, $, directory, worktree })
       try {
         const tool = input.tool;
         const args = output.args || {};
+
+        // v3.0: Load & apply hookify rules (user-definable via .md files)
+        const hookifyRules = loadHookifyRules();
+        if (hookifyRules.length > 0) {
+          switch (tool) {
+            case 'bash': {
+              applyHookifyAction(checkHookifyBash(args.command || '', hookifyRules));
+              break;
+            }
+            case 'write':
+            case 'edit':
+            case 'apply_patch': {
+              applyHookifyAction(checkHookifyFile(args.filePath || '', hookifyRules));
+              break;
+            }
+          }
+        }
+
         switch (tool) {
           case 'bash': {
             const raw = args.command || '';

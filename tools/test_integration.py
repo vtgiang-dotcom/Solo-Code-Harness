@@ -100,7 +100,7 @@ def test_plugin() -> None:
     check("solocode-guard.js exists", plugin.is_file())
     if plugin.is_file():
         content = plugin.read_text(encoding="utf-8")
-        check("  version v2.5", "v2.5" in content[:200], "not v2.5")
+        check("  version v3.0", "v3.0" in content[:200], "not v3.0")
         check("  BLOCK_PATTERNS declared", "BLOCK_PATTERNS" in content)
         check("  SECRET_PATTERNS declared", "SECRET_PATTERNS" in content)
         check("  chat.message hook", "chat.message" in content)
