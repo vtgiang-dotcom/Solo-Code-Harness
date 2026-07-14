@@ -12,9 +12,11 @@ Usage:
 from __future__ import annotations
 
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 SKIP_FILE = ROOT / "tools" / "opencode-skip-skills.txt"
 
 
@@ -146,6 +148,36 @@ def _issue_matches_skip(issue: str, skip_set: set[str]) -> bool:
     return False
 
 
+def check_shared_state() -> list[str]:
+    """Check that .solocode/shared-state.db exists and passes integrity_check."""
+    issues: list[str] = []
+    db_path = ROOT / ".solocode" / "shared-state.db"
+
+    if not db_path.exists():
+        issues.append("Missing: .solocode/shared-state.db (run 'python tools/migrate_to_shared_state.py')")
+        return issues
+
+    from tools.shared_state import SharedState
+
+    with SharedState(db_path) as state:
+        errors = state.integrity_check()
+        if errors:
+            issues.append(f"Corrupt DB: .solocode/shared-state.db — {errors}")
+            return issues
+
+        now = datetime.now(timezone.utc)
+        for feat in state.get_features():
+            if feat["status"] == "in-progress" and feat["last_updated"]:
+                try:
+                    dt = datetime.fromisoformat(feat["last_updated"])
+                    if now - dt > timedelta(days=7):
+                        issues.append(f"Stale feature: {feat['id']} in-progress since {feat['last_updated'][:10]}")
+                except ValueError:
+                    pass
+
+    return issues
+
+
 def run_engine_checks(
     src: Path, dst: Path, dst_label: str,
     *,
@@ -200,6 +232,17 @@ def main() -> int:
     all_issues.extend(
         run_engine_checks(kilo, ROOT / ".copilot", ".copilot", instruction_suffix=False)
     )
+
+    # Shared state health (không thuộc riêng engine nào)
+    print("\n--- Shared State ---")
+    shared_issues = check_shared_state()
+    if shared_issues:
+        print("[DRIFT] Shared state:")
+        for i in shared_issues:
+            print(f"  {i}")
+        all_issues.extend(shared_issues)
+    else:
+        print("[OK] Shared state")
 
     print(f"\nTotal drift issues: {len(all_issues)}")
     if all_issues:
