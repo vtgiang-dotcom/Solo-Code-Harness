@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """
-One-time migration: .opencode/state/feature_list.json → .solocode/shared-state.db
-Idempotent — an toàn khi chạy nhiều lần (feature đã tồn tại sẽ bị bỏ qua, không ghi đè).
+One-time migration:
+  .opencode/state/feature_list.json → .solocode/shared-state.db (features)
+  .opencode/state/progress.md       → .solocode/shared-state.db (session_log)
+Idempotent — an toàn khi chạy nhiều lần.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -15,24 +18,25 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-SRC = ROOT / ".opencode" / "state" / "feature_list.json"
+FEATURES_SRC = ROOT / ".opencode" / "state" / "feature_list.json"
+PROGRESS_SRC = ROOT / ".opencode" / "state" / "progress.md"
 
 
 def migrate_features() -> int:
-    if not SRC.exists():
-        print(f"[SKIP] Source not found: {SRC}")
+    if not FEATURES_SRC.exists():
+        print(f"[SKIP] Source not found: {FEATURES_SRC}")
         return 1
 
     from tools.shared_state import SharedState
 
-    data = json.loads(SRC.read_text(encoding="utf-8"))
+    data = json.loads(FEATURES_SRC.read_text(encoding="utf-8"))
     features = data["features"]
     print(f"Found {len(features)} features in source")
 
+    # Nguồn dùng "done" thay vì "completed" — chuẩn hóa khi migrate
+    STATUS_MAP = {"done": "completed"}
     migrated = 0
     with SharedState() as state:
-        # Nguồn dùng "done" thay vì "completed" — chuẩn hóa khi migrate
-        STATUS_MAP = {"done": "completed"}
         for feat in features:
             existing = state.get_feature(feat["id"])
             if existing:
@@ -48,7 +52,6 @@ def migrate_features() -> int:
                 name=feat.get("name", ""),
             )
             migrated += 1
-            # Tránh lỗi encoding Windows — chỉ hiển thị tên FEATURE hoặc id
             display_name = feat.get("name") or feat["id"]
             print(f"  [{feat['id']}] Migrated: {feat.get('status', '?')}: {display_name}", flush=True)
 
@@ -62,5 +65,54 @@ def migrate_features() -> int:
     return 0
 
 
+def migrate_sessions() -> int:
+    """Migrate .opencode/state/progress.md sessions to shared state session_log."""
+    if not PROGRESS_SRC.exists():
+        print("[SKIP] progress.md not found")
+        return 0
+
+    from tools.shared_state import SharedState
+
+    content = PROGRESS_SRC.read_text(encoding="utf-8")
+    # Khớp dòng dạng: "## 2026-06-23 — Mở rộng deploy.py: ..."
+    sessions = re.findall(r'##\s+(\d{4}-\d{2}-\d{2})\s*[—–-]\s*(.+)', content)
+
+    migrated = 0
+    with SharedState() as state:
+        existing_count = len(state.get_recent_sessions(limit=10_000_000))
+        # Lấy summary các session hiện có để tránh duplicate khi chạy lại
+        existing_summaries = {s["summary"] for s in state.get_recent_sessions(limit=10_000_000)}
+        for date_str, summary in reversed(sessions):  # cũ nhất trước để giữ đúng thứ tự
+            s = f"[{date_str}] {summary.strip()}"
+            if s in existing_summaries:
+                continue
+            state.add_session_entry(
+                engine="opencode",
+                model="unknown",
+                summary=s,
+            )
+            migrated += 1
+        total = len(state.get_recent_sessions(limit=10_000_000))
+
+    if migrated > 0:
+        print(f"Migrated {migrated} session entries (had {existing_count} before)")
+    else:
+        print("No session entries found in progress.md")
+    print(f"Shared state now has {total} session_log entries")
+    return 0
+
+
 if __name__ == "__main__":
-    sys.exit(migrate_features())
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--sessions", action="store_true", help="Chỉ migrate session log")
+    parser.add_argument("--all", action="store_true", help="Migrate cả features và sessions")
+    args = parser.parse_args()
+
+    rc = 0
+    if args.all or not args.sessions:
+        rc |= migrate_features()
+    if args.all or args.sessions:
+        rc |= migrate_sessions()
+    sys.exit(rc)
