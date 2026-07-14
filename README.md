@@ -55,7 +55,7 @@ python tools/deploy.py scaffold /path/to/new-project --engine opencode
 python tools/deploy.py scaffold /path/to/new-project --engine copilot
 ```
 
-Scaffold creates the directory, copies all engine configs (OpenCode + Kilo + Gemini), generates `.gitignore` and `README.md`, runs `git init`, and prints post-setup instructions.
+Scaffold creates the directory, copies all engine configs (OpenCode + Kilo + Copilot + Gemini), generates `.gitignore` and `README.md`, runs `git init`, and prints post-setup instructions.
 
 ### Deploy to an existing project
 
@@ -87,8 +87,8 @@ python tools/deploy.py
 
 | Directory | Purpose |
 |---|---|
-| `.opencode/` | **Primary** — OpenCode: agents (14), skills (42), plugin v2.5, commands (4), tools (2), state (5) |
-| `.copilot/` | GitHub Copilot: agents (14), skills (47), commands (13), instruction (7), memory (3) |
+| `.opencode/` | **Primary** — OpenCode: agents (14), skills (47), plugin v2.5, commands (4), tools (2), state (5) |
+| `.copilot/` | GitHub Copilot: agents (14), skills (47), commands (13), instruction (10), memory (4) |
 | `.kilo/` | Kilo Code: agents (14), skills (47), hooks, memory, instruction |
 | `.gemini/` | Gemini/Antigravity: agents (14), skills (47), commands (12), knowledge |
 | `.github/` | Shared scripts: `security_scan.py`, `checklist.py`, `check_skips.py`, `eval_harness.py`, `security-allowlist.txt` + `copilot-instructions.md`, `prompts/` |
@@ -271,7 +271,7 @@ python tools/deploy.py scaffold /path/to/new-project --engine opencode
 python tools/deploy.py scaffold /path/to/new-project --engine copilot
 ```
 
-Scaffold tạo thư mục, copy config cho tất cả engine (OpenCode + Kilo + Gemini), sinh `.gitignore` và `README.md`, chạy `git init`, và in hướng dẫn post-setup.
+Scaffold tạo thư mục, copy config cho tất cả engine (OpenCode + Kilo + Copilot + Gemini), sinh `.gitignore` và `README.md`, chạy `git init`, và in hướng dẫn post-setup.
 
 ### Deploy — copy harness vào dự án có sẵn
 
@@ -303,8 +303,8 @@ python tools/deploy.py
 
 | Thư mục | Mục đích |
 |---|---|
-| `.opencode/` | **Chính** — OpenCode: agents (14), skills (42), plugin v2.5, commands (4), tools (2), state (5) |
-| `.copilot/` | GitHub Copilot: agents (14), skills (47), commands (13), instruction (7), memory (3) |
+| `.opencode/` | **Chính** — OpenCode: agents (14), skills (47), plugin v2.5, commands (4), tools (2), state (5) |
+| `.copilot/` | GitHub Copilot: agents (14), skills (47), commands (13), instruction (10), memory (4) |
 | `.kilo/` | Kilo Code: agents (14), skills (47), hooks, memory, instruction |
 | `.gemini/` | Gemini/Antigravity: agents (14), skills (47), commands (12), knowledge |
 | `.github/` | Script dùng chung: `security_scan.py`, `checklist.py`, `eval_harness.py` + `copilot-instructions.md`, `prompts/` |
