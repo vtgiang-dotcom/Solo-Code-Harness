@@ -106,6 +106,15 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+# Số lần thử lại + độ trễ khi khởi tạo DB lần đầu bị "database is locked".
+# Cần thiết vì PRAGMA/executescript trong __init__ chạy TRƯỚC bất kỳ
+# transaction BEGIN IMMEDIATE nào, nên có thể va chạm khi 2 engine cùng
+# tạo file .db mới lần đầu gần như đồng thời (đã tái hiện được bug này
+# bằng test_concurrent_lock_acquire trước khi có retry).
+_INIT_RETRY_ATTEMPTS = 10
+_INIT_RETRY_DELAY_SECONDS = 0.1
+
+
 class SharedState:
     """Cross-engine shared state manager backed by SQLite (local-only)."""
 
@@ -113,14 +122,35 @@ class SharedState:
         self.path = path or DB_PATH
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self.path, isolation_level=None, timeout=30)
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute("PRAGMA foreign_keys=ON")
-        self._conn.executescript(SCHEMA_SQL)
+        self._init_schema_with_retry()
+
+    def _init_schema_with_retry(self) -> None:
+        """Run PRAGMA + schema setup, retrying on transient 'database is locked'.
+
+        This happens outside any BEGIN IMMEDIATE transaction, so it is not
+        covered by SQLite's own busy_timeout the same way writes are —
+        retry manually instead of letting the first attempt crash the caller.
+        """
+        import time
+
+        last_error: sqlite3.OperationalError | None = None
+        for attempt in range(_INIT_RETRY_ATTEMPTS):
+            try:
+                self._conn.execute("PRAGMA journal_mode=WAL")
+                self._conn.execute("PRAGMA foreign_keys=ON")
+                self._conn.executescript(SCHEMA_SQL)
+                return
+            except sqlite3.OperationalError as e:
+                if "locked" not in str(e).lower() and "busy" not in str(e).lower():
+                    raise
+                last_error = e
+                time.sleep(_INIT_RETRY_DELAY_SECONDS * (attempt + 1))
+        raise last_error  # type: ignore[misc]
 
     def close(self) -> None:
         self._conn.close()
 
-    def __enter__(self) -> "SharedState":
+    def __enter__(self) -> SharedState:
         return self
 
     def __exit__(self, *_exc: object) -> None:
@@ -241,7 +271,7 @@ class SharedState:
         rows = self._conn.execute(
             "SELECT timestamp, engine, model, session_id, summary, features_touched, "
             "files_changed, commits, verification FROM session_log "
-            "ORDER BY timestamp DESC LIMIT ?",
+            "ORDER BY timestamp DESC, id DESC LIMIT ?",
             (limit,),
         ).fetchall()
         return [

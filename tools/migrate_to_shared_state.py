@@ -34,7 +34,7 @@ def migrate_features() -> int:
     print(f"Found {len(features)} features in source")
 
     # Nguồn dùng "done" thay vì "completed" — chuẩn hóa khi migrate
-    STATUS_MAP = {"done": "completed"}
+    status_map = {"done": "completed"}
     migrated = 0
     with SharedState() as state:
         for feat in features:
@@ -42,7 +42,7 @@ def migrate_features() -> int:
             if existing:
                 print(f"  [{feat['id']}] Already exists — skipping")
                 continue
-            status = STATUS_MAP.get(feat["status"], feat["status"])
+            status = status_map.get(feat["status"], feat["status"])
             state.set_feature_status(
                 feat["id"],
                 status,

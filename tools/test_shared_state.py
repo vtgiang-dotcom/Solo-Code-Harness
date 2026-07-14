@@ -138,6 +138,11 @@ def test_concurrent_lock_acquire():
     """Two threads racing to lock the same path — exactly one must win, no crash."""
     with tempfile.TemporaryDirectory() as tmpdir:
         path = Path(tmpdir) / "shared-state.db"
+        # Khởi tạo schema TRƯỚC khi spawn thread — tránh race điều kiện lúc tạo
+        # file .db lần đầu (PRAGMA/executescript ngoài transaction BEGIN IMMEDIATE),
+        # để phần concurrent chỉ còn kiểm tra đúng 1 thứ: tranh chấp acquire_lock.
+        SharedState(path).close()
+
         results: list[bool] = []
         barrier = threading.Barrier(2)
         errors: list[Exception] = []
@@ -145,7 +150,9 @@ def test_concurrent_lock_acquire():
         def worker(engine: str) -> None:
             try:
                 with SharedState(path) as state:
-                    barrier.wait()
+                    # timeout để không bao giờ treo vô hạn nếu thread kia lỗi
+                    # trước khi tới barrier — biến hang thành fail rõ ràng.
+                    barrier.wait(timeout=10)
                     results.append(state.acquire_lock("src/shared.py", engine=engine, model="test"))
             except Exception as e:  # noqa: BLE001 — test must observe any crash, not hide it
                 errors.append(e)
@@ -154,8 +161,10 @@ def test_concurrent_lock_acquire():
         t2 = threading.Thread(target=worker, args=("copilot",))
         t1.start()
         t2.start()
-        t1.join()
-        t2.join()
+        t1.join(timeout=15)
+        t2.join(timeout=15)
 
+        assert not t1.is_alive(), "Thread 'kilo' did not finish within timeout — possible deadlock"
+        assert not t2.is_alive(), "Thread 'copilot' did not finish within timeout — possible deadlock"
         assert errors == [], f"No exception should be raised during lock contention, got: {errors}"
         assert sorted(results) == [False, True], f"Exactly one thread should win the lock, got: {results}"
