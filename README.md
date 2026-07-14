@@ -96,6 +96,21 @@ python tools/deploy.py
 | `.vscode/` | VS Code settings + MCP config for Copilot |
 | `docs/specs/` | Architecture specs, migration plans, historical docs |
 
+## Shared State (Cross-Engine, Local-Only)
+
+All 4 engines share a single SQLite file at `.solocode/shared-state.db` — **local-only, không commit git** (thư mục `.solocode/` đã bị `.gitignore` chặn):
+
+- **`features`** — status + ownership (not-started / in-progress / completed / blocked)
+- **`session_log`** — mỗi session được ghi lại: engine, model, files changed, verification (giữ tối đa 1000 dòng gần nhất)
+- **`active_locks`** — ngăn 2 engine sửa cùng 1 file cùng lúc (tự hết hạn sau 2 giờ)
+- **`shared_memory_*`** — conventions, gotchas, decisions dùng chung giữa các engine
+
+```bash
+python tools/shared_state.py show
+python tools/shared_state.py features
+python tools/shared_state.py locks
+```
+
 ## Gates
 
 | Gate | Command | What it checks |

@@ -62,6 +62,7 @@ Phải tồn tại các thư mục: .claude/ .copilot/ .github/ .gemini/ .kilo/ 
 | `.ruff.toml` | Python lint config | PEP 8, type hints |
 | `tools/` | Generator, validator, drift detector, integration tests | `generate_harness.py`, `garden.py`, `test_integration.py`, `deploy.py`, `validate_schemas.py` |
 | `docs/specs/` | Kho spec/RFC | Có ngày, có status |
+| `.solocode/shared-state.db` | Cross-engine shared state (SQLite) | Local-only, KHÔNG commit git — xem `tools/shared_state.py` |
 
 ## 2. File cấu hình hợp lệ [HARD]
 

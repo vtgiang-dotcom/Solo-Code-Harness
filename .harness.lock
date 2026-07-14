@@ -7,7 +7,7 @@
 # Không sửa, không phân tích như logic nghiệp vụ.
 
 [harness]
-version = "3.3.0"
+version = "3.4.0"
 source = "solo-code-io/solo-code-cli"
 generated_at = "2026-07-13T00:27:00Z"
 
