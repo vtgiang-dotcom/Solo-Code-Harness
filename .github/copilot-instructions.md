@@ -216,6 +216,36 @@ Two external LLM providers are configured in `.vscode/settings.json`. Switch mod
 - If cost matters → prefer `deepseek-chat`
 - If analyzing large files / repos → prefer `gemini-2.5-pro` (1M token context)
 
+## Shared State — Cross-Engine Collaboration (MANDATORY)
+
+This project uses `.solocode/shared-state.db` (SQLite, local-only — NOT committed to git) as the single source of truth for development status across all 4 engines (Kilo, OpenCode, Copilot, Gemini).
+
+### Session Start
+1. Read state via `python tools/shared_state.py show`
+2. Check `active_locks` — avoid editing files locked by another engine
+3. Check `features` — find one `in-progress` (or promote a `not-started` → `in-progress`)
+4. Review recent session log entries for context
+5. Load `shared_memory` conventions/gotchas into current session context
+
+### Session End (MANDATORY — before stopping)
+Run the following Python before ending your session:
+```python
+from tools.shared_state import SharedState
+
+with SharedState() as state:
+    state.set_feature_status("feat-XXX", "completed", engine="copilot", model="<your-model>", evidence="<what you did>")
+    state.add_session_entry(
+        engine="copilot",
+        model="<your-model>",
+        summary="<one-line summary of what was done>",
+        features_touched=["feat-XXX"],
+        files_changed=["path/to/file1.py", "path/to/file2.py"],
+        verification={"security_scan": True, "integration_tests": True},
+    )
+```
+
+Use `python tools/shared_state.py show` / `features` / `locks` to inspect current state.
+
 ## Skills System
 
 The Copilot engine includes 44 specialized skills in `.copilot/skill/`. To invoke a skill, reference its trigger keywords. Auto-loaded skills: `code-review-expert`, `file-editor-pro`, `git-workflow-master`, `permission-guard`, `systematic-debugging`, `brainstorming`, `testing-patterns`, `api-patterns`, `solo-code-harness`.
