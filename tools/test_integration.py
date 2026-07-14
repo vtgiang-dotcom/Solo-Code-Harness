@@ -23,6 +23,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 OPENCODE = ROOT / ".opencode"
 
 PASS = 0
@@ -80,14 +81,14 @@ def test_skills() -> None:
 
 
 def test_instructions() -> None:
-    print("\n--- Instructions (expect 8) ---")
+    print("\n--- Instructions (expect 10) ---")
     inst_dir = OPENCODE / "instruction"
     check("instruction/ directory exists", inst_dir.is_dir())
     if not inst_dir.is_dir():
         return
 
     files = sorted(inst_dir.glob("*.instructions.md"))
-    check(f"instruction count = {len(files)}", len(files) == 9, f"got {len(files)}")
+    check(f"instruction count = {len(files)}", len(files) == 10, f"got {len(files)}")
 
     for f in files:
         size = f.stat().st_size
@@ -251,14 +252,14 @@ def test_copilot_skills() -> None:
 
 
 def test_copilot_instructions() -> None:
-    print("\n--- Copilot Instructions (expect 8) ---")
+    print("\n--- Copilot Instructions (expect 10) ---")
     inst_dir = COPILOT / "instruction"
     check("instruction/ directory exists", inst_dir.is_dir())
     if not inst_dir.is_dir():
         return
 
     files = sorted(inst_dir.glob("*.md"))
-    check(f"instruction count = {len(files)}", len(files) == 9, f"got {len(files)}")
+    check(f"instruction count = {len(files)}", len(files) == 10, f"got {len(files)}")
 
     for f in files:
         size = f.stat().st_size
@@ -335,6 +336,25 @@ def test_copilot_vscode() -> None:
             check("  mcp.json: valid JSON", False, "parse error")
 
 
+def test_shared_state() -> None:
+    print("\n--- Shared State ---")
+    db_path = ROOT / ".solocode" / "shared-state.db"
+    check("shared-state.db exists", db_path.is_file())
+
+    if db_path.is_file():
+        from tools.shared_state import SharedState
+        with SharedState(db_path) as state:
+            errors = state.integrity_check()
+            check("  integrity_check passes", errors == [], f"errors: {errors}")
+
+            features = state.get_features()
+            check("  feature count >= 19", len(features) >= 19, f"got {len(features)}")
+
+            for f in features:
+                if f["status"] == "in-progress":
+                    check(f"  {f['id']}: has owner", f["owner"].get("engine") is not None)
+
+
 # ─── Main ──────────────────────────────────────────────────────────
 def main() -> int:
     print("=" * 60)
@@ -350,6 +370,8 @@ def main() -> int:
     test_commands()
     test_tools()
     test_config()
+
+    test_shared_state()
 
     print("\n  [Copilot Engine]")
     test_copilot_agents()
