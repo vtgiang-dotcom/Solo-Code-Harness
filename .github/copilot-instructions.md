@@ -218,7 +218,7 @@ Two external LLM providers are configured in `.vscode/settings.json`. Switch mod
 
 ## Shared State — Cross-Engine Collaboration (MANDATORY)
 
-This project uses `.solocode/shared-state.db` (SQLite, local-only — NOT committed to git) as the single source of truth for development status across all 4 engines (Kilo, OpenCode, Copilot, Gemini).
+This project uses `.solocode/shared-state.db` (SQLite, local-only — NOT committed to git) as the single source of truth for development status across all 5 engines (OpenCode, Claude Code, Kilo, Copilot, Gemini).
 
 ### Session Start
 1. Read state via `python tools/shared_state.py show`

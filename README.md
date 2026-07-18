@@ -55,7 +55,7 @@ python tools/deploy.py scaffold /path/to/new-project --engine opencode
 python tools/deploy.py scaffold /path/to/new-project --engine copilot
 ```
 
-Scaffold creates the directory, copies all engine configs (OpenCode + Kilo + Copilot + Gemini), generates `.gitignore` and `README.md`, runs `git init`, and prints post-setup instructions.
+Scaffold creates the directory, copies all engine configs (OpenCode + Claude Code + Kilo + Copilot + Gemini), generates `.gitignore` and `README.md`, runs `git init`, and prints post-setup instructions.
 
 ### Deploy to an existing project
 
@@ -99,7 +99,7 @@ python tools/deploy.py
 
 ## Shared State (Cross-Engine, Local-Only)
 
-All 4 engines share a single SQLite file at `.solocode/shared-state.db` — **local-only, không commit git** (thư mục `.solocode/` đã bị `.gitignore` chặn):
+All 5 engines share a single SQLite file at `.solocode/shared-state.db` — **local-only, không commit git** (thư mục `.solocode/` đã bị `.gitignore` chặn):
 
 - **`features`** — status + ownership (not-started / in-progress / completed / blocked)
 - **`session_log`** — mỗi session được ghi lại: engine, model, files changed, verification (giữ tối đa 1000 dòng gần nhất)

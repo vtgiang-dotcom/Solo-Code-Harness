@@ -3,7 +3,7 @@
 shared_state.py — Cross-engine shared state reader/writer (SQLite backend).
 
 Single source of truth at .solocode/shared-state.db (LOCAL ONLY — not committed to git,
-directory already excluded via .gitignore). All 4 engines (Kilo, OpenCode, Copilot, Gemini)
+directory already excluded via .gitignore). All 5 engines (OpenCode, Claude Code, Kilo, Copilot, Gemini)
 read/write this file when running on the same machine/workspace.
 
 Why SQLite instead of JSON + manual file locking:

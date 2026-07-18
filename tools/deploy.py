@@ -127,7 +127,7 @@ EXCLUDE_FILES = {
 # Default README template for scaffolded projects
 README_TEMPLATE = """# {project_name}
 
-> Scaffolded from [Solo-Code-CLI](https://github.com/Solo-Code-CLI) — AI agent harness with Kilo + OpenCode + Copilot + Gemini engines.
+> Scaffolded from [Solo-Code-CLI](https://github.com/Solo-Code-CLI) — AI agent harness with OpenCode + Claude Code + Kilo + Copilot + Gemini engines.
 
 {description}
 
@@ -165,8 +165,9 @@ python .github/scripts/checklist.py .
 
 ## Engines
 
+- **[OpenCode](https://opencode.ai)** — agents, plugins, MCP servers (primary)
+- **[Claude Code](https://claude.com/claude-code)** — subagents, skills, commands, hooks, `CLAUDE.md`
 - **[Kilo](https://kilo.ai)** — hooks, skills, memory, orchestrators
-- **[OpenCode](https://opencode.ai)** — agents, plugins, MCP servers
 - **[Copilot](https://github.com/features/copilot)** — agents, skills, commands, prompts
 - **[Gemini](https://gemini.google.com)** — additional AI assistant config
 
@@ -176,11 +177,11 @@ This project was scaffolded with **Solo-Code Harness** — an AI agent disciplin
 
 | Contains | Purpose |
 |----------|---------|
-| `.kilo/`, `.opencode/`, `.copilot/`, `.gemini/` | AI agent rules, skills, hooks — NOT project logic |
+| `.kilo/`, `.opencode/`, `.copilot/`, `.gemini/`, `.claude/` | AI agent rules, skills, hooks — NOT project logic |
 | `.github/scripts/` | Verification scripts (`security_scan.py`, `checklist.py`) |
 | `tools/` | Harness utilities (`deploy.py`, `garden.py`) |
 | `.vscode/` | Harness IDE config — NOT project config |
-| `AGENTS.md`, `kilo.jsonc`, `opencode.json`, `SPEC.md`, `.harness.lock` | Agent behavior configuration |
+| `AGENTS.md`, `CLAUDE.md`, `kilo.jsonc`, `opencode.json`, `SPEC.md`, `.harness.lock` | Agent behavior configuration |
 
 > **Read `.harness.lock`** for the authoritative boundary list. Never modify harness files to fix a project bug. Never modify project files to fix a harness issue.
 
@@ -436,7 +437,7 @@ def _generate_harness_lock(target: Path, dry_run: bool = False) -> None:
         return
 
     # Read version from source pyproject.toml
-    version = "3.3.0"
+    version = "3.5.0"
     src_pyproject = ROOT / "pyproject.toml"
     if src_pyproject.is_file():
         for line in src_pyproject.read_text(encoding="utf-8").splitlines():
