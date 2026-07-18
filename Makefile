@@ -51,7 +51,7 @@ garden:
 	$(PY) tools/garden.py
 
 test:
-	$(PY) -m pytest tools/test_harness.py tools/test_claude_engine.py tools/test_claude_guard.py -v
+	$(PY) -m pytest tools/test_harness.py tools/test_claude_engine.py tools/test_claude_guard.py tools/test_claude_hooks.py -v
 
 check:
 	@echo "=== Lint (ruff) ==="
@@ -64,7 +64,7 @@ check:
 	$(PY) tools/garden.py || exit 1
 	@echo ""
 	@echo "=== Harness Tests ==="
-	$(PY) -m pytest tools/test_harness.py tools/test_claude_engine.py tools/test_claude_guard.py -q || exit 1
+	$(PY) -m pytest tools/test_harness.py tools/test_claude_engine.py tools/test_claude_guard.py tools/test_claude_hooks.py -q || exit 1
 	@echo ""
 	@echo "=== Security Scan ==="
 	$(PY) .github/scripts/security_scan.py . || exit 1

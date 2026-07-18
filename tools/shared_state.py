@@ -36,7 +36,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = ROOT / ".solocode" / "shared-state.db"
 LOCK_TIMEOUT_HOURS = 2
 MAX_SESSION_LOG_ROWS = 1000
-VALID_ENGINES = ("kilo", "opencode", "copilot", "gemini")
+VALID_ENGINES = ("kilo", "opencode", "claude", "copilot", "gemini")
 VALID_STATUSES = ("not-started", "in-progress", "completed", "blocked")
 
 SCHEMA_SQL = """

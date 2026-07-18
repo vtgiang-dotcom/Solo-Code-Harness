@@ -437,7 +437,7 @@ def _generate_harness_lock(target: Path, dry_run: bool = False) -> None:
         return
 
     # Read version from source pyproject.toml
-    version = "3.5.0"
+    version = "3.6.0"
     src_pyproject = ROOT / "pyproject.toml"
     if src_pyproject.is_file():
         for line in src_pyproject.read_text(encoding="utf-8").splitlines():

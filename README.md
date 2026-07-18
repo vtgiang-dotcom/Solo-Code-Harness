@@ -88,7 +88,7 @@ python tools/deploy.py
 | Directory | Purpose |
 |---|---|
 | `.opencode/` | **Primary** — OpenCode: agents (14), skills (47), plugin v2.5, commands (4), tools (2), state (5) |
-| `.claude/` | Claude Code: agents (14), skills (47), commands (13), instruction (10), guard hook + `settings.json`; rulebook `CLAUDE.md` at root |
+| `.claude/` | Claude Code: agents (14), skills (47), commands (13), instruction (10), guard + lifecycle hooks + `settings.json`; rulebook `CLAUDE.md` at root |
 | `.copilot/` | GitHub Copilot: agents (14), skills (47), commands (13), instruction (10), memory (4) |
 | `.kilo/` | Kilo Code: agents (14), skills (47), hooks, memory, instruction |
 | `.gemini/` | Gemini/Antigravity: agents (14), skills (47), commands (12), knowledge |
@@ -172,14 +172,20 @@ python tools/generate_harness.py --harness claude
 | Skills (47) | `.claude/skills/<name>/SKILL.md` | Auto-discovered capabilities |
 | Slash commands (13) | `.claude/commands/*.md` | `/verify`, `/plan`, `/decide`, `/debug`, `/commit`, … |
 | Guard hook | `.claude/hooks/guard.py` + `.claude/settings.json` | `PreToolUse` — blocks destructive commands, secret leaks, protected-config edits |
+| Quality-gate hook | `.claude/hooks/quality_gate.py` | `PostToolUse` (Edit/Write) — advisory ruff/prettier/biome/gofmt format check |
+| Security-post hook | `.claude/hooks/security_post.py` | `PostToolUse` (Bash) — scans `git diff` for secrets after commit/push |
+| Session hooks | `.claude/hooks/session_start.py`, `session_end.py` | `SessionStart`/`SessionEnd` — load git + cross-engine context; log session to shared-state |
 
 The guard hook is a stdlib-only Python port of `solocode-guard.js` (same 33
 destructive patterns + 15 secret patterns + protected config files). It blocks a
-tool call by returning a `PreToolUse` deny decision and exit code 2.
+tool call by returning a `PreToolUse` deny decision and exit code 2. The
+PostToolUse and Session hooks are advisory (always exit 0, never block) and are
+stdlib-only Python ports of the corresponding Kilo lifecycle hooks — bringing
+Claude Code to enforcement parity with the Kilo engine.
 
 ```bash
-# Test the guard hook suite
-python -m pytest tools/test_claude_guard.py -q
+# Test the guard + lifecycle hook suites
+python -m pytest tools/test_claude_guard.py tools/test_claude_hooks.py -q
 ```
 
 ### Launch Claude Code via FreeModel

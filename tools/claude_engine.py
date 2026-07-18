@@ -15,8 +15,10 @@ Generated artifacts:
 Design notes:
   - The `model` field is intentionally dropped from agents so Claude uses the
     session default model (works with any provider/gateway).
-  - Static hook infra (.claude/hooks/guard.py, .claude/settings.json) is NOT
-    generated here -- it is version-controlled static harness code.
+  - Static hook infra (.claude/hooks/*.py, .claude/settings.json) is NOT
+    generated here -- it is version-controlled static harness code. This covers
+    the PreToolUse guard plus the PostToolUse (quality_gate, security_post) and
+    SessionStart/SessionEnd lifecycle hooks.
 
 Usage (via generate_harness.py):
     python tools/generate_harness.py --harness claude
@@ -340,7 +342,7 @@ boundary list.
 
 When asked "Is Solo-Code Harness active?", answer:
 `Solo-Code Harness active: behavior rules, anti-hallucination rules, security rules,
-prose quality rules, {n_skills} skills, {n_agents} agents, guard hook enabled (Claude Code).
+prose quality rules, {n_skills} skills, {n_agents} agents, guard + lifecycle hooks enabled (Claude Code).
 Use /verify to validate.`
 
 ## Claude Code Assets
@@ -348,8 +350,15 @@ Use /verify to validate.`
 - **Subagents ({n_agents})** in `.claude/agents/` -- invoke via the Task tool or by name.
 - **Skills ({n_skills})** in `.claude/skills/` -- auto-discovered `SKILL.md` capabilities.
 - **Slash commands ({n_commands})** in `.claude/commands/` -- `/verify`, `/plan`, `/decide`, `/ship`, and more.
-- **Guard hook** in `.claude/hooks/guard.py` (registered via `.claude/settings.json`
-  `PreToolUse`) -- blocks destructive commands, secret leaks, and protected-config edits.
+- **Guard hook** in `.claude/hooks/guard.py` (`PreToolUse`) -- blocks destructive
+  commands, secret leaks, and protected-config edits.
+- **Quality-gate hook** in `.claude/hooks/quality_gate.py` (`PostToolUse` Edit/Write)
+  -- advisory format check (ruff/prettier/biome/gofmt) after each edit.
+- **Security-post hook** in `.claude/hooks/security_post.py` (`PostToolUse` Bash)
+  -- scans `git diff` for secrets after `git commit`/`git push`.
+- **Session hooks** `session_start.py` / `session_end.py` (`SessionStart`/`SessionEnd`)
+  -- load git + cross-engine context at start; log the session to the local
+  shared-state DB at end. All hooks are stdlib-only Python and non-blocking except the guard.
 
 ## Behavior Rules (MANDATORY)
 

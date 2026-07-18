@@ -196,7 +196,11 @@ def check_claude(src: Path, dst: Path, *, skip_set: set[str] | None = None) -> l
 
     # Static harness infra required for the Claude engine
     for rel, desc in (
-        ("hooks/guard.py", "guard hook"),
+        ("hooks/guard.py", "guard hook (PreToolUse)"),
+        ("hooks/quality_gate.py", "quality-gate hook (PostToolUse)"),
+        ("hooks/security_post.py", "security-post hook (PostToolUse)"),
+        ("hooks/session_start.py", "session-start hook (SessionStart)"),
+        ("hooks/session_end.py", "session-end hook (SessionEnd)"),
         ("settings.json", "settings (hook registration)"),
     ):
         if not (dst / rel).exists():

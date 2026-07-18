@@ -47,7 +47,7 @@ This project is powered by **Solo-Code Harness** — an AI agent discipline laye
 ## Self-Verification Handshake
 
 When asked "Is Solo-Code Harness active?" or "What rules apply here?", answer:
-`Solo-Code Harness active: behavior rules, anti-hallucination rules, security rules, prose quality rules, 47 skills, 14 agents, hooks enabled (Kilo) / plugins enabled (OpenCode) / guard hook enabled (Claude Code). Use /verify to validate.`
+`Solo-Code Harness active: behavior rules, anti-hallucination rules, security rules, prose quality rules, 47 skills, 14 agents, hooks enabled (Kilo) / plugins enabled (OpenCode) / guard + lifecycle hooks enabled (Claude Code). Use /verify to validate.`
 
 ## OpenCode-Specific Tools
 
