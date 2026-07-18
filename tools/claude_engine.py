@@ -294,6 +294,31 @@ def generate_instructions(kilo_root: Path, claude_root: Path) -> int:
     return 0
 
 
+def generate_memory(kilo_root: Path, claude_root: Path) -> int:
+    """Copy memory files from .kilo/memory/ to .claude/memory/ for parity.
+
+    Claude Code auto-loads CLAUDE.md as primary memory, but mirroring the
+    .kilo/memory/ corpus (MEMORY.md index, conventions, design intent) keeps the
+    knowledge available to subagents and prevents cross-engine drift (feat-008).
+    """
+    src_dir = kilo_root / "memory"
+    dst_dir = claude_root / "memory"
+    if not src_dir.is_dir():
+        print(f"[ERROR] Source memory directory not found: {src_dir}")
+        return 1
+
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    copied = 0
+    for f in sorted(src_dir.glob("*.md")):
+        dst = dst_dir / f.name
+        dst.write_bytes(f.read_bytes())
+        with contextlib.suppress(Exception):
+            shutil.copystat(f, dst)
+        copied += 1
+    print(f"Claude memory copied: {copied}")
+    return 0
+
+
 def generate_claude_md(root_dir: Path) -> int:
     """Generate root CLAUDE.md -- Claude Code auto-loads this as project memory."""
     agents_dir = root_dir / ".kilo" / "agents"
@@ -415,6 +440,8 @@ def generate_all(kilo_root: Path, claude_root: Path, root_dir: Path, *, skip_nam
     generate_commands(kilo_root, claude_root)
     print("--- Claude instructions ---")
     generate_instructions(kilo_root, claude_root)
+    print("--- Claude memory ---")
+    generate_memory(kilo_root, claude_root)
     print("--- Claude rulebook ---")
     generate_claude_md(root_dir)
     return 0

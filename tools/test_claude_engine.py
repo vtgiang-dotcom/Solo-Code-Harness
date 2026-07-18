@@ -115,3 +115,46 @@ def test_tools_allowlist_deterministic_order():
     tools = _build_tools_allowlist(perms)
     # Must follow _TOOL_ORDER: Read, Grep, Glob, Edit, Write, Bash, Task
     assert tools == ["Read", "Edit", "Write", "Bash", "Task"]
+
+
+# ── memory + manifest parity (feat-008, feat-010) ─────────────────────────
+
+def test_claude_memory_generated():
+    """feat-008: .claude/memory/ mirrors .kilo/memory/."""
+    root = Path(__file__).resolve().parent.parent
+    kilo_mem = root / ".kilo" / "memory"
+    claude_mem = root / ".claude" / "memory"
+    assert claude_mem.is_dir(), ".claude/memory/ must exist"
+    kilo_files = {f.name for f in kilo_mem.glob("*.md")}
+    claude_files = {f.name for f in claude_mem.glob("*.md")}
+    assert kilo_files == claude_files, f"memory drift: {kilo_files ^ claude_files}"
+
+
+def test_memory_has_tech_stack_and_gotchas():
+    """feat-008 definition of done: Tech Stack + >=3 gotcha entries."""
+    root = Path(__file__).resolve().parent.parent
+    text = (root / ".kilo" / "memory" / "MEMORY.md").read_text(encoding="utf-8")
+    assert "Tech Stack" in text
+    assert text.count("[gotcha]") >= 3
+
+
+def test_garden_manifest_parser_accurate():
+    """feat-010: agent.yaml list parser matches reality."""
+    import garden
+
+    root = Path(__file__).resolve().parent.parent
+    text = (root / "agent.yaml").read_text(encoding="utf-8")
+    skills = garden._parse_agent_yaml_list(text, "skills")
+    agents = garden._parse_agent_yaml_list(text, "agents")
+    actual_skills = {p.name for p in (root / ".kilo" / "skill").iterdir() if p.is_dir()}
+    actual_agents = {f.stem for f in (root / ".kilo" / "agents").glob("*.md")}
+    assert set(skills) == actual_skills, f"skill drift: {set(skills) ^ actual_skills}"
+    assert set(agents) == actual_agents, f"agent drift: {set(agents) ^ actual_agents}"
+
+
+def test_garden_manifest_check_clean():
+    """feat-010: garden.check_manifest reports no drift on current tree."""
+    import garden
+
+    root = Path(__file__).resolve().parent.parent
+    assert garden.check_manifest(root) == []

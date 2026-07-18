@@ -50,8 +50,12 @@ jobs:
         run: python tools/garden.py
         shell: bash
 
+      - name: Bootstrap Smoke Test (init.sh)
+        run: bash init.sh --quiet
+        shell: bash
+
       - name: Harness Tests
-        run: python -m pytest tools/test_harness.py -v --tb=short
+        run: python -m pytest tools/test_harness.py tools/test_claude_engine.py tools/test_claude_guard.py tools/test_claude_hooks.py -v --tb=short
         shell: bash
 
   ci-ok:

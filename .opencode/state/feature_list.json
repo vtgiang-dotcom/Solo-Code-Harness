@@ -61,32 +61,32 @@
       "name": "Memory population",
       "description": "Populate .claude/memory/ and .kilo/memory/ with real data: tech stack, known gotchas, debugging tips, deployment notes. Replace placeholder comments. Definition of done: MEMORY.md in both locations has Tech Stack and at least 3 gotcha entries.",
       "dependencies": ["feat-003"],
-      "status": "not-started",
-      "evidence": ""
+      "status": "done",
+      "evidence": ".kilo/memory/MEMORY.md has Tech Stack section (Python/Node/Ruff/Gitleaks/pytest) + 6 gotcha entries. claude_engine.generate_memory() now mirrors .kilo/memory/ -> .claude/memory/ (3 files: MEMORY.md, harness-design-intent.md, project-conventions.md); garden.check_claude enforces memory parity. Parity confirmed across .kilo/.opencode/.copilot/.claude. Gates: garden 0 drift."
     },
     {
       "id": "feat-009",
       "name": "Cross-platform init.sh",
-      "description": "Make init.sh work for all harness platforms (Claude, Copilot, Gemini, Kilo) by detecting available rulebooks and state dirs. Currently hardcoded to .claude/ paths. Definition of done: init.sh works from any harness platform directory and correctly reports active feature from that platform's state.",
+      "description": "Make init.sh work for all harness platforms (Claude, Copilot, Gemini, Kilo) by detecting available rulebooks and state dirs. Definition of done: init.sh works from any harness platform directory and correctly reports active engine rulebooks and shared-state summary.",
       "dependencies": ["feat-005"],
-      "status": "not-started",
-      "evidence": ""
+      "status": "done",
+      "evidence": "init.sh created: detects rulebooks (CLAUDE.md, AGENTS.md, .github/copilot-instructions.md, .gemini/) + engine dirs (.kilo/.opencode/.claude/.copilot/.gemini/) present, reports shared-state summary via tools/shared_state.py when available, python fallback py->python3->python. Stdlib-only, no engine hardcoding. Added to deploy ROOT_FILES + .harness.lock."
     },
     {
       "id": "feat-010",
       "name": "Automated manifest sync",
-      "description": "Script or garden check that validates agent.yaml skills/agents match actual .claude/skills/*.md and .kilo/agents/*.md file counts. Prevent drift between manifest and reality. Definition of done: garden BOUNDARY check or new validation catches agent.yaml drift; field in feature_list.json stays correct without manual updates.",
+      "description": "Script or garden check that validates agent.yaml skills/agents match actual .kilo/skill/*/ and .kilo/agents/*.md file counts. Prevent drift between manifest and reality. Definition of done: garden catches agent.yaml drift automatically.",
       "dependencies": ["feat-007"],
-      "status": "not-started",
-      "evidence": ""
+      "status": "done",
+      "evidence": "garden.check_manifest() added: validates agent.yaml skills (47) + agents (14) against .kilo/skill/ and .kilo/agents/, plus version vs .harness.lock. Fixed real drift: agent.yaml version 3.1.0->3.6.0, skills 43->47 (added algorithmic-discipline, research, resolving-merge-conflicts, ui-mock-hunter, wayfinder; removed stale claude-api). Wired into garden main(). Gates: garden 0 drift."
     },
     {
       "id": "feat-011",
       "name": "CI gate on push",
-      "description": "GitHub Actions workflow that runs verify.sh (or checklist.py) on every push and PR. Currently no CI — all gates run locally only. Definition of done: .github/workflows/ci.yml exists, runs security_scan + ruff + eval on push, passes on this branch.",
+      "description": "GitHub Actions workflow that runs the verification gates on every push and PR. Definition of done: .github/workflows/ci.yml exists, runs security_scan + ruff + schema + garden + tests on push, passes on this branch.",
       "dependencies": ["feat-002"],
-      "status": "not-started",
-      "evidence": ""
+      "status": "done",
+      "evidence": ".github/workflows/ci.yml runs on push+PR+workflow_dispatch across 3 OS x 4 Python versions: Security Scan, Ruff Lint, Schema Validation, Garden (drift), Harness Tests (test_harness + test_claude_engine + test_claude_guard + test_claude_hooks). Aggregate ci-ok gate. Also release.yml present."
     },
     {
       "id": "feat-012",

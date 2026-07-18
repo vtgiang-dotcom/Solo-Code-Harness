@@ -194,6 +194,9 @@ def check_claude(src: Path, dst: Path, *, skip_set: set[str] | None = None) -> l
     # Instructions (direct copy, same filename)
     issues.extend(check_instructions(src, dst, ".claude"))
 
+    # Memory (direct copy, same filename) — feat-008 parity
+    issues.extend(check_memory(src, dst, ".claude"))
+
     # Static harness infra required for the Claude engine
     for rel, desc in (
         ("hooks/guard.py", "guard hook (PreToolUse)"),
@@ -278,6 +281,90 @@ def run_engine_checks(
     return issues
 
 
+def _parse_agent_yaml_list(text: str, key: str) -> list[str]:
+    """Extract a top-level YAML list (e.g. `skills:` / `agents:`) without PyYAML.
+
+    Only handles the simple `key:` followed by `  - item` block style used in
+    agent.yaml. Stops at the next top-level key (a line starting in column 0
+    that is not a list item). Stdlib-only to keep the harness zero-dependency.
+    """
+    items: list[str] = []
+    in_block = False
+    for raw in text.splitlines():
+        stripped = raw.strip()
+        if not in_block:
+            # Enter the block only on the bare `key:` header (no inline value).
+            if stripped == f"{key}:":
+                in_block = True
+            continue
+        # Inside the block.
+        if raw.startswith(("  - ", "- ")) or stripped.startswith("- "):
+            items.append(stripped[2:].strip())
+        elif stripped == "":
+            continue
+        elif not raw.startswith(" "):
+            # New top-level key — block ended.
+            break
+    return items
+
+
+def check_manifest(root: Path) -> list[str]:
+    """feat-010: validate agent.yaml skills/agents match real .kilo/ file counts.
+
+    Prevents drift between the published manifest (agent.yaml) and reality:
+      - skills listed must match .kilo/skill/*/ directory names exactly
+      - agents listed must match .kilo/agents/*.md file stems exactly
+      - version must match the harness version in .harness.lock
+    """
+    issues: list[str] = []
+    manifest = root / "agent.yaml"
+    if not manifest.is_file():
+        return issues
+    text = manifest.read_text(encoding="utf-8")
+
+    # Skills parity
+    skill_dir = root / ".kilo" / "skill"
+    if skill_dir.is_dir():
+        actual = {p.name for p in skill_dir.iterdir() if p.is_dir()}
+        listed = set(_parse_agent_yaml_list(text, "skills"))
+        for name in sorted(actual - listed):
+            issues.append(f"agent.yaml missing skill: {name} (exists in .kilo/skill/)")
+        for name in sorted(listed - actual):
+            issues.append(f"agent.yaml stale skill: {name} (no .kilo/skill/{name}/)")
+
+    # Agents parity
+    agent_dir = root / ".kilo" / "agents"
+    if agent_dir.is_dir():
+        actual_a = {f.stem for f in agent_dir.glob("*.md")}
+        listed_a = set(_parse_agent_yaml_list(text, "agents"))
+        for name in sorted(actual_a - listed_a):
+            issues.append(f"agent.yaml missing agent: {name} (exists in .kilo/agents/)")
+        for name in sorted(listed_a - actual_a):
+            issues.append(f"agent.yaml stale agent: {name} (no .kilo/agents/{name}.md)")
+
+    # Version parity with .harness.lock
+    lock = root / ".harness.lock"
+    if lock.is_file():
+        lock_version = ""
+        for line in lock.read_text(encoding="utf-8").splitlines():
+            s = line.strip()
+            if s.startswith("version"):
+                lock_version = s.split("=", 1)[1].strip().strip('"') if "=" in s else ""
+                break
+        manifest_version = ""
+        for line in text.splitlines():
+            s = line.strip()
+            if s.startswith("version:"):
+                manifest_version = s.split(":", 1)[1].strip().strip('"')
+                break
+        if lock_version and manifest_version and lock_version != manifest_version:
+            issues.append(
+                f"agent.yaml version {manifest_version} != .harness.lock version {lock_version}"
+            )
+
+    return issues
+
+
 def main() -> int:
     kilo = ROOT / ".kilo"
 
@@ -317,6 +404,17 @@ def main() -> int:
         all_issues.extend(shared_issues)
     else:
         print("[OK] Shared state")
+
+    # Manifest sync (agent.yaml vs reality) — feat-010
+    print("\n--- Manifest (agent.yaml) ---")
+    manifest_issues = check_manifest(ROOT)
+    if manifest_issues:
+        print("[DRIFT] Manifest sync:")
+        for i in manifest_issues:
+            print(f"  {i}")
+        all_issues.extend(manifest_issues)
+    else:
+        print("[OK] Manifest sync (agent.yaml)")
 
     print(f"\nTotal drift issues: {len(all_issues)}")
     if all_issues:

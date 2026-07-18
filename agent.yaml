@@ -1,6 +1,6 @@
 spec_version: "0.1.0"
 name: solo-code-harness
-version: 3.1.0
+version: 3.6.0
 description: "AI coding harness biến agent thành Solo-Code Engineer có kỷ luật. Multi-platform: Claude, Copilot, Gemini, Cursor, Kilo."
 author: "Solo-Code Team"
 license: MIT
@@ -11,12 +11,12 @@ model:
     - deepseek-v4-flash
     - gpt-4o
 skills:
+  - algorithmic-discipline
   - api-patterns
   - block-no-verify
   - brainstorming
   - browser-testing-with-devtools
   - ci-cd-and-automation
-  - claude-api
   - code-review-expert
   - codebase-design
   - context-engineering
@@ -41,6 +41,8 @@ skills:
   - plan
   - planning-and-task-breakdown
   - requesting-code-review
+  - research
+  - resolving-merge-conflicts
   - security-and-hardening
   - shipping-and-launch
   - simplify-code
@@ -52,7 +54,9 @@ skills:
   - systematic-debugging
   - task-delegation
   - testing-patterns
+  - ui-mock-hunter
   - using-agent-skills
+  - wayfinder
   - writing-great-skills
 agents:
   - architect

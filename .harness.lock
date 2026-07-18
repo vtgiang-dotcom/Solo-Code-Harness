@@ -41,6 +41,7 @@ files = [
     "opencode.ps1",
     "claude-env.ps1",
     "verify.sh",
+    "init.sh",
     "extensions_config.json",
     "SPEC.md",
     ".gitignore",
