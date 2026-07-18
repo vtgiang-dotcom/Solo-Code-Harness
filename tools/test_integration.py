@@ -339,20 +339,23 @@ def test_copilot_vscode() -> None:
 def test_shared_state() -> None:
     print("\n--- Shared State ---")
     db_path = ROOT / ".solocode" / "shared-state.db"
-    check("shared-state.db exists", db_path.is_file())
+    # DB is local-only (gitignored, created on first engine run). A fresh
+    # checkout legitimately has none — only validate integrity when present.
+    if not db_path.is_file():
+        check("shared-state.db (local-only, skipped when absent)", True)
+        return
 
-    if db_path.is_file():
-        from tools.shared_state import SharedState
-        with SharedState(db_path) as state:
-            errors = state.integrity_check()
-            check("  integrity_check passes", errors == [], f"errors: {errors}")
+    from tools.shared_state import SharedState
+    with SharedState(db_path) as state:
+        errors = state.integrity_check()
+        check("  integrity_check passes", errors == [], f"errors: {errors}")
 
-            features = state.get_features()
-            check("  feature count >= 19", len(features) >= 19, f"got {len(features)}")
+        features = state.get_features()
+        check("  feature count >= 19", len(features) >= 19, f"got {len(features)}")
 
-            for f in features:
-                if f["status"] == "in-progress":
-                    check(f"  {f['id']}: has owner", f["owner"].get("engine") is not None)
+        for f in features:
+            if f["status"] == "in-progress":
+                check(f"  {f['id']}: has owner", f["owner"].get("engine") is not None)
 
 
 # ─── Main ──────────────────────────────────────────────────────────

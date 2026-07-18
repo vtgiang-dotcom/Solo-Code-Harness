@@ -215,12 +215,17 @@ def check_claude(src: Path, dst: Path, *, skip_set: set[str] | None = None) -> l
 
 
 def check_shared_state() -> list[str]:
-    """Check that .solocode/shared-state.db exists and passes integrity_check."""
+    """Check .solocode/shared-state.db integrity — IF it exists.
+
+    The DB is local-only by design: gitignored + deploy-excluded, created on
+    first engine run. A fresh checkout (CI, clone, deploy) legitimately has no
+    DB, so its absence is NOT drift — treating it as such breaks every clean
+    environment. We only validate integrity/staleness when the DB is present.
+    """
     issues: list[str] = []
     db_path = ROOT / ".solocode" / "shared-state.db"
 
     if not db_path.exists():
-        issues.append("Missing: .solocode/shared-state.db (run 'python tools/migrate_to_shared_state.py')")
         return issues
 
     from tools.shared_state import SharedState
@@ -403,7 +408,7 @@ def main() -> int:
             print(f"  {i}")
         all_issues.extend(shared_issues)
     else:
-        print("[OK] Shared state")
+        print("[OK] Shared state (local DB present or absent — both valid)")
 
     # Manifest sync (agent.yaml vs reality) — feat-010
     print("\n--- Manifest (agent.yaml) ---")
