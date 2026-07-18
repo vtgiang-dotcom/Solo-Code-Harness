@@ -39,6 +39,7 @@ files = [
     "Makefile",
     "pyproject.toml",
     "opencode.ps1",
+    "claude-env.ps1",
     "verify.sh",
     "extensions_config.json",
     "SPEC.md",

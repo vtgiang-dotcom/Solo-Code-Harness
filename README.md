@@ -182,6 +182,27 @@ tool call by returning a `PreToolUse` deny decision and exit code 2.
 python -m pytest tools/test_claude_guard.py -q
 ```
 
+### Launch Claude Code via FreeModel
+
+`claude-env.ps1` loads `.env`, normalizes the gateway URL, and launches Claude Code
+with a single Anthropic-compatible API key (works with [FreeModel](https://freemodel.dev)
+and other gateways).
+
+```powershell
+# 1. Copy the template and fill your key
+Copy-Item .env.example .env
+#    then edit .env → set ANTHROPIC_API_KEY=<your-key>
+
+# 2. Launch Claude Code with the harness environment
+./claude-env.ps1
+
+# Pass-through args work too:
+./claude-env.ps1 --help
+```
+
+`.env.example` ships with the FreeModel defaults (`ANTHROPIC_BASE_URL=https://cc.freemodel.dev`).
+Your real `.env` is gitignored and never deployed.
+
 ## Guard Plugin (`solocode-guard.js` v2.5)
 
 - **33 destructive command patterns** (rm, git reset, dd, format, shutdown, chmod/chown system dirs, temp-dir destruction)
