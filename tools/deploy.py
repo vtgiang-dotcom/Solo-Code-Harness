@@ -54,7 +54,7 @@ ROOT_FILES = [
     "Makefile",
     "opencode.ps1",
     "claude-env.ps1",
-    ".env.example",
+    ".env.template",
     "SPEC.md",
     "verify.sh",
     "agent.yaml",

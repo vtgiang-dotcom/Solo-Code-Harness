@@ -190,7 +190,7 @@ and other gateways).
 
 ```powershell
 # 1. Copy the template and fill your key
-Copy-Item .env.example .env
+Copy-Item .env.template .env
 #    then edit .env → set ANTHROPIC_API_KEY=<your-key>
 
 # 2. Launch Claude Code with the harness environment
@@ -200,8 +200,8 @@ Copy-Item .env.example .env
 ./claude-env.ps1 --help
 ```
 
-`.env.example` ships with the FreeModel defaults (`ANTHROPIC_BASE_URL=https://cc.freemodel.dev`).
-Your real `.env` is gitignored and never deployed.
+`.env.template` ships with the FreeModel defaults (`ANTHROPIC_BASE_URL=https://cc.freemodel.dev`)
+alongside CommandCode + DeepSeek entries for OpenCode. Your real `.env` is gitignored and never deployed.
 
 ## Guard Plugin (`solocode-guard.js` v2.5)
 
