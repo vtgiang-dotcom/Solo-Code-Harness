@@ -36,6 +36,15 @@ ROOT_DIR = TOOLS_DIR.parent
 SKIP_FILE = TOOLS_DIR / "opencode-skip-skills.txt"
 KILO_DIR = ROOT_DIR / ".kilo"
 OPENCODE_DIR = ROOT_DIR / ".opencode"
+CLAUDE_DIR = ROOT_DIR / ".claude"
+
+
+def _load_claude_engine():
+    """Import the sibling claude_engine module (tools/ may not be on sys.path)."""
+    if str(TOOLS_DIR) not in sys.path:
+        sys.path.insert(0, str(TOOLS_DIR))
+    import claude_engine
+    return claude_engine
 
 
 # ---------------------------------------------------------------------------
@@ -526,7 +535,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--harness",
-        choices=["all", "skills", "agents", "instructions", "memory"],
+        choices=["all", "skills", "agents", "instructions", "memory", "claude"],
         default="all",
         help="Which asset type to generate (default: all).",
     )
@@ -583,6 +592,9 @@ def main() -> int:
         generate_agents(kilo_root, opencode_root)
         generate_instructions(kilo_root, opencode_root, global_install=global_install)
         generate_memory(kilo_root, opencode_root)
+        # Claude Code engine
+        skip_names = set() if args.include_all else load_skip_list(SKIP_FILE)
+        _load_claude_engine().generate_all(kilo_root, ROOT_DIR / ".claude", ROOT_DIR, skip_names=skip_names)
     elif harness == "skills":
         return generate_skills(kilo_root, opencode_root, include_all=args.include_all, plugin_filter=args.plugin)
     elif harness == "agents":
@@ -591,6 +603,9 @@ def main() -> int:
         return generate_instructions(kilo_root, opencode_root, global_install=global_install)
     elif harness == "memory":
         return generate_memory(kilo_root, opencode_root)
+    elif harness == "claude":
+        skip_names = set() if args.include_all else load_skip_list(SKIP_FILE)
+        return _load_claude_engine().generate_all(kilo_root, ROOT_DIR / ".claude", ROOT_DIR, skip_names=skip_names)
 
     return 0
 

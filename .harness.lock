@@ -18,6 +18,8 @@ dirs = [
     ".opencode",
     ".copilot",
     ".gemini",
+    ".claude",
+    ".claude-plugin",
     ".github",
     ".contracts",
     ".vscode",
@@ -27,6 +29,7 @@ dirs = [
 # File gốc harness — KHÔNG phải code dự án
 files = [
     "AGENTS.md",
+    "CLAUDE.md",
     "agent.yaml",
     "kilo.jsonc",
     "opencode.json",

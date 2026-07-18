@@ -106,7 +106,7 @@ SKIP_EXTENSIONS = {
 def should_skip(file_path: Path) -> bool:
     # Skip files that intentionally contain mock secrets for testing
     name = file_path.name.lower()
-    if name in {"eval_harness.py", "secret-scan.test.js", "guard.test.js"}:
+    if name in {"eval_harness.py", "secret-scan.test.js", "guard.test.js", "test_claude_guard.py"}:
         return True
     if name in SKIP_NAMES:
         return True

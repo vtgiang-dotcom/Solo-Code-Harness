@@ -1,7 +1,7 @@
 {
   "name": "solo-code-harness",
-  "version": "3.1.0",
-  "description": "AI coding agent harness — rules, skills, hooks, and verification gates. 44 skills, 14 agents, 20+ lifecycle hooks, 6 verification gates. Transforms any AI coding assistant into a disciplined Solo-Code Engineer.",
+  "version": "3.5.0",
+  "description": "AI coding agent harness — rules, skills, hooks, and verification gates. 47 skills, 14 agents, guard hook (PreToolUse), 13 slash commands, 5 verification gates. Transforms Claude Code into a disciplined Solo-Code Engineer.",
   "author": {
     "name": "Solo-Code Team",
     "email": "admin@solo-code.com"

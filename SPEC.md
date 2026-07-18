@@ -56,6 +56,8 @@ Phải tồn tại các thư mục: .claude/ .copilot/ .github/ .gemini/ .kilo/ 
 | `.harness.lock` | Ranh giới harness/project | Tự động generate bởi `tools/deploy.py` |
 | `opencode.json` | OpenCode engine config | Permission, shell, MCP servers |
 | `kilo.jsonc` | Kilo engine config | Provider, model, agent, permission |
+| `CLAUDE.md` | Claude Code rulebook | Auto-generate từ `.kilo/` bởi `tools/claude_engine.py` |
+| `.claude/settings.json` | Claude Code hooks + permissions | Đăng ký PreToolUse guard hook |
 | `extensions_config.json` | Extension feature flags | Mặc định TẮT: `enable_code_review_agent`, `enable_harness_guard` |
 | `.mcp.json` | MCP server config dùng chung | context7, sequential-thinking |
 | `.gitleaks.toml` | Git leak detection rules | Allowlist `.venv`, `node_modules` |

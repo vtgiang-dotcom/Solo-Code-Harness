@@ -34,12 +34,12 @@ This project is powered by **Solo-Code Harness** — an AI agent discipline laye
 
 | If the file path starts with... | Then it is... | Action |
 |----------------------------------|---------------|--------|
-| `.kilo/`, `.opencode/`, `.copilot/`, `.gemini/` | Harness engine | Rules/skills/hooks for AI behavior — not project logic |
+| `.kilo/`, `.opencode/`, `.copilot/`, `.gemini/`, `.claude/`, `.claude-plugin/` | Harness engine | Rules/skills/hooks for AI behavior — not project logic |
 | `.vscode/` | Harness IDE config | VS Code settings + MCP servers — not project source |
 | `.github/scripts/` | Harness verification | `security_scan.py`, `checklist.py`, `check_skips.py`, `eval_harness.py`, `security-allowlist.txt` |
 | `tools/` | Harness utilities | `deploy.py`, `generate_harness.py`, `garden.py`, `harness_config.py` |
 | `.contracts/` | Harness sub-agent contracts | Status contracts for delegated agents |
-| `AGENTS.md`, `agent.yaml`, `kilo.jsonc`, `opencode.json`, `.mcp.json`, `.ruff.toml`, `.gitleaks.toml`, `Makefile`, `opencode.ps1`, `verify.sh`, `extensions_config.json`, `SPEC.md`, `.harness.lock`, `.solocode/`, `.pre-commit-config.yaml`, `.github/pull_request_template.md` | Harness config | Agent behavior configuration — not application config |
+| `AGENTS.md`, `agent.yaml`, `kilo.jsonc`, `opencode.json`, `.mcp.json`, `.ruff.toml`, `.gitleaks.toml`, `Makefile`, `opencode.ps1`, `verify.sh`, `extensions_config.json`, `SPEC.md`, `.harness.lock`, `.solocode/`, `.pre-commit-config.yaml`, `.github/pull_request_template.md`, `CLAUDE.md` | Harness config | Agent behavior configuration — not application config |
 | **Everything else** | **Project code** | Your actual application — this is what you modify |
 
 **Key rule:** Never modify harness files to fix a project bug. Never modify project files to fix a harness issue. Read `.harness.lock` for the authoritative boundary list.
@@ -47,7 +47,7 @@ This project is powered by **Solo-Code Harness** — an AI agent discipline laye
 ## Self-Verification Handshake
 
 When asked "Is Solo-Code Harness active?" or "What rules apply here?", answer:
-`Solo-Code Harness active: behavior rules, anti-hallucination rules, security rules, prose quality rules, 47 skills, 14 agents, hooks enabled (Kilo) / plugins enabled (OpenCode). Use /verify to validate.`
+`Solo-Code Harness active: behavior rules, anti-hallucination rules, security rules, prose quality rules, 47 skills, 14 agents, hooks enabled (Kilo) / plugins enabled (OpenCode) / guard hook enabled (Claude Code). Use /verify to validate.`
 
 ## OpenCode-Specific Tools
 

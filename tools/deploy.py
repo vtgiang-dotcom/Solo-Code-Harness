@@ -42,6 +42,7 @@ ROOT = Path(__file__).resolve().parent.parent
 # Files to copy (relative to ROOT)
 ROOT_FILES = [
     "AGENTS.md",
+    "CLAUDE.md",
     "opencode.json",
     "kilo.jsonc",
     ".mcp.json",
@@ -71,6 +72,8 @@ DIRS_ALL = [
     ".kilo",
     ".copilot",
     ".gemini",
+    ".claude",
+    ".claude-plugin",
     ".github",
     ".vscode",
     ".contracts",
@@ -92,11 +95,19 @@ DIRS_COPILOT = [
     "tools",
 ]
 
+DIRS_CLAUDE = [
+    ".claude",
+    ".claude-plugin",
+    ".github",
+    ".contracts",
+    "tools",
+]
+
 # Patterns to exclude from copy
 EXCLUDE_DIRS = {
     ".pytest_cache", ".ruff_cache", "node_modules", ".git",
     "__pycache__", ".venv", "venv",
-    ".solocode", ".claude-plugin", "cocoindex-code-main", "docs",
+    ".solocode", "cocoindex-code-main", "docs",
     # Runtime state directories — never belong in a deploy
     "sessions",           # .kilo/state/sessions/
     "logs",               # .kilo/logs/
@@ -104,6 +115,7 @@ EXCLUDE_DIRS = {
 EXCLUDE_FILES = {
     ".env", "usage.log", "usage.jsonl",
     ".DS_Store", "Thumbs.db",
+    "settings.local.json",  # .claude/ personal overrides — never deploy
     # Runtime state files — never belong in a deploy
     "token-log.jsonl",    # .kilo/state/token-log.jsonl
     "tool-count.json",    # .kilo/state/tool-count.json
@@ -195,6 +207,8 @@ dirs = [
     ".opencode",
     ".copilot",
     ".gemini",
+    ".claude",
+    ".claude-plugin",
     ".github",
     ".contracts",
     ".vscode",
@@ -204,6 +218,7 @@ dirs = [
 # File gốc harness — KHÔNG phải code dự án
 files = [
     "AGENTS.md",
+    "CLAUDE.md",
     "agent.yaml",
     "kilo.jsonc",
     "opencode.json",
@@ -582,6 +597,8 @@ def scaffold(
         dirs = DIRS_OPENCODE
     elif engine == "copilot":
         dirs = DIRS_COPILOT
+    elif engine == "claude":
+        dirs = DIRS_CLAUDE
     else:
         dirs = DIRS_ALL
 
@@ -782,6 +799,10 @@ def _cleanup_stale_files(
         for item in dst.rglob("*"):
             if item.is_file():
                 rel = item.relative_to(target_path).as_posix()
+                # Skip files intentionally excluded from copy (personal
+                # overrides, .pyc, runtime state) — they are never "stale".
+                if not should_copy(item):
+                    continue
                 # Skip generated directories (not in source manifest)
                 if rel.startswith(".github/agents/"):
                     continue
@@ -836,6 +857,8 @@ def deploy(target: str, *, engine: str = "all", dry_run: bool = False) -> int:
         dirs = DIRS_OPENCODE
     elif engine == "copilot":
         dirs = DIRS_COPILOT
+    elif engine == "claude":
+        dirs = DIRS_CLAUDE
     else:
         dirs = DIRS_ALL
 
@@ -963,13 +986,13 @@ def interactive() -> int:
 
     # Ask engine
     while True:
-        engine = input("Engine (all/opencode/copilot) [all]: ").strip().lower()
+        engine = input("Engine (all/opencode/copilot/claude) [all]: ").strip().lower()
         if not engine:
             engine = "all"
             break
-        if engine in ("all", "opencode", "copilot"):
+        if engine in ("all", "opencode", "copilot", "claude"):
             break
-        print("  Please enter 'all', 'opencode', or 'copilot'.")
+        print("  Please enter 'all', 'opencode', 'copilot', or 'claude'.")
 
     # Ask dry-run
     dry_run_input = input("Dry run? (y/N): ").strip().lower()
@@ -1032,7 +1055,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--engine",
-        choices=["all", "opencode", "copilot"],
+        choices=["all", "opencode", "copilot", "claude"],
         default="all",
         help="Which engine harness to deploy (default: all)",
     )

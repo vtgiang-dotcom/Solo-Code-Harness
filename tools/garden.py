@@ -148,6 +148,65 @@ def _issue_matches_skip(issue: str, skip_set: set[str]) -> bool:
     return False
 
 
+def check_claude(src: Path, dst: Path, *, skip_set: set[str] | None = None) -> list[str]:
+    """Parity checks for the Claude engine (.claude/).
+
+    Claude uses different directory names than the other engines:
+      .kilo/agents      -> .claude/agents
+      .kilo/skill       -> .claude/skills   (plural)
+      .kilo/command     -> .claude/commands (plural)
+      .kilo/instruction -> .claude/instruction
+    Plus static infra: CLAUDE.md, settings.json, hooks/guard.py.
+    """
+    issues: list[str] = []
+    skip_set = skip_set or set()
+
+    # Agents (same subdir name)
+    issues.extend(_check_parity_dir(src, dst, ".claude", "agents"))
+
+    # Skills: .kilo/skill/* dirs must exist in .claude/skills/*
+    src_skills = src / "skill"
+    dst_skills = dst / "skills"
+    if src_skills.is_dir():
+        src_names = {p.name for p in src_skills.iterdir() if p.is_dir()} - skip_set
+        dst_names = {p.name for p in dst_skills.iterdir() if p.is_dir()} if dst_skills.is_dir() else set()
+        for name in sorted(src_names - dst_names):
+            issues.append(f"Missing skill: .claude/skills/{name}/")
+        for name in sorted(dst_names - src_names):
+            issues.append(f"Stale skill (no source): .claude/skills/{name}/")
+        # SKILL.md health
+        if dst_skills.is_dir():
+            for entry in sorted(dst_skills.iterdir()):
+                if entry.is_dir() and not (entry / "SKILL.md").exists():
+                    issues.append(f"Skill missing SKILL.md: .claude/skills/{entry.name}")
+
+    # Commands: .kilo/command/*.md must exist in .claude/commands/*.md
+    src_cmd = src / "command"
+    dst_cmd = dst / "commands"
+    if src_cmd.is_dir():
+        src_names = {f.name for f in src_cmd.iterdir() if f.suffix == ".md"}
+        dst_names = {f.name for f in dst_cmd.iterdir()} if dst_cmd.is_dir() else set()
+        for name in sorted(src_names - dst_names):
+            issues.append(f"Missing command: .claude/commands/{name}")
+        for name in sorted(dst_names - src_names):
+            issues.append(f"Stale command (no source): .claude/commands/{name}")
+
+    # Instructions (direct copy, same filename)
+    issues.extend(check_instructions(src, dst, ".claude"))
+
+    # Static harness infra required for the Claude engine
+    for rel, desc in (
+        ("hooks/guard.py", "guard hook"),
+        ("settings.json", "settings (hook registration)"),
+    ):
+        if not (dst / rel).exists():
+            issues.append(f"Missing {desc}: .claude/{rel}")
+    if not (ROOT / "CLAUDE.md").exists():
+        issues.append("Missing rulebook: CLAUDE.md (run 'python tools/generate_harness.py --harness claude')")
+
+    return issues
+
+
 def check_shared_state() -> list[str]:
     """Check that .solocode/shared-state.db exists and passes integrity_check."""
     issues: list[str] = []
@@ -232,6 +291,17 @@ def main() -> int:
     all_issues.extend(
         run_engine_checks(kilo, ROOT / ".copilot", ".copilot", instruction_suffix=False)
     )
+
+    # .claude/ engine — different subdir names (skills/commands plural) + static infra
+    print("\n--- .claude/ ---")
+    claude_issues = check_claude(kilo, ROOT / ".claude", skip_set=skip_skills)
+    if claude_issues:
+        print("[DRIFT] Claude engine (.claude):")
+        for i in claude_issues:
+            print(f"  {i}")
+        all_issues.extend(claude_issues)
+    else:
+        print("[OK] Claude engine (.claude)")
 
     # Shared state health (không thuộc riêng engine nào)
     print("\n--- Shared State ---")

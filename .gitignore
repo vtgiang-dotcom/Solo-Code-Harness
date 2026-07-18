@@ -22,6 +22,9 @@ node_modules/
 # Harness per-project config (generated locally, not committed)
 .solocode/
 
+# Claude Code personal overrides (generated locally, not committed)
+.claude/settings.local.json
+
 # OS
 .DS_Store
 Thumbs.db

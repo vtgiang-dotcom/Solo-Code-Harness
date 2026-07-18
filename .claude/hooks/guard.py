@@ -1,0 +1,193 @@
+#!/usr/bin/env python3
+"""
+solocode-guard (Claude Code hook) — PreToolUse safety gate.
+
+Port of .opencode/plugins/solocode-guard.js to a Claude Code PreToolUse hook.
+Stdlib-only Python (no jq/bash) for Windows portability.
+
+Wired via .claude/settings.json:
+    "hooks": { "PreToolUse": [ { "matcher": "Bash|Edit|Write|MultiEdit",
+        "hooks": [ { "type": "command",
+            "command": "python .claude/hooks/guard.py" } ] } ] }
+
+Protocol:
+  - Reads the tool call JSON from stdin: {tool_name, tool_input, ...}.
+  - Bash: blocks destructive commands and leaked secrets in the command string.
+  - Edit/Write/MultiEdit: blocks writes to protected config files and blocks
+    content containing hardcoded secrets.
+  - Blocks by printing a PreToolUse deny decision to stdout AND exiting 2
+    (stderr feedback) — both are honored by Claude Code.
+  - Allows by exiting 0 with no output (normal permission flow applies).
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import sys
+
+# ─── Destructive Command Patterns (port of BLOCK_PATTERNS) ──────────────────
+BLOCK_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
+    ("rm_root", re.compile(r"rm\s+-rf?\s+/(?:\s|$|\*|\"|')")),
+    ("rm_home", re.compile(r"rm\s+-rf?\s+~")),
+    ("rm_wildcard", re.compile(r"rm\s+-rf?\s+\*")),
+    ("rm_no_preserve", re.compile(r"rm\s+--no-preserve-root")),
+    ("force_push_main", re.compile(r"git\s+push\s+.*(--force|-f)\s+.*(main|master)")),
+    ("git_reset_hard", re.compile(r"git\s+reset\s+--hard")),
+    ("drop_table", re.compile(r"DROP\s+(?:TABLE|DATABASE)", re.I)),
+    ("truncate_table", re.compile(r"TRUNCATE\s+TABLE", re.I)),
+    ("dd_raw", re.compile(r"dd\s+if=")),
+    ("mkfs", re.compile(r"mkfs\.")),
+    ("shred", re.compile(r"shred\s+")),
+    ("dev_write", re.compile(r">\s*/dev/sd[a-z]")),
+    ("win_del_force", re.compile(r"del\s+/f\s+/s")),
+    ("win_remove_recursive", re.compile(r"Remove-Item\s+.*-Recurse.*-Force")),
+    ("format_disk", re.compile(r"\bformat\s")),
+    ("diskpart", re.compile(r"\bdiskpart\b")),
+    ("shutdown_system", re.compile(r"(?:shutdown|reboot|halt)\b")),
+    ("rm_relative_wildcard", re.compile(r"rm\s+-rf?\s+\./")),
+    ("rm_r_wildcard", re.compile(r"rm\s+-r\s+\*")),
+    ("rm_r_f_wildcard", re.compile(r"rm\s+-r\s+-f\s+\*")),
+    ("git_clean_force", re.compile(r"git\s+clean\s+-f")),
+    ("rm_system_dir", re.compile(r"rm\s+-rf?\s+/(?:etc|usr|var|bin|lib(?:64)?|boot|sbin|opt|root|sys|proc|dev)(?:/|\s|$)")),
+    ("curl_pipe_shell", re.compile(r"(?:curl|wget)\s+.*\|\s*(?:ba)?sh\b")),
+    ("dd_device_write", re.compile(r"dd\s+.*of=/dev/")),
+    ("chmod_chown_system", re.compile(r"(?:chmod|chown)\s+-R\s+(?:[^/\s]+\s+)*/(?:etc|usr|var|bin|lib(?:64)?|boot|sbin|opt|root|sys|proc|dev)(?:/|\s|$)")),
+    ("rm_temp_linux", re.compile(r"rm\s+-rf?\s+/tmp/")),
+    ("rm_temp_win", re.compile(r"rm\s+-rf?\s+\$?(?:env:)?TEMP\b", re.I)),
+    ("del_temp_win", re.compile(r"del\s+(?:/f\s+)?/[qs]\s+\$?(?:env:)?TEMP\b", re.I)),
+    ("win_rd_recursive", re.compile(r"(?:rd|rmdir)\s+(?:.*\s)?/s\b", re.I)),
+    ("win_del_any", re.compile(r"del\s+(?:.*\s)?/[qsf]\b", re.I)),
+    ("win_format_volume", re.compile(r"\bFormat-Volume\b")),
+    ("win_stop_computer", re.compile(r"\bStop-Computer\b")),
+    ("win_restart_computer", re.compile(r"\bRestart-Computer\b")),
+]
+
+# ─── Secret Detection Patterns (port of SECRET_PATTERNS) ────────────────────
+SECRET_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
+    ("aws_access_key", re.compile(r"(?:AKIA|ASIA)[A-Z0-9]{16}")),
+    ("aws_secret_key", re.compile(r"(?:aws|amazon).{0,20}(?:secret|key|token).{0,10}[:=]\s*[\"'][A-Za-z0-9/+=]{20,}", re.I)),
+    ("generic_api_key", re.compile(r"(?:api[_-]?key|apikey|secret|password)\s*[:=]\s*[\"'][^\"']{8,}[\"']", re.I)),
+    ("private_key_pem", re.compile(r"-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----")),
+    ("jwt_token", re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}")),
+    ("github_token", re.compile(r"(?:gh[pousr]_|github[_-]?pat[_-]?|github[_-]?token[_-]?)[A-Za-z0-9_]{20,}", re.I)),
+    ("google_api_key", re.compile(r"AIza[0-9A-Za-z_-]{35}")),
+    ("slack_token", re.compile(r"xox[baprs]-[0-9A-Za-z-]{10,}")),
+    ("stripe_key", re.compile(r"(?:sk|pk)_(?:test|live)_[0-9a-zA-Z]{24,}")),
+    ("mongodb_uri", re.compile(r"mongodb(?:\+srv)?://[^:]+:[^@]+@")),
+    ("postgres_uri", re.compile(r"postgres(?:ql)?://[^:]+:[^@]+@")),
+    ("redis_uri", re.compile(r"redis://[^:]+:[^@]+@")),
+    ("hardcoded_token", re.compile(r"(?:token|bearer)\s*[:=]\s*[\"'][A-Za-z0-9._\-+/=]{20,}[\"']", re.I)),
+    ("discord_webhook", re.compile(r"https://discord(?:app)?\.com/api/webhooks/\d+/[A-Za-z0-9_-]+", re.I)),
+    ("basic_auth", re.compile(r"https?://[^:]+:[^@]+@")),
+]
+
+# ─── Protected Config Files (port of PROTECTED_FILES) ───────────────────────
+PROTECTED_FILES: frozenset[str] = frozenset({
+    ".eslintrc", ".eslintrc.js", ".eslintrc.cjs", ".eslintrc.json",
+    ".eslintrc.yml", ".eslintrc.yaml",
+    "eslint.config.js", "eslint.config.mjs", "eslint.config.cjs",
+    "eslint.config.ts", "eslint.config.mts", "eslint.config.cts",
+    ".prettierrc", ".prettierrc.js", ".prettierrc.cjs", ".prettierrc.json",
+    ".prettierrc.yml", ".prettierrc.yaml",
+    "prettier.config.js", "prettier.config.cjs", "prettier.config.mjs",
+    "biome.json", "biome.jsonc",
+    ".ruff.toml", "ruff.toml",
+    ".shellcheckrc",
+    ".stylelintrc", ".stylelintrc.json", ".stylelintrc.yml",
+    ".markdownlint.json", ".markdownlint.yaml", ".markdownlintrc",
+    ".flake8", ".pylintrc", "tox.ini",
+    ".golangci.yml", ".golangci.yaml", ".golangci.json",
+    ".editorconfig",
+})
+
+
+def normalize_command(command: str) -> str:
+    """Strip sudo/env/bash -c wrappers + collapse whitespace to defeat bypasses."""
+    if not command or not isinstance(command, str):
+        return ""
+    cmd = re.sub(r"\s+", " ", command).strip()
+    while True:
+        prev = cmd
+        cmd = re.sub(r"^sudo\s+", "", cmd)
+        cmd = re.sub(r"^env(\s+\w+=[^\s]*)+\s+", "", cmd)
+        cmd = re.sub(r"^(?:bash|sh)\s+-c\s+", "", cmd)
+        cmd = re.sub(r"^(['\"])(.*)\1$", r"\2", cmd)
+        if cmd == prev:
+            break
+    cmd = re.sub(r"^/?(?:[\w.-]+/)+([\w.-]+)", r"\1", cmd)
+    return cmd
+
+
+def find_destructive(command: str) -> str | None:
+    for raw in (command, normalize_command(command)):
+        if not raw:
+            continue
+        for name, pattern in BLOCK_PATTERNS:
+            if pattern.search(raw):
+                return name
+    return None
+
+
+def find_secret(text: str) -> str | None:
+    if not text:
+        return None
+    for name, pattern in SECRET_PATTERNS:
+        if pattern.search(text):
+            return name
+    return None
+
+
+def deny(reason: str) -> None:
+    """Emit a Claude PreToolUse deny decision and exit non-zero."""
+    print(json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
+        }
+    }))
+    print(f"[solocode-guard] BLOCKED: {reason}", file=sys.stderr)
+    sys.exit(2)
+
+
+def main() -> int:
+    try:
+        payload = json.load(sys.stdin)
+    except (json.JSONDecodeError, ValueError):
+        return 0  # No parseable input — do not block.
+
+    tool = payload.get("tool_name", "")
+    tool_input = payload.get("tool_input", {}) or {}
+
+    if tool == "Bash":
+        command = tool_input.get("command", "") or ""
+        hit = find_destructive(command)
+        if hit:
+            deny(f"destructive command pattern '{hit}' detected. "
+                 f"Run manually if you are certain this is safe.")
+        secret = find_secret(command)
+        if secret:
+            deny(f"possible secret '{secret}' in command. Use environment variables instead.")
+        return 0
+
+    if tool in ("Edit", "Write", "MultiEdit"):
+        file_path = tool_input.get("file_path", "") or ""
+        basename = os.path.basename(file_path)
+        if basename in PROTECTED_FILES:
+            deny(f"'{basename}' is a protected config file. Confirm before editing linter/formatter config.")
+        # Scan proposed content for secrets.
+        content = tool_input.get("content", "") or tool_input.get("new_string", "") or ""
+        for edit in tool_input.get("edits", []) or []:
+            content += "\n" + (edit.get("new_string", "") or "")
+        secret = find_secret(content)
+        if secret:
+            deny(f"possible secret '{secret}' in file content. Use environment variables instead.")
+        return 0
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
