@@ -28,14 +28,6 @@
 - [verify] `.github/scripts/security-allowlist.txt` — mọi call site "nguy hiểm" (subprocess, os.environ) phải có justification trong file này.
 - [verify] `.opencode/tests/repro/test-repro.mjs` — RED tests, non-gating. Chuyển vào test-guard.mjs sau khi fix bug.
 
-## Copilot Chat Integration (2025-07-12)
-- [copilot] Agents live in `.claude/agents/*.md` (NOT `.copilot/agents/`). Required frontmatter: `name` + `model`.
-- [copilot] MCP servers configured in `opencode.json`: context7, sequential-thinking, memory, playwright.
-- [copilot] Self-guardrails in `.github/copilot-instructions.md` + agent system prompts to compensate for no hooks.
-- [copilot] BYOK utility model fix: set `chat.byokUtilityModelDefault`, `chat.utilityModel`, `chat.utilitySmallModel` to `mainAgent` in settings.json.
-- [copilot] Kilo `.kilo/agents/` = Copilot `.claude/agents/` (different directories, different frontmatter format).
-- [copilot] Kilo hooks cannot be replicated. Only workaround: explicit self-guardrails in system prompt.
-
 ## Gotchas
 - [gotcha] Python PATH on Git Bash: init.sh and Makefile use fallback python3 → python → py
 - [gotcha] WSL detection bug: verify.sh `grep -qi microsoft /proc/version` matches Git Bash
@@ -43,3 +35,50 @@
 - [gotcha] E501 globally ignored in .ruff.toml [lint]; no per-file E501 needed
 - [gotcha] Dead dir refs: ECC-main, agents-main, hermes-agent-main, etc. are stale — never restore
 - [gotcha] jsonschema not in .venv; schema validation via tools/validate_schemas.py
+
+## Decisions
+- [decision] 2026-07-23: `.opencode/` deprecated (v3.7.0). Verified via `diff`:
+  agents (14/14) and skills (47/47) are a 100% content mirror of `.kilo/` —
+  zero unique capability. Only non-mirrored asset was `command/ship.md`,
+  ported to `.kilo/command/` + `.claude/commands/`. Physical removal planned
+  for v4.0.0 after one green CI cycle. See `.harness.lock` for boundary status.
+- [decision] 2026-07-23: adopted **jcode** as the cost/latency-optimized worker
+  engine (DeepSeek v4 via CommandCode gateway), orchestrated by Claude Code.
+  Empirical benchmark (not vendor claims): jcode ~2-9x faster startup/latency,
+  ~15-63x lower RAM than OpenCode for concurrent worker sessions. No dedicated
+  `.jcode/` dir needed — reads `AGENTS.md` + `.claude/skills/` (fallback) +
+  `.mcp.json` natively. Launcher: `jcode.ps1` (syncs `COMMANDCODE_API_KEY`
+  from `.env` on every launch).
+- [decision] 2026-07-23: `tools/deploy.py` scaffold/deploy manifest trimmed —
+  target projects only get RUNTIME harness assets (agents/skills/commands/
+  hooks/config), never Solo-Code-CLI's own dev tooling (deploy.py, garden.py,
+  generate_harness.py, test_*.py), meta docs (SPEC.md, CONTRIBUTING.md,
+  CODE_OF_CONDUCT.md, SECURITY.md), CI workflows, or this repo's own
+  accumulated memory (MEMORY.md/project-conventions.md/harness-design-intent.md
+  — replaced with blank per-engine templates so target projects start clean).
+  Result: -21% scaffold size (1036->845 files, 6.1MB->4.8MB), verified via
+  live scaffold to a temp dir + `boundary_audit.py` + `checklist.py`.
+- [decision] 2026-07-23: Phase 3 executed — `.opencode/` physically removed
+  (agents/skills/commands/plugins/state/tests/tool, root `opencode.json`,
+  `opencode.ps1`, `package.json`, `package-lock.json`, `node_modules/`), all
+  deleted via `git rm` (reversible via git history, not raw `rm -rf`) per an
+  explicit user confirmation gate from the auto-mode safety classifier.
+  `jcode-master/` (vendored third-party source checkout) also deleted after
+  installing the compiled `jcode.exe` to `~/.cargo/bin/` (on PATH) so
+  `jcode.ps1` keeps working without the source tree. Updated in lockstep:
+  `.harness.lock`/`agent.yaml` -> v4.0.0, `tools/generate_harness.py`
+  (stripped ~530 lines of dead OpenCode-generation code, kept only the Claude
+  engine generator), `tools/garden.py`, `tools/validate_schemas.py` (re-pointed
+  `.opencode` -> `.kilo` as validation source), `tools/test_integration.py`
+  (removed 8 OpenCode-specific test functions), `.github/scripts/{check_skips,
+  boundary_audit,checklist}.py`, `AGENTS.md`/`CLAUDE.md`/all engines'
+  `harness-boundaries.md`/`harness-checklist.md`/`shared-state.md`, README
+  (both languages). Deleted `tools/migrate_to_shared_state.py` and
+  `tools/test_harness.py` (both tested/migrated OpenCode-only artifacts that
+  no longer exist). `.copilot/memory/` + `.copilot/instruction/*.md` manually
+  synced from `.kilo/` (no auto-generator exists for Copilot; parity is
+  check-only via `garden.py`). Verified clean: `garden.py` 0 drift, `pytest
+  tools/` 75 passed, `validate_schemas.py` 0 errors, `test_integration.py`
+  183/184 pass (1 pre-existing unrelated failure), `boundary_audit.py` clean,
+  `checklist.py` 5/5 pass — all re-verified on a fresh live scaffold to a
+  temp dir, not just in this repo.

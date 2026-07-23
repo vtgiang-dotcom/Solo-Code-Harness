@@ -20,11 +20,12 @@
 
 ## Nếu DB bị hỏng (corrupt)
 
-Nếu `python tools/shared_state.py validate` báo lỗi, hoặc thao tác đọc/ghi báo `sqlite3.DatabaseError` — xoá file DB và migrate lại từ đầu (dữ liệu gốc vẫn còn ở `.opencode/state/feature_list.json` và `progress.md`, không mất):
+Nếu `python tools/shared_state.py validate` báo lỗi, hoặc thao tác đọc/ghi báo `sqlite3.DatabaseError` — xoá file DB và để nó tự tái tạo schema rỗng ở lần chạy tiếp theo (KHÔNG còn nguồn migrate dự phòng từ `.opencode/state/` — đã gỡ ở v4.0.0; lịch sử feature/session trước đó sẽ mất nếu chưa backup):
 
 ```bash
+cp .solocode/shared-state.db .solocode/shared-state.db.bak   # backup trước khi xoá, nếu còn dùng được
 rm .solocode/shared-state.db .solocode/shared-state.db-wal .solocode/shared-state.db-shm
-python tools/migrate_to_shared_state.py --all
+# SharedState() tự tạo schema rỗng ở lần mở kế tiếp — không cần script migrate riêng.
 ```
 
 ## CLI Quick Reference

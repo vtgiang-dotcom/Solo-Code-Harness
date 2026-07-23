@@ -58,3 +58,27 @@
   — replaced with blank per-engine templates so target projects start clean).
   Result: -21% scaffold size (1036->845 files, 6.1MB->4.8MB), verified via
   live scaffold to a temp dir + `boundary_audit.py` + `checklist.py`.
+- [decision] 2026-07-23: Phase 3 executed — `.opencode/` physically removed
+  (agents/skills/commands/plugins/state/tests/tool, root `opencode.json`,
+  `opencode.ps1`, `package.json`, `package-lock.json`, `node_modules/`), all
+  deleted via `git rm` (reversible via git history, not raw `rm -rf`) per an
+  explicit user confirmation gate from the auto-mode safety classifier.
+  `jcode-master/` (vendored third-party source checkout) also deleted after
+  installing the compiled `jcode.exe` to `~/.cargo/bin/` (on PATH) so
+  `jcode.ps1` keeps working without the source tree. Updated in lockstep:
+  `.harness.lock`/`agent.yaml` -> v4.0.0, `tools/generate_harness.py`
+  (stripped ~530 lines of dead OpenCode-generation code, kept only the Claude
+  engine generator), `tools/garden.py`, `tools/validate_schemas.py` (re-pointed
+  `.opencode` -> `.kilo` as validation source), `tools/test_integration.py`
+  (removed 8 OpenCode-specific test functions), `.github/scripts/{check_skips,
+  boundary_audit,checklist}.py`, `AGENTS.md`/`CLAUDE.md`/all engines'
+  `harness-boundaries.md`/`harness-checklist.md`/`shared-state.md`, README
+  (both languages). Deleted `tools/migrate_to_shared_state.py` and
+  `tools/test_harness.py` (both tested/migrated OpenCode-only artifacts that
+  no longer exist). `.copilot/memory/` + `.copilot/instruction/*.md` manually
+  synced from `.kilo/` (no auto-generator exists for Copilot; parity is
+  check-only via `garden.py`). Verified clean: `garden.py` 0 drift, `pytest
+  tools/` 75 passed, `validate_schemas.py` 0 errors, `test_integration.py`
+  183/184 pass (1 pre-existing unrelated failure), `boundary_audit.py` clean,
+  `checklist.py` 5/5 pass — all re-verified on a fresh live scaffold to a
+  temp dir, not just in this repo.

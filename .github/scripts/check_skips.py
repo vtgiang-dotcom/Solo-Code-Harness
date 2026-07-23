@@ -45,14 +45,17 @@ def check_file(file_path: Path) -> list[str]:
 
 
 def main():
-    test_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".opencode/tests")
+    # Default target: tools/ (this repo's pytest suite). .opencode/tests
+    # (the old default) was removed in v4.0.0 along with the OpenCode engine.
+    test_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("tools")
     if not test_dir.is_dir():
         print(f"SKIP: {test_dir} not found")
         sys.exit(0)
 
     all_violations = []
-    for f in test_dir.rglob("*.mjs"):
-        all_violations.extend(check_file(f))
+    for pattern in ("*.py", "*.mjs"):
+        for f in test_dir.rglob(pattern):
+            all_violations.extend(check_file(f))
 
     if all_violations:
         print(f"No-skips policy: {len(all_violations)} violation(s)")

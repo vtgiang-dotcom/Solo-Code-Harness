@@ -207,16 +207,19 @@ def main():
     else:
         print_warning("eval_harness.py not found, skipping Harness Eval")
 
-    # Guard plugin tests (OpenCode)
-    guard_test = project_path / ".opencode" / "tests" / "test-guard.mjs"
-    if guard_test.exists():
+    # Guard hook syntax check (Claude Code -- .opencode/tests/test-guard.mjs
+    # was removed in v4.0.0 along with the OpenCode engine)
+    guard_hook = project_path / ".claude" / "hooks" / "guard.py"
+    if guard_hook.exists():
         results.append(
             run_check(
-                "Guard Tests", ["node", str(guard_test)], timeout=120
+                "Guard Hook Syntax",
+                [sys.executable, "-c", f"import py_compile; py_compile.compile(r'{guard_hook}', doraise=True)"],
+                timeout=30,
             )
         )
     else:
-        print_warning("test-guard.mjs not found, skipping Guard Tests")
+        print_warning("guard.py not found, skipping Guard Hook check")
 
     if npm.exists():
         results.append(

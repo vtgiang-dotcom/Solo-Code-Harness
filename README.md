@@ -2,47 +2,47 @@
 
 AI coding agent harness — rules, skills, hooks, and verification gates for disciplined Solo-Code engineering.
 
-Engine support: **Kilo Code** (`.kilo/`, source-of-truth — all other engine artifacts are generated from here), **Claude Code** (`.claude/` + `CLAUDE.md`, orchestrator), **jcode** (worker engine, DeepSeek v4 via CommandCode — no dedicated dir, reads `AGENTS.md`/`.claude/skills/`/`.mcp.json` natively), **GitHub Copilot** (`.copilot/`), **Gemini/Antigravity** (`.gemini/`).
+Engine support: **Kilo Code** (`.kilo/`, source of truth — all other engine artifacts are generated from or kept in parity with it), **Claude Code** (`.claude/` + `CLAUDE.md`, orchestrator, generated from `.kilo/`), **jcode** (worker engine, DeepSeek v4 via CommandCode gateway — no dedicated dir, reads `AGENTS.md` + `.claude/skills/` + `.mcp.json` natively), **GitHub Copilot** (`.copilot/`, manually kept in parity with `.kilo/`), **Gemini/Antigravity** (`.gemini/`).
 
-> **`.opencode/` is deprecated as of v3.7.0.** It was a 100%-parity generated mirror of `.kilo/` (verified via diff — zero content difference in agents/skills) and added no unique capability once Claude Code (full agent/command parity) and jcode (faster, ~15-60x lighter RAM for concurrent DeepSeek workers) covered its runtime role. Scheduled for physical removal in v4.0.0. See `.harness.lock` for details.
+> **v4.0.0:** OpenCode engine removed. It was a 100%-parity generated mirror of `.kilo/` (verified via diff — zero content difference in agents/skills) with no unique capability once Claude Code (full agent/command parity) and jcode (faster, ~15-60x lighter RAM for concurrent DeepSeek workers) covered its runtime role. Full history in `.kilo/memory/MEMORY.md` → "Decisions".
 
 ## Quick Start
 
 ```bash
-# Launch Claude Code (orchestrator)
-# see claude-env.ps1
+# Launch Claude Code (orchestrator) — see claude-env.ps1
+./claude-env.ps1
 
 # Launch jcode (DeepSeek worker, cost-saving)
 ./jcode.ps1
 
-# Generate harness artifacts
-make generate
+# Regenerate the Claude engine from .kilo/ source
+python tools/generate_harness.py --harness claude
 
 # Run all quality gates
 make check
 
 # Single gates
-make test              # Harness tests (15 tests)
+make test              # Harness tests
 make security-scan     # Secret detection
-make validate          # Schema validation
-make garden            # Drift detection (.kilo vs .opencode)
+make validate          # Schema validation (.kilo/ agents + skills)
+make garden            # Drift detection (.kilo <-> .claude / .copilot)
 
-# Integration tests (182 checks)
+# Integration tests (Copilot structure + shared state)
 python tools/test_integration.py
 
-# Guard plugin tests (80 cases, v2.6)
-node .opencode/tests/test-guard.mjs
-
-# Bug reproduction suite (non-gating)
-node .opencode/tests/repro/test-repro.mjs
-
 # No-skips test policy
-python .github/scripts/check_skips.py .opencode/tests/
+python .github/scripts/check_skips.py tools/
 ```
 
 ## Scaffold & Deploy
 
 Use `tools/deploy.py` to replicate this harness into new or existing projects.
+Deploy is **runtime-only**: it copies what a target project needs to actually
+*run* the AI-CLI harness (agents/skills/commands/hooks/config), never
+Solo-Code-CLI's own dev tooling (`deploy.py`, `garden.py`, `generate_harness.py`,
+`test_*.py`), meta docs (`SPEC.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`,
+`SECURITY.md`), CI workflows, or this repo's own accumulated memory — target
+projects get fresh blank memory templates instead.
 
 ### Scaffold a new project
 
@@ -53,14 +53,14 @@ python tools/deploy.py scaffold /path/to/new-project
 # Custom project name and description
 python tools/deploy.py scaffold /path/to/new-project --name my-app --description "My app"
 
-# OpenCode-only engine
-python tools/deploy.py scaffold /path/to/new-project --engine opencode
+# Kilo-only engine
+python tools/deploy.py scaffold /path/to/new-project --engine kilo
 
 # Copilot-only engine
 python tools/deploy.py scaffold /path/to/new-project --engine copilot
 ```
 
-Scaffold creates the directory, copies all engine configs (OpenCode + Claude Code + Kilo + Copilot + Gemini), generates `.gitignore` and `README.md`, runs `git init`, and prints post-setup instructions.
+Scaffold creates the directory, copies engine configs (Kilo + Claude Code + Copilot + Gemini, runtime-only — see "Deploy is runtime-only" note above), generates `.gitignore` and `README.md`, runs `git init`, and prints post-setup instructions.
 
 ### Deploy to an existing project
 
@@ -92,16 +92,15 @@ python tools/deploy.py
 
 | Directory | Purpose |
 |---|---|
-| `.opencode/` | **Deprecated (v3.7.0)** — OpenCode: agents (14), skills (47), plugin v2.5, commands (4), tools (2), state (5). Kept for CI parity only; do not extend. |
-| `.claude/` | **Orchestrator** — Claude Code: agents (14), skills (47), commands (14, incl. `ship`), instruction (10), guard + lifecycle hooks + `settings.json`; rulebook `CLAUDE.md` at root |
-| `.copilot/` | GitHub Copilot: agents (14), skills (47), commands (13), instruction (10), memory (4) |
-| `.kilo/` | **Source of truth** — Kilo Code: agents (14), skills (47), commands (14, incl. `ship`), hooks, memory, instruction. All other engine artifacts are generated from here via `tools/generate_harness.py`. |
+| `.claude/` | **Orchestrator** — Claude Code: agents (14), skills (47), commands (14, incl. `ship`), instruction (10), guard + lifecycle hooks + `settings.json`; rulebook `CLAUDE.md` at root. Generated from `.kilo/` via `tools/generate_harness.py --harness claude`. |
+| `.copilot/` | GitHub Copilot: agents (14), skills (47), commands (13), instruction (10), memory (4). Manually kept in parity with `.kilo/`; checked (not generated) by `tools/garden.py`. |
+| `.kilo/` | **Source of truth** — Kilo Code: agents (14), skills (47), commands (14, incl. `ship`), hooks, memory, instruction. Edit here first. |
 | *(jcode)* | **Worker engine** — no dedicated dir; auto-loads `AGENTS.md` + `.claude/skills/` (fallback) + `.mcp.json` natively. Launcher: `jcode.ps1`. Used for cheap/fast concurrent DeepSeek sub-tasks delegated by Claude Code. |
 | `.gemini/` | Gemini/Antigravity: agents (14), skills (47), commands (12), knowledge |
-| `.github/` | Shared scripts: `security_scan.py`, `checklist.py`, `check_skips.py`, `eval_harness.py`, `security-allowlist.txt` + `copilot-instructions.md`, `prompts/` |
-| `tools/` | Generator, validator, drift detector, integration tests |
+| `.github/` | Shared scripts: `security_scan.py`, `checklist.py`, `check_skips.py`, `eval_harness.py`, `boundary_audit.py`, `security-allowlist.txt` + `copilot-instructions.md`, `prompts/` |
+| `tools/` | Generator (`generate_harness.py`, `claude_engine.py`), validator, drift detector (`garden.py`), integration tests, `shared_state.py` (runtime dep of Claude session hooks) |
 | `.vscode/` | VS Code settings + MCP config for Copilot |
-| `docs/specs/` | Architecture specs, migration plans, historical docs |
+| `docs/specs/` | Architecture specs, migration plans, historical decision records (never deployed — dev-only) |
 
 ## Shared State (Cross-Engine, Local-Only)
 
@@ -123,23 +122,24 @@ python tools/shared_state.py locks
 | Gate | Command | What it checks |
 |---|---|---|
 | Lint | `ruff check .` | Python code style |
-| Schema | `make validate` | Frontmatter validity (53 files) |
-| Drift | `make garden` | .kilo ↔ .opencode parity |
-| Harness Tests | `make test` | Generator (15 tests) |
-| Integration | `python tools/test_integration.py` | Full .opencode/ structure (182 checks) |
-| Security | `make security-scan` | Hardcoded secrets (337 files) |
-| Guard | `node .opencode/tests/test-guard.mjs` | Destructive command + fuzz payloads (80 tests, v2.6) |
-| No-Skips | `python .github/scripts/check_skips.py .opencode/tests/` | Unauthorized test skips (skip/skipif without reason) |
-| Repro | `node .opencode/tests/repro/test-repro.mjs` | Bug reproduction suite (RED tests, non-gating) |
+| Schema | `make validate` | `.kilo/` agent + skill frontmatter validity |
+| Drift | `make garden` | `.kilo` ↔ `.claude` (generated) / `.copilot` (manual parity) |
+| Harness Tests | `make test` | Generator + shared-state (`tools/test_*.py`) |
+| Integration | `python tools/test_integration.py` | Copilot structure + shared state schema |
+| Security | `make security-scan` | Hardcoded secrets |
+| Boundary | `python .github/scripts/boundary_audit.py .` | No project files leaked into harness dirs |
+| No-Skips | `python .github/scripts/check_skips.py tools/` | Unauthorized test skips (skip/skipif without reason) |
 
-## OpenCode Commands
+## Slash Commands (Kilo + Claude Code)
 
 | Command | Purpose |
 |---|---|
-| `/verify` | Run all 6 verification gates |
+| `/verify` | Run all verification gates |
 | `/plan` | Delegate to planner agent |
 | `/decide` | Delegate to architect agent |
 | `/ship` | Pre-launch checklist |
+| `/commit` | Create conventional commit |
+| `/debug` | Systematic debugging workflow |
 
 ## Copilot Setup (VS Code)
 
@@ -176,18 +176,17 @@ python tools/generate_harness.py --harness claude
 | Rulebook | `CLAUDE.md` | Auto-loaded project memory (boundaries + rules) |
 | Subagents (14) | `.claude/agents/*.md` | Invoke via Task tool or by name |
 | Skills (47) | `.claude/skills/<name>/SKILL.md` | Auto-discovered capabilities |
-| Slash commands (13) | `.claude/commands/*.md` | `/verify`, `/plan`, `/decide`, `/debug`, `/commit`, … |
+| Slash commands (14) | `.claude/commands/*.md` | `/verify`, `/plan`, `/decide`, `/ship`, `/debug`, `/commit`, … |
 | Guard hook | `.claude/hooks/guard.py` + `.claude/settings.json` | `PreToolUse` — blocks destructive commands, secret leaks, protected-config edits |
 | Quality-gate hook | `.claude/hooks/quality_gate.py` | `PostToolUse` (Edit/Write) — advisory ruff/prettier/biome/gofmt format check |
 | Security-post hook | `.claude/hooks/security_post.py` | `PostToolUse` (Bash) — scans `git diff` for secrets after commit/push |
 | Session hooks | `.claude/hooks/session_start.py`, `session_end.py` | `SessionStart`/`SessionEnd` — load git + cross-engine context; log session to shared-state |
 
-The guard hook is a stdlib-only Python port of `solocode-guard.js` (same 33
-destructive patterns + 15 secret patterns + protected config files). It blocks a
-tool call by returning a `PreToolUse` deny decision and exit code 2. The
-PostToolUse and Session hooks are advisory (always exit 0, never block) and are
-stdlib-only Python ports of the corresponding Kilo lifecycle hooks — bringing
-Claude Code to enforcement parity with the Kilo engine.
+The guard hook is a stdlib-only Python port of the Kilo `gate-guard.js`/`secret-scan.js`
+lifecycle hooks (33 destructive patterns + 15 secret patterns + protected config
+files). It blocks a tool call by returning a `PreToolUse` deny decision and exit
+code 2. The PostToolUse and Session hooks are advisory (always exit 0, never
+block) — bringing Claude Code to enforcement parity with the Kilo engine.
 
 ```bash
 # Test the guard + lifecycle hook suites
@@ -213,55 +212,29 @@ Copy-Item .env.template .env
 ```
 
 `.env.template` ships with the FreeModel defaults (`ANTHROPIC_BASE_URL=https://cc.freemodel.dev`)
-alongside CommandCode + DeepSeek entries for OpenCode. Your real `.env` is gitignored and never deployed.
+alongside a `COMMANDCODE_API_KEY` entry shared with jcode. Your real `.env` is gitignored and never deployed.
 
-## Guard Plugin (`solocode-guard.js` v2.5)
+## jcode Setup (DeepSeek Worker Engine)
 
-- **33 destructive command patterns** (rm, git reset, dd, format, shutdown, chmod/chown system dirs, temp-dir destruction)
-- **15 secret detection patterns** (AWS keys, JWT, GitHub tokens, DB URIs, webhooks)
-- **19 protected config files** (ESLint, Prettier, Biome, Ruff, etc.)
-- **Normalize stage** — strips `sudo`, `bash -c`, whitespace to defeat bypasses
-- **`tool.execute.after`** — catches secrets leaked in bash output
-- **`chat.message`** — auto-injects session state on startup
+`jcode.ps1` launches [jcode](https://github.com/1jehuang/jcode) as a cost/latency-optimized
+worker, orchestrated by Claude Code for high-concurrency sub-tasks. It syncs
+`COMMANDCODE_API_KEY` from `.env` into jcode's provider profile on every launch.
+
+```powershell
+# 1. Make sure .env has COMMANDCODE_API_KEY set (see FreeModel setup above)
+
+# 2. Launch jcode
+./jcode.ps1
+
+# 3. Or run a single non-interactive task (used by Claude Code as orchestrator)
+jcode run --provider-profile commandcode --model deepseek/deepseek-v4-flash "your task"
+```
+
+jcode has no dedicated harness directory — it auto-loads `AGENTS.md` (project
+rules) and falls back to `.claude/skills/` for skill discovery, and reads
+`.mcp.json` for MCP servers natively. No porting/mirroring needed.
 
 Connects to [Command Code](https://commandcode.ai) — single API key for Claude, GPT, Gemini, DeepSeek, Qwen, Kimi, GLM, MiniMax, Step, and other models.
-
-### Setup (1-time)
-
-```powershell
-# 1. Install the provider plugin
-opencode plugin commandcode-go-opencode-provider
-
-# 2. Save API key as Windows User environment variable
-[Environment]::SetEnvironmentVariable("COMMANDCODE_API_KEY", "your-key", "User")
-
-# 3. Open new PowerShell → launch OpenCode
-opencode
-```
-
-### Configuration (in `opencode.json` — already set up)
-
-```json
-"plugin": ["commandcode-go-opencode-provider/server"],
-"provider": {
-    "commandcode": {
-        "npm": "commandcode-go-opencode-provider",
-        "name": "Command Code",
-        "env": ["COMMANDCODE_API_KEY"]
-    }
-}
-```
-
-Plugin registers all models from `models.json` (bundled in the npm package).
-Use `/models` in OpenCode to switch models.
-
-### When key expires
-
-```powershell
-[Environment]::SetEnvironmentVariable("COMMANDCODE_API_KEY", "new-key", "User")
-```
-
-Open new PowerShell → `opencode`. No file changes needed.
 
 ## MCP Servers
 
@@ -276,44 +249,46 @@ Open new PowerShell → `opencode`. No file changes needed.
 
 Bộ harness (dây cương) cho AI coding agent — rules, skills, hooks và verification gates dành cho kỹ thuật Solo-Code có kỷ luật.
 
-Hỗ trợ engine: **Kilo Code** (`.kilo/`, nguồn gốc — mọi engine khác được sinh ra từ đây), **Claude Code** (`.claude/` + `CLAUDE.md`, điều phối), **jcode** (worker chạy DeepSeek v4 qua CommandCode — không cần thư mục riêng), **GitHub Copilot** (`.copilot/`), **Gemini/Antigravity** (`.gemini/`).
+Hỗ trợ engine: **Kilo Code** (`.kilo/`, nguồn gốc — mọi engine khác được sinh ra từ đây hoặc giữ song song), **Claude Code** (`.claude/` + `CLAUDE.md`, điều phối, sinh từ `.kilo/`), **jcode** (worker chạy DeepSeek v4 qua CommandCode — không cần thư mục riêng), **GitHub Copilot** (`.copilot/`, giữ song song thủ công với `.kilo/`), **Gemini/Antigravity** (`.gemini/`).
 
-> **`.opencode/` đã deprecated từ v3.7.0** — là bản mirror sinh 100% từ `.kilo/` (đã verify bằng diff, không khác biệt nội dung), không còn giá trị riêng khi Claude Code (parity đầy đủ agent/command) và jcode (nhanh hơn, nhẹ RAM hơn ~15-60x cho worker DeepSeek đồng thời) đã lấp vai trò runtime của nó. Sẽ gỡ vật lý ở v4.0.0. Xem `.harness.lock`.
+> **v4.0.0:** đã gỡ engine OpenCode. Nó từng là bản mirror sinh 100% từ `.kilo/` (đã verify bằng diff, không khác biệt nội dung), không còn giá trị riêng khi Claude Code (parity đầy đủ agent/command) và jcode (nhanh hơn, nhẹ RAM hơn ~15-60x cho worker DeepSeek đồng thời) đã lấp vai trò runtime của nó. Lịch sử đầy đủ trong `.kilo/memory/MEMORY.md` → "Decisions".
 
-## Quick Start
+## Bắt đầu nhanh
 
 ```bash
-# Mở OpenCode
-opencode
+# Mở Claude Code (điều phối) — xem claude-env.ps1
+./claude-env.ps1
 
-# Sinh các artifact của harness
-make generate
+# Mở jcode (worker DeepSeek, tiết kiệm chi phí)
+./jcode.ps1
+
+# Sinh lại engine Claude từ nguồn .kilo/
+python tools/generate_harness.py --harness claude
 
 # Chạy tất cả quality gates
 make check
 
 # Gates riêng lẻ
-make test              # Harness tests (15 tests)
+make test              # Harness tests
 make security-scan     # Phát hiện secret trong code
-make validate          # Schema validation
-make garden            # Drift detection (.kilo vs .opencode)
+make validate          # Schema validation (.kilo/ agents + skills)
+make garden            # Drift detection (.kilo <-> .claude / .copilot)
 
-# Integration tests (182 checks)
+# Integration tests (cấu trúc Copilot + shared state)
 python tools/test_integration.py
 
-# Guard plugin tests (80 cases, v2.6)
-node .opencode/tests/test-guard.mjs
-
-# Bug reproduction suite (non-gating)
-node .opencode/tests/repro/test-repro.mjs
-
 # No-skips test policy
-python .github/scripts/check_skips.py .opencode/tests/
+python .github/scripts/check_skips.py tools/
 ```
 
 ## Scaffold & Deploy
 
 Dùng `tools/deploy.py` để nhân bản harness này vào dự án mới hoặc dự án có sẵn.
+Deploy chỉ mang theo **phần runtime cần để chạy harness** (agents/skills/commands/
+hooks/config) — không mang theo công cụ dev của Solo-Code-CLI (`deploy.py`,
+`garden.py`, `generate_harness.py`, `test_*.py`), tài liệu nội bộ (`SPEC.md`,
+`CONTRIBUTING.md`...), CI workflows, hay bộ nhớ tích luỹ của chính repo này —
+dự án đích nhận memory template rỗng để tự ghi quy ước riêng.
 
 ### Scaffold — tạo dự án mới
 
@@ -324,14 +299,14 @@ python tools/deploy.py scaffold /path/to/new-project
 # Tuỳ chỉnh tên và mô tả
 python tools/deploy.py scaffold /path/to/new-project --name my-app --description "My app"
 
-# Chỉ engine OpenCode
-python tools/deploy.py scaffold /path/to/new-project --engine opencode
+# Chỉ engine Kilo
+python tools/deploy.py scaffold /path/to/new-project --engine kilo
 
 # Chỉ engine Copilot
 python tools/deploy.py scaffold /path/to/new-project --engine copilot
 ```
 
-Scaffold tạo thư mục, copy config cho tất cả engine (OpenCode + Kilo + Copilot + Gemini), sinh `.gitignore` và `README.md`, chạy `git init`, và in hướng dẫn post-setup.
+Scaffold tạo thư mục, copy config engine (Kilo + Claude Code + Copilot + Gemini, chỉ phần runtime), sinh `.gitignore` và `README.md`, chạy `git init`, và in hướng dẫn post-setup.
 
 ### Deploy — copy harness vào dự án có sẵn
 
@@ -363,88 +338,85 @@ python tools/deploy.py
 
 | Thư mục | Mục đích |
 |---|---|
-| `.opencode/` | **Chính** — OpenCode: agents (14), skills (47), plugin v2.5, commands (4), tools (2), state (5) |
-| `.claude/` | Claude Code: agents (14), skills (47), commands (13), instruction (10), guard hook + `settings.json`; rulebook `CLAUDE.md` ở root |
-| `.copilot/` | GitHub Copilot: agents (14), skills (47), commands (13), instruction (10), memory (4) |
-| `.kilo/` | Kilo Code: agents (14), skills (47), hooks, memory, instruction |
+| `.claude/` | **Điều phối** — Claude Code: agents (14), skills (47), commands (14, gồm `ship`), instruction (10), guard + lifecycle hooks + `settings.json`; rulebook `CLAUDE.md` ở root. Sinh từ `.kilo/` qua `tools/generate_harness.py --harness claude`. |
+| `.copilot/` | GitHub Copilot: agents (14), skills (47), commands (13), instruction (10), memory (4). Giữ song song thủ công với `.kilo/`; `tools/garden.py` chỉ kiểm tra, không tự sinh. |
+| `.kilo/` | **Nguồn gốc** — Kilo Code: agents (14), skills (47), commands (14, gồm `ship`), hooks, memory, instruction. Sửa ở đây trước tiên. |
+| *(jcode)* | **Worker engine** — không có thư mục riêng; tự load `AGENTS.md` + `.claude/skills/` (fallback) + `.mcp.json`. Launcher: `jcode.ps1`. |
 | `.gemini/` | Gemini/Antigravity: agents (14), skills (47), commands (12), knowledge |
-| `.github/` | Script dùng chung: `security_scan.py`, `checklist.py`, `eval_harness.py` + `copilot-instructions.md`, `prompts/` |
-| `tools/` | Generator, validator, drift detector, integration tests |
+| `.github/` | Script dùng chung: `security_scan.py`, `checklist.py`, `check_skips.py`, `eval_harness.py`, `boundary_audit.py` + `copilot-instructions.md`, `prompts/` |
+| `tools/` | Generator (`generate_harness.py`, `claude_engine.py`), validator, drift detector (`garden.py`), integration tests, `shared_state.py` (runtime dep của Claude session hooks) |
 | `.vscode/` | VS Code settings + MCP config cho Copilot |
-| `docs/specs/` | Architecture specs, migration plans, historical docs |
+| `docs/specs/` | Architecture specs, migration plans, hồ sơ quyết định lịch sử (không deploy — chỉ dev nội bộ) |
 
 ## Verification Gates
 
 | Gate | Lệnh | Kiểm tra |
 |---|---|---|
 | Lint | `ruff check .` | Python code style |
-| Schema | `make validate` | Frontmatter validity (53 files) |
-| Drift | `make garden` | Cân bằng .kilo ↔ .opencode |
-| Harness Tests | `make test` | Generator (15 tests) |
-| Integration | `python tools/test_integration.py` | Cấu trúc .opencode/ đầy đủ (182 checks) |
-| Security | `make security-scan` | Secret hardcode (337 files) |
-| Guard | `node .opencode/tests/test-guard.mjs` | Mẫu lệnh phá hoại + fuzz payloads (80 tests, v2.6) |
-| No-Skips | `python .github/scripts/check_skips.py .opencode/tests/` | Skip/skipif không lý do |
-| Repro | `node .opencode/tests/repro/test-repro.mjs` | Bug reproduction suite (RED tests, non-gating) |
+| Schema | `make validate` | Frontmatter agent + skill trong `.kilo/` |
+| Drift | `make garden` | `.kilo` ↔ `.claude` (sinh tự động) / `.copilot` (giữ song song thủ công) |
+| Harness Tests | `make test` | Generator + shared-state (`tools/test_*.py`) |
+| Integration | `python tools/test_integration.py` | Cấu trúc Copilot + schema shared state |
+| Security | `make security-scan` | Secret hardcode |
+| Boundary | `python .github/scripts/boundary_audit.py .` | Không có file dự án lẫn vào thư mục harness |
+| No-Skips | `python .github/scripts/check_skips.py tools/` | Skip/skipif không lý do |
 
-## OpenCode Commands
+## Slash Commands (Kilo + Claude Code)
 
 | Lệnh | Chức năng |
 |---|---|
-| `/verify` | Chạy tất cả 6 verification gates |
+| `/verify` | Chạy tất cả verification gates |
 | `/plan` | Giao việc cho planner agent |
 | `/decide` | Giao việc cho architect agent |
 | `/ship` | Pre-launch checklist |
+| `/commit` | Tạo conventional commit |
+| `/debug` | Quy trình debug có hệ thống |
 
-## Guard Plugin (`solocode-guard.js` v2.5)
+## Claude Code Setup
 
-- **33 mẫu lệnh nguy hiểm** (rm, git reset, dd, format, shutdown, chmod/chown thư mục hệ thống, phá huỷ temp-dir)
-- **15 mẫu phát hiện secret** (AWS keys, JWT, GitHub tokens, DB URIs, webhooks)
-- **19 file config được bảo vệ** (ESLint, Prettier, Biome, Ruff, v.v.)
-- **Normalize stage** — loại bỏ `sudo`, `bash -c`, khoảng trắng để chống bypass
-- **`tool.execute.after`** — bắt secret rò rỉ trong output bash
-- **`chat.message`** — tự động inject session state khi khởi động
+```bash
+# Sinh lại engine Claude từ nguồn .kilo/
+python tools/generate_harness.py --harness claude
+```
 
-## CommandCode Provider
+Guard hook là bản port stdlib-only Python từ `gate-guard.js`/`secret-scan.js` của
+Kilo (33 mẫu lệnh nguy hiểm + 15 mẫu secret + danh sách file config được bảo vệ).
+PostToolUse/Session hooks chỉ mang tính khuyến nghị (luôn exit 0) — đưa Claude
+Code lên ngang hàng enforcement với Kilo.
+
+```bash
+# Test bộ guard + lifecycle hook
+python -m pytest tools/test_claude_guard.py tools/test_claude_hooks.py -q
+```
+
+### Chạy Claude Code qua FreeModel
+
+```powershell
+Copy-Item .env.template .env
+#    rồi sửa .env → ANTHROPIC_API_KEY=<key-của-bạn>
+./claude-env.ps1
+```
+
+## jcode Setup (Worker DeepSeek)
+
+`jcode.ps1` chạy [jcode](https://github.com/1jehuang/jcode) như một worker tối
+ưu chi phí/độ trễ, do Claude Code điều phối cho các sub-task chạy đồng thời.
+Tự đồng bộ `COMMANDCODE_API_KEY` từ `.env` vào provider profile của jcode mỗi lần chạy.
+
+```powershell
+# 1. Đảm bảo .env đã có COMMANDCODE_API_KEY
+
+# 2. Chạy jcode
+./jcode.ps1
+
+# 3. Hoặc chạy 1 task không tương tác (Claude Code dùng khi điều phối)
+jcode run --provider-profile commandcode --model deepseek/deepseek-v4-flash "task của bạn"
+```
+
+jcode không có thư mục harness riêng — tự load `AGENTS.md` + fallback sang
+`.claude/skills/` + đọc `.mcp.json` — không cần port/mirror gì thêm.
 
 Kết nối tới [Command Code](https://commandcode.ai) — một API key dùng được Claude, GPT, Gemini, DeepSeek, Qwen, Kimi, GLM, MiniMax, Step và nhiều model khác.
-
-### Thiết lập (1 lần)
-
-```powershell
-# 1. Cài plugin provider
-opencode plugin commandcode-go-opencode-provider
-
-# 2. Lưu API key vào biến môi trường Windows User
-[Environment]::SetEnvironmentVariable("COMMANDCODE_API_KEY", "key-của-bạn", "User")
-
-# 3. Mở PowerShell mới → chạy OpenCode
-opencode
-```
-
-### Cấu hình (trong `opencode.json` — đã có sẵn)
-
-```json
-"plugin": ["commandcode-go-opencode-provider/server"],
-"provider": {
-    "commandcode": {
-        "npm": "commandcode-go-opencode-provider",
-        "name": "Command Code",
-        "env": ["COMMANDCODE_API_KEY"]
-    }
-}
-```
-
-Plugin tự động đăng ký tất cả model từ `models.json` (bundled trong npm package).
-Dùng `/models` trong OpenCode để chọn model.
-
-### Khi key hết hạn
-
-```powershell
-[Environment]::SetEnvironmentVariable("COMMANDCODE_API_KEY", "key-mới", "User")
-```
-
-Mở PowerShell mới → `opencode`. Không cần sửa file nào.
 
 ## MCP Servers
 

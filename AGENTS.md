@@ -24,7 +24,7 @@ permissions:
 
 > **CRITICAL:** Read this file fully before taking any action. These rules are NON-NEGOTIABLE.
 
-This file serves both **Kilo** (reads `.kilo/` for hooks/skills/memory), **OpenCode** (reads `.opencode/` for plugins/skills/memory), and **GitHub Copilot** (reads `.copilot/` for agents/skills/commands, `.github/copilot-instructions.md` for rulebook). Sections referencing `.kilo/` paths are Kilo-specific; OpenCode and Copilot ignore them. Engine-specific equivalents are maintained in `.opencode/` and `.copilot/` respectively.
+This file serves **Kilo** (reads `.kilo/` for hooks/skills/memory — source of truth), **Claude Code** (reads `.claude/` + `CLAUDE.md`, generated from `.kilo/`), **jcode** (reads this file + `.claude/skills/` directly, no dedicated dir), and **GitHub Copilot** (reads `.copilot/` for agents/skills/commands, `.github/copilot-instructions.md` for rulebook). Sections referencing `.kilo/` paths are Kilo-specific; other engines ignore them and use their own generated/mirrored equivalents. (`.opencode/` was deprecated in v3.7.0 and physically removed in v4.0.0 — see `.harness.lock`.)
 
 ## Harness Boundaries (READ FIRST)
 
@@ -34,12 +34,12 @@ This project is powered by **Solo-Code Harness** — an AI agent discipline laye
 
 | If the file path starts with... | Then it is... | Action |
 |----------------------------------|---------------|--------|
-| `.kilo/`, `.opencode/`, `.copilot/`, `.gemini/`, `.claude/`, `.claude-plugin/` | Harness engine | Rules/skills/hooks for AI behavior — not project logic |
+| `.kilo/`, `.copilot/`, `.gemini/`, `.claude/`, `.claude-plugin/` | Harness engine | Rules/skills/hooks for AI behavior — not project logic |
 | `.vscode/` | Harness IDE config | VS Code settings + MCP servers — not project source |
-| `.github/scripts/` | Harness verification | `security_scan.py`, `checklist.py`, `check_skips.py`, `eval_harness.py`, `security-allowlist.txt` |
-| `tools/` | Harness utilities | `deploy.py`, `generate_harness.py`, `garden.py`, `harness_config.py` |
+| `.github/scripts/` | Harness verification | `security_scan.py`, `checklist.py`, `check_skips.py`, `eval_harness.py`, `security-allowlist.txt`, `boundary_audit.py` |
+| `tools/` | Harness utilities | `deploy.py`, `generate_harness.py`, `garden.py`, `shared_state.py` |
 | `.contracts/` | Harness sub-agent contracts | Status contracts for delegated agents |
-| `AGENTS.md`, `agent.yaml`, `kilo.jsonc`, `opencode.json`, `.mcp.json`, `.ruff.toml`, `.gitleaks.toml`, `Makefile`, `opencode.ps1`, `claude-env.ps1`, `init.sh`, `verify.sh`, `extensions_config.json`, `SPEC.md`, `.harness.lock`, `.solocode/`, `.pre-commit-config.yaml`, `.github/pull_request_template.md`, `CLAUDE.md` | Harness config | Agent behavior configuration — not application config |
+| `AGENTS.md`, `agent.yaml`, `kilo.jsonc`, `.mcp.json`, `.ruff.toml`, `.gitleaks.toml`, `Makefile`, `jcode.ps1`, `claude-env.ps1`, `init.sh`, `verify.sh`, `extensions_config.json`, `.harness.lock`, `.solocode/`, `.pre-commit-config.yaml`, `.github/pull_request_template.md`, `CLAUDE.md` | Harness config | Agent behavior configuration — not application config |
 | **Everything else** | **Project code** | Your actual application — this is what you modify |
 
 **Key rule:** Never modify harness files to fix a project bug. Never modify project files to fix a harness issue. Read `.harness.lock` for the authoritative boundary list.
@@ -180,29 +180,28 @@ Key enforcement points:
 
 ---
 
-## Session State Lifecycle (OpenCode)
+## Session State Lifecycle (shared state)
 
-The guard plugin auto-injects current state at session start. State files live at `.opencode/state/`.
+Cross-engine session state lives in `.solocode/shared-state.db` (SQLite, local-only,
+never committed). All engines read/write it via `tools/shared_state.py`'s
+`SharedState` class. `.claude/hooks/session_start.py` / `session_end.py` already
+call this automatically — you rarely need to touch it by hand.
 
 ### Startup
 
-1. The plugin injects `session-handoff.md` + feature summary into your first message.
-2. Read `.opencode/state/feature_list.json` to see all features and their status.
-3. Pick exactly ONE `in-progress` feature (or promote one `not-started` to `in-progress`).
-4. Do NOT work on multiple features in one session.
+1. `session_start.py` reads current feature status + recent session log from
+   `.solocode/shared-state.db` and injects a summary into context.
+2. Pick exactly ONE `in-progress` feature (or promote one `not-started` to `in-progress`)
+   via `state.set_feature_status(...)`.
+3. Do NOT work on multiple features in one session.
 
 ### Wrap-Up (before ending session)
 
-1. **Update `feature_list.json`**: set statuses, populate `evidence` with links/commands proving the work is done.
-2. **Append to `progress.md`** (newest on top):
-   ```
-   ### YYYY-MM-DD — Summary
-   - [x] Completed: X
-   - Decisions made: why you chose A over B
-   - Verification: which gates passed
-   ```
-3. **Overwrite `session-handoff.md`**: current objective, completed this session, next steps.
-4. **Call `/session-log`** or `session-log` tool to record the session.
+1. **Update feature status**: `state.set_feature_status("feat-id", "completed", ..., evidence="...")`.
+2. **Log the session**: `state.add_session_entry(engine=..., model=..., summary="...")`
+   (newest entries are read first at next session start).
+3. `session_end.py` calls this automatically on Claude Code; other engines call
+   `tools/shared_state.py` directly if no lifecycle hook exists for that engine.
 
 ---
 
@@ -270,7 +269,7 @@ If the agent cannot proceed without a decision that falls outside its permitted 
 Before marking any task complete, verify:
 - [ ] `python .github/scripts/security_scan.py .` passes
 - [ ] `python .github/scripts/checklist.py .` passes
-- [ ] `python .github/scripts/check_skips.py .opencode/tests/` passes (0 unauthorized skips)
+- [ ] `python .github/scripts/check_skips.py tools/` passes (0 unauthorized skips)
 - [ ] No console.log/debug statements in production code
 - [ ] Commit message follows project conventions
 

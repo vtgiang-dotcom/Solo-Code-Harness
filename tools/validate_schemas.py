@@ -49,7 +49,14 @@ def parse_frontmatter(content: str) -> dict | None:
 
 
 def validate_agent(file_path: Path) -> list[str]:
-    """Validate an agent markdown file's frontmatter."""
+    """Validate an agent markdown file's frontmatter (.kilo/agents/ native format).
+
+    Note: this used to check for "deprecated V1 keys" -- that check validated
+    the OUTPUT of the Kilo->OpenCode permission migration (V1 `permission:` ->
+    V2 `permissions:` array). OpenCode was removed in v4.0.0, so .kilo/agents/
+    (the source) legitimately uses its own native V1 `permission:` format --
+    that is correct here, not an error.
+    """
     errors: list[str] = []
     content = file_path.read_text(encoding="utf-8", errors="ignore")
     fm = parse_frontmatter(content)
@@ -57,23 +64,8 @@ def validate_agent(file_path: Path) -> list[str]:
         errors.append(f"{file_path.name}: Missing or malformed frontmatter")
         return errors
 
-    # Check for deprecated V1 keys
-    v1_keys = {"prompt", "temperature", "top_p", "disable", "maxSteps", "tools", "permission"}
-    found_v1 = v1_keys & set(fm.keys())
-    if found_v1:
-        errors.append(f"{file_path.name}: V1 deprecated keys: {', '.join(sorted(found_v1))}")
-
-    # Check permissions format in raw text
-    fm_start = content.find("---")
-    fm_end = content.find("\n---", 3)
-    if fm_start == 0 and fm_end != -1:
-        raw = content[3:fm_end]
-        if "permissions:" in raw:
-            # Check for proper V2 format: - action: / resource: / effect:
-            perm_section = raw[raw.index("permissions:"):]
-            if "- action:" not in perm_section:
-                errors.append(f"{file_path.name}: permissions block missing V2 array items")
-
+    # Structural check only: not every .kilo/agents/ file uses a top-level
+    # `description:` key (some rely on body prose instead) -- that's valid.
     return errors
 
 
@@ -92,19 +84,21 @@ def validate_skill(file_path: Path) -> list[str]:
 
 def main() -> int:
     root = ROOT
-    opencode = root / ".opencode"
+    # .kilo/ is the source of truth (.opencode/ was removed in v4.0.0 -- see
+    # .harness.lock). Validate the source directly.
+    kilo = root / ".kilo"
     errors: list[str] = []
     checked = 0
 
     # Validate agents
-    agents_dir = opencode / "agents"
+    agents_dir = kilo / "agents"
     if agents_dir.is_dir():
         for f in sorted(agents_dir.glob("*.md")):
             checked += 1
             errors.extend(validate_agent(f))
 
     # Validate skills
-    skills_dir = opencode / "skill"
+    skills_dir = kilo / "skill"
     if skills_dir.is_dir():
         for skill_dir in sorted(skills_dir.iterdir()):
             if skill_dir.is_dir():

@@ -7,29 +7,28 @@
 # Không sửa, không phân tích như logic nghiệp vụ.
 
 [harness]
-version = "3.7.0"
+version = "4.0.0"
 source = "solo-code-io/solo-code-cli"
 generated_at = "2026-07-23T00:00:00Z"
 
-# --- ENGINE STATUS (v3.7.0) ---
-# .opencode/  -> DEPRECATED. Content is a 100%-parity generated mirror of
-#                .kilo/ (agents, skills identical; verified via diff, 2026-07-23).
-#                Its only non-mirrored asset (command/ship.md) has been ported
-#                to .kilo/command/ship.md and .claude/commands/ship.md.
-#                Scheduled for physical removal in v4.0.0 once CI stays green
-#                for one full cycle without it. Do NOT add new content here.
-# jcode       -> NEW cost/latency-optimized worker engine for scriptable,
+# --- ENGINE STATUS (v4.0.0) ---
+# .opencode/  -> REMOVED (was: 100%-parity generated mirror of .kilo/, zero
+#                unique capability; its one non-mirrored asset, command/
+#                ship.md, was ported to .kilo/command/ + .claude/commands/
+#                before removal). Full history: .kilo/memory/MEMORY.md
+#                "Decisions" section, 2026-07-23.
+# jcode       -> Cost/latency-optimized worker engine for scriptable,
 #                high-concurrency sub-tasks (DeepSeek v4 via CommandCode
 #                gateway). No dedicated harness dir needed: reads AGENTS.md,
 #                .claude/skills/ (fallback) and .mcp.json natively. Launcher:
-#                jcode.ps1. Orchestrated by Claude Code (planner) per
-#                docs/decision: 2026-07-23 jcode-vs-opencode evaluation.
+#                jcode.ps1. Orchestrated by Claude Code (planner).
+# .copilot/   -> NOT auto-generated. Manually kept in parity with .kilo/
+#                (source of truth); verified by tools/garden.py drift checks.
 
 [boundaries]
 # Thư mục harness — KHÔNG chứa code dự án
 dirs = [
     ".kilo",
-    ".opencode",  # deprecated, see [harness] note above — kept for CI parity until v4.0.0
     ".copilot",
     ".gemini",
     ".claude",
@@ -46,13 +45,11 @@ files = [
     "CLAUDE.md",
     "agent.yaml",
     "kilo.jsonc",
-    "opencode.json",
     ".mcp.json",
     ".ruff.toml",
     ".gitleaks.toml",
     "Makefile",
     "pyproject.toml",
-    "opencode.ps1",   # deprecated, see [harness] note above
     "jcode.ps1",
     "claude-env.ps1",
     "verify.sh",

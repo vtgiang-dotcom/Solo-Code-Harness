@@ -3,7 +3,8 @@
 Solo-Code -> Claude Code Engine Generator
 
 Reads .kilo/ source assets and replicates them into .claude/ for Claude Code,
-making Claude a first-class engine at parity with .opencode / .copilot / .gemini.
+making Claude a first-class engine at parity with .copilot / .gemini.
+(.opencode/ was deprecated in v3.7.0, removed in v4.0.0 -- see .harness.lock.)
 
 Generated artifacts:
   - .claude/agents/*.md          Subagents (Kilo permission -> Claude tools allowlist)
@@ -351,12 +352,12 @@ Before analyzing or modifying ANY file, classify it:
 
 | If the path starts with... | Then it is... | Action |
 |----------------------------|---------------|--------|
-| `.kilo/`, `.opencode/`, `.copilot/`, `.gemini/`, `.claude/` | Harness engine | AI behavior config -- not project logic |
+| `.kilo/`, `.copilot/`, `.gemini/`, `.claude/` | Harness engine | AI behavior config -- not project logic |
 | `.vscode/` | Harness IDE config | Editor + MCP config -- not project source |
 | `.github/scripts/` | Harness verification | Security/lint/eval scripts |
 | `tools/` | Harness utilities | Generator, deploy, garden, config |
 | `.contracts/` | Sub-agent contracts | Status contracts for delegated agents |
-| `AGENTS.md`, `CLAUDE.md`, `agent.yaml`, `kilo.jsonc`, `opencode.json`, `.mcp.json`, `Makefile`, `SPEC.md`, `.harness.lock`, `.solocode/` | Harness config | Agent behavior config -- not app config |
+| `AGENTS.md`, `CLAUDE.md`, `agent.yaml`, `kilo.jsonc`, `.mcp.json`, `Makefile`, `.harness.lock`, `.solocode/` | Harness config | Agent behavior config -- not app config |
 | **Everything else** | **Project code** | Your actual application -- this is what you modify |
 
 **Key rule:** Never modify harness files to fix a project bug, and never modify

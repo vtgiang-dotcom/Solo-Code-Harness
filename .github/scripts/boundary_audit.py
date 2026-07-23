@@ -21,9 +21,10 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 # ─── Harness directories ───────────────────────────────────────────────────
 HARNESS_DIRS = [
     ".kilo",
-    ".opencode",
     ".copilot",
     ".gemini",
+    ".claude",
+    ".claude-plugin",
     ".github",
     ".contracts",
     ".vscode",
@@ -47,6 +48,8 @@ HARNESS_ALLOWED_EXTENSIONS = {
     ".sh",       # Shell scripts
     ".lock",     # Package lock files, .harness.lock
     ".jsonl",    # Log files
+    ".sql",      # Schema docs (tools/shared_state_schema.sql)
+    ".template", # Env templates (.env.template)
     ".gitignore",# Git ignore
     ".gitkeep",  # Git keep
     ".prompt.md",# Copilot prompts

@@ -3,7 +3,11 @@
 Garden — Drift Detection
 =========================
 Checks for stale artifacts, missing generated files, and dead links
-between .kilo/ ↔ .opencode/ and .kilo/ ↔ .copilot/ directories.
+between .kilo/ (source of truth) ↔ .claude/ (generated) and
+.kilo/ ↔ .copilot/ (manually-maintained parity) directories.
+
+.opencode/ was deprecated in v3.7.0 and physically removed in v4.0.0 —
+see .harness.lock and .kilo/memory/MEMORY.md "Decisions" section.
 
 Usage:
     python tools/garden.py
@@ -376,14 +380,8 @@ def main() -> int:
     all_issues: list[str] = []
     skip_skills = _load_skip_skills()
 
-    # .opencode/ engine — uses .instructions.md suffix
-    print("--- .opencode/ ---")
-    all_issues.extend(
-        run_engine_checks(kilo, ROOT / ".opencode", ".opencode", instruction_suffix=True, skip_set=skip_skills)
-    )
-
     # .copilot/ engine — direct copy, no suffix
-    print("\n--- .copilot/ ---")
+    print("--- .copilot/ ---")
     all_issues.extend(
         run_engine_checks(kilo, ROOT / ".copilot", ".copilot", instruction_suffix=False)
     )

@@ -47,7 +47,6 @@
 - [ ] IMPLEMENT.md captures decisions and deviations as they happen
 - [ ] `/plan`, `/decide`, `/verify` commands are functional
 - [ ] `.github/pull_request_template.md` exists and includes all verification gates
-- [ ] Repro suite (`.opencode/tests/repro/`) tracks known bugs with bug IDs
 
 ## Permissions & sandbox
 
@@ -59,12 +58,12 @@
 
 ## Verification loop
 
-- [ ] Tests exist for the agent's outputs (`test_harness.py`, `eval_harness.py`, `test-guard.mjs`, `test-repro.mjs`, `check_skips.py`)
+- [ ] Tests exist for the agent's outputs (`test_harness.py`, `eval_harness.py`, `check_skips.py`, `.claude/hooks/guard.py` behavior)
 - [ ] The agent can run the verification command itself (`checklist.py`)
 - [ ] Verification runs automatically on task completion, not just on PR
 - [ ] Eval criteria are written down before the task starts, not after
 - [ ] Security scan passes before any commit
-- [ ] No-skips policy enforced: `python .github/scripts/check_skips.py .opencode/tests/`
+- [ ] No-skips policy enforced: `python .github/scripts/check_skips.py tools/`
 - [ ] All "dangerous" calls in `security-allowlist.txt` have current, correct justifications
 
 ## Observability
