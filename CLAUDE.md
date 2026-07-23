@@ -29,13 +29,13 @@ boundary list.
 
 When asked "Is Solo-Code Harness active?", answer:
 `Solo-Code Harness active: behavior rules, anti-hallucination rules, security rules,
-prose quality rules, 47 skills, 14 agents, guard + lifecycle hooks enabled (Claude Code).
+prose quality rules, 49 skills, 14 agents, guard + lifecycle hooks enabled (Claude Code).
 Use /verify to validate.`
 
 ## Claude Code Assets
 
 - **Subagents (14)** in `.claude/agents/` -- invoke via the Task tool or by name.
-- **Skills (47)** in `.claude/skills/` -- auto-discovered `SKILL.md` capabilities.
+- **Skills (49)** in `.claude/skills/` -- auto-discovered `SKILL.md` capabilities.
 - **Slash commands (14)** in `.claude/commands/` -- `/verify`, `/plan`, `/decide`, `/ship`, and more.
 - **Guard hook** in `.claude/hooks/guard.py` (`PreToolUse`) -- blocks destructive
   commands, secret leaks, and protected-config edits.

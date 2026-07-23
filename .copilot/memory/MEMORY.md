@@ -82,3 +82,22 @@
   183/184 pass (1 pre-existing unrelated failure), `boundary_audit.py` clean,
   `checklist.py` 5/5 pass — all re-verified on a fresh live scaffold to a
   temp dir, not just in this repo.
+- [decision] 2026-07-23: reviewed Anthropic's official Claude Code Prompt
+  Library (scraped ref doc `promt_claude_code`, deleted after review — not
+  harness content). ~90% of its 52 prompt categories were already covered by
+  existing `.kilo/skill/` entries (Onboard->wayfinder, Debug->systematic-
+  debugging, Git->git-workflow-master, etc.). Found 2 genuine gaps and added
+  them as new skills: `steering-and-course-correction` (redirect an agent
+  mid-task without derailing/losing valid partial work) and
+  `incident-investigation` (production incident/log-analysis workflow,
+  distinct from single-bug debugging). Skill count: 47->49 in `.kilo/`,
+  `.claude/`, `.copilot/` (all in parity); `.gemini/antigravity/skills/`
+  manually updated too but still lags `.kilo/` by 3 (pre-existing gap,
+  unrelated to this change — `garden.py` does not check Gemini parity).
+  Synced: agent.yaml skills list, `.claude/skills/` (regenerated via
+  generate_harness.py --harness claude), `.copilot/skill/` (manual copy,
+  no auto-generator exists), `.gemini/antigravity/skills/` (manual copy).
+  Fixed a stale hardcoded "expect 47" assertion in test_integration.py's
+  test_copilot_skills(). Verified: garden.py 0 drift, validate_schemas.py
+  0 errors (63 files), pytest tools/ 75 passed, test_integration.py
+  187/188 pass (1 pre-existing unrelated failure).

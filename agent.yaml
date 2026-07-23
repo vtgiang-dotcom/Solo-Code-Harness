@@ -30,6 +30,7 @@ skills:
   - frontend-ui-engineering
   - git-workflow-master
   - handoff
+  - incident-investigation
   - idea-refine
   - improve-codebase-architecture
   - incremental-implementation
@@ -50,6 +51,7 @@ skills:
   - source-driven-development
   - spec-driven-development
   - spike
+  - steering-and-course-correction
   - subagent-driven-development
   - systematic-debugging
   - task-delegation

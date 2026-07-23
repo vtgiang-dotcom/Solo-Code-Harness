@@ -61,14 +61,14 @@ def test_copilot_agents() -> None:
 
 
 def test_copilot_skills() -> None:
-    print("\n--- Copilot Skills (expect 47) ---")
+    print("\n--- Copilot Skills (expect 49) ---")
     skills_dir = COPILOT / "skill"
     check("skill/ directory exists", skills_dir.is_dir())
     if not skills_dir.is_dir():
         return
 
     skills = sorted([d for d in skills_dir.iterdir() if d.is_dir()])
-    check(f"skill count = {len(skills)}", len(skills) == 47, f"got {len(skills)}")
+    check(f"skill count = {len(skills)}", len(skills) == 49, f"got {len(skills)}")
 
     for d in skills:
         skill_md = d / "SKILL.md"
