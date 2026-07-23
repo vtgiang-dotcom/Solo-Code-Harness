@@ -15,6 +15,10 @@ Behavior (all best-effort, never blocks — always exits 0):
   - detected package manager (pnpm/yarn/bun/npm)
   - up to 3 most recent shared-state sessions (any engine) if the local
     SQLite state + tools/shared_state.py are available
+  - unseen Gemini/Antigravity handoff reports in
+    .gemini/antigravity/handoff/outbox/ (see handoff/README.md) — tracked via
+    a local-only "seen" marker at .solocode/gemini-handoff-seen.json so each
+    report is announced once, not every session
   - prints a SessionStart hookSpecificOutput JSON with additionalContext
 """
 
@@ -87,6 +91,36 @@ def _recent_sessions(cwd: Path, limit: int = 3) -> list[str]:
                 sys.path.remove(str(tools_dir))
 
 
+def _new_gemini_reports(cwd: Path) -> list[str]:
+    """Best-effort: find outbox/*-report.md files not yet announced.
+
+    Tracks announced filenames in .solocode/gemini-handoff-seen.json (local-
+    only, gitignored) so a report is surfaced once, then stays quiet.
+    Silent on any failure — this is advisory, never required.
+    """
+    outbox = cwd / ".gemini" / "antigravity" / "handoff" / "outbox"
+    if not outbox.is_dir():
+        return []
+    reports = sorted(f.name for f in outbox.glob("*-report.md"))
+    if not reports:
+        return []
+
+    seen_file = cwd / ".solocode" / "gemini-handoff-seen.json"
+    seen: list[str] = []
+    if seen_file.is_file():
+        with suppress(Exception):
+            seen = json.loads(seen_file.read_text(encoding="utf-8"))
+
+    new = [r for r in reports if r not in seen]
+    if new:
+        with suppress(Exception):
+            seen_file.parent.mkdir(parents=True, exist_ok=True)
+            seen_file.write_text(
+                json.dumps(sorted(set(seen) | set(new))), encoding="utf-8"
+            )
+    return new
+
+
 def main() -> int:
     # Consume stdin if present (SessionStart payload) — we don't require it.
     with suppress(Exception):
@@ -97,6 +131,7 @@ def main() -> int:
         git = _git_info()
         pm = _detect_package_manager(cwd)
         sessions = _recent_sessions(cwd)
+        new_reports = _new_gemini_reports(cwd)
     except Exception:  # noqa: BLE001 — never crash session startup
         return 0
 
@@ -108,6 +143,12 @@ def main() -> int:
     if sessions:
         lines.append("Recent cross-engine sessions:")
         lines.extend(f"  - {s}" for s in sessions)
+    if new_reports:
+        lines.append(
+            f"{len(new_reports)} new Gemini/Antigravity handoff report(s) "
+            "in .gemini/antigravity/handoff/outbox/ — read them:"
+        )
+        lines.extend(f"  - .gemini/antigravity/handoff/outbox/{r}" for r in new_reports)
 
     print(json.dumps({
         "hookSpecificOutput": {

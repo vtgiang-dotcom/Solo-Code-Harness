@@ -230,6 +230,22 @@ soon-to-be-compacted summary.** Do this proactively, not just when reminded:
    manually: whenever a session naturally runs long, checkpoint decisions to
    `MEMORY.md` rather than relying on the engine's own summarization.
 
+### Delegating a task to Gemini/Antigravity (manual handoff)
+
+Antigravity IDE has no headless CLI (verified: only GUI window/diff flags,
+no prompt-execution subcommand) — a human must relay tasks to it manually.
+To minimize copy-paste, use the file-based handoff protocol instead of
+pasting plan/result text through chat:
+
+1. Write the plan to `.gemini/antigravity/handoff/inbox/<slug>-plan.md`
+   (see `.gemini/antigravity/handoff/README.md` for the exact format).
+2. Tell the user the one line to relay: *"Open Antigravity, tell Gemini to
+   read `.gemini/antigravity/handoff/inbox/<slug>-plan.md` and write its
+   report to `.gemini/antigravity/handoff/outbox/<slug>-report.md`."*
+3. `.claude/hooks/session_start.py` auto-detects new `outbox/*-report.md`
+   files at the next session start and announces them — no need to ask the
+   user to paste the result back.
+
 ---
 
 ## Git Commit Convention

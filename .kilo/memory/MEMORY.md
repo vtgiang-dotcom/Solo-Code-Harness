@@ -144,3 +144,29 @@
   engine event). Updated README (EN+VI) Claude Code Setup section.
   Verified: garden.py 0 drift, pytest tools/ 79 passed (75+4 new),
   validate_schemas.py 0 errors, checklist.py 5/5 pass.
+- [decision] 2026-07-23: added a file-based Claude<->Gemini/Antigravity
+  handoff protocol. User's manual "vibe code" workflow: ask Claude for a
+  plan, hand-relay it to Gemini via Antigravity IDE (Claude cannot control
+  that IDE), Antigravity produces a report artifact, user brings it back for
+  Claude to evaluate. Verified before building anything: `antigravity-ide.cmd
+  --help` only exposes GUI window/diff/extension flags, no headless
+  prompt-execution subcommand -- unlike jcode, true CLI-level orchestration
+  isn't possible with the currently installed tooling (no separate scriptable
+  `gemini` CLI is installed either). So a human relay step is unavoidable for
+  now; the goal was reducing it to "read file X, write file Y" instead of
+  copy-pasting full plan/result text through chat.
+  Built: `.gemini/antigravity/handoff/{inbox,outbox}/` (git-tracked, durable
+  audit trail -- deliberately separate from `.gemini/antigravity/knowledge/`,
+  which is a STATIC rules corpus indexed by metadata.json, not a per-task
+  inbox). Protocol documented in `handoff/README.md`. Extended
+  `.claude/hooks/session_start.py` to auto-detect new `outbox/*-report.md`
+  files at next session start (tracked via a local-only, gitignored
+  `.solocode/gemini-handoff-seen.json` marker so each report is announced
+  once, not every session) -- added 1 new pytest covering announce-once
+  behavior. Added a "Claude Code Handoff Protocol" section to
+  `.gemini/antigravity/AGENTS.md` (auto-loaded by Gemini in Antigravity) so
+  Gemini itself knows to check inbox/ and where to write outbox/. Added a
+  "Delegating a task to Gemini/Antigravity" section to root AGENTS.md
+  (source of truth, regenerated into CLAUDE.md). Updated README (EN+VI).
+  Verified: garden.py 0 drift, pytest tools/ 80 passed, validate_schemas.py
+  0 errors, boundary_audit.py clean, checklist.py 5/5 pass.

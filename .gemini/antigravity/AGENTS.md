@@ -170,6 +170,25 @@ Persistent memory at `.gemini/antigravity/knowledge/`. The AI reads Knowledge It
 
 ---
 
+## Claude Code Handoff Protocol (check at session start)
+
+Claude Code cannot invoke Antigravity headlessly, so a human relays tasks
+manually. Check `.gemini/antigravity/handoff/inbox/` for `*-plan.md` files
+with `status: pending` in the frontmatter — these are tasks Claude Code
+delegated to you. Full protocol: `.gemini/antigravity/handoff/README.md`.
+
+When given a plan file to execute:
+1. Read the full plan file (`Task`, `Context`, `Expected report format` sections).
+2. Do the work.
+3. Write your report to `.gemini/antigravity/handoff/outbox/<same-slug>-report.md`
+   with a frontmatter header (`slug`, `completed`, `from: gemini`) — Claude
+   Code auto-detects new files here at its next session start.
+4. Do NOT delete or edit the plan file in `inbox/` — it's the durable record
+   of what was asked. Update its `status:` to `done` if you want, but leave
+   the file itself intact.
+
+---
+
 ## Security Rules
 
 Key enforcement points:

@@ -237,6 +237,17 @@ rules) and falls back to `.claude/skills/` for skill discovery, and reads
 
 Connects to [Command Code](https://commandcode.ai) — single API key for Claude, GPT, Gemini, DeepSeek, Qwen, Kimi, GLM, MiniMax, Step, and other models.
 
+## Gemini/Antigravity Handoff (manual, file-based)
+
+Antigravity IDE has no headless CLI, so Claude Code cannot invoke it
+directly (unlike jcode). Instead of copy-pasting plan/result text through
+chat, use the file-based protocol in `.gemini/antigravity/handoff/`:
+Claude writes a plan to `handoff/inbox/<slug>-plan.md`, you relay one line
+to Antigravity ("read this plan, write your report to
+`handoff/outbox/<slug>-report.md`"), and `.claude/hooks/session_start.py`
+auto-detects the new report at Claude's next session start. Full protocol:
+`.gemini/antigravity/handoff/README.md`.
+
 ## MCP Servers
 
 | Server | Status | Purpose |
@@ -420,6 +431,16 @@ jcode không có thư mục harness riêng — tự load `AGENTS.md` + fallback 
 `.claude/skills/` + đọc `.mcp.json` — không cần port/mirror gì thêm.
 
 Kết nối tới [Command Code](https://commandcode.ai) — một API key dùng được Claude, GPT, Gemini, DeepSeek, Qwen, Kimi, GLM, MiniMax, Step và nhiều model khác.
+
+## Handoff Gemini/Antigravity (thủ công, qua file)
+
+Antigravity IDE không có CLI headless nên Claude Code không thể gọi trực
+tiếp như jcode. Thay vì copy-paste kế hoạch/kết quả qua chat, dùng giao thức
+file trong `.gemini/antigravity/handoff/`: Claude ghi kế hoạch vào
+`handoff/inbox/<slug>-plan.md`, bạn chỉ cần chuyển 1 dòng cho Antigravity
+("đọc plan này, ghi report vào `handoff/outbox/<slug>-report.md`"), và
+`.claude/hooks/session_start.py` sẽ tự phát hiện report mới ở phiên Claude
+kế tiếp. Chi tiết: `.gemini/antigravity/handoff/README.md`.
 
 ## MCP Servers
 

@@ -109,6 +109,32 @@ def test_session_start_empty_stdin_exits_zero():
     assert r.returncode == 0
 
 
+def test_session_start_announces_new_gemini_report(tmp_path, monkeypatch):
+    """A new outbox/*-report.md should be announced once, then go quiet."""
+    outbox = ROOT / ".gemini" / "antigravity" / "handoff" / "outbox"
+    seen_file = ROOT / ".solocode" / "gemini-handoff-seen.json"
+    marker = outbox / "pytest-fixture-report.md"
+    seen_backup = seen_file.read_text(encoding="utf-8") if seen_file.is_file() else None
+    try:
+        marker.write_text("---\nslug: pytest-fixture\n---\ntest\n", encoding="utf-8")
+        if seen_file.is_file():
+            seen_file.unlink()
+
+        r1 = _run("session_start.py", {})
+        assert r1.returncode == 0
+        assert "pytest-fixture-report.md" in r1.stdout
+
+        r2 = _run("session_start.py", {})
+        assert r2.returncode == 0
+        assert "pytest-fixture-report.md" not in r2.stdout
+    finally:
+        marker.unlink(missing_ok=True)
+        if seen_backup is not None:
+            seen_file.write_text(seen_backup, encoding="utf-8")
+        elif seen_file.is_file():
+            seen_file.unlink()
+
+
 # ─── session_end.py ─────────────────────────────────────────────────────────
 
 def test_session_end_exists():
