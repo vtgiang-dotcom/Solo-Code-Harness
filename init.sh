@@ -45,7 +45,7 @@ check_rulebook() {
   fi
 }
 check_rulebook "CLAUDE.md"                          "Claude Code"
-check_rulebook "AGENTS.md"                          "Kilo / OpenCode (AGENTS.md)"
+check_rulebook "AGENTS.md"                          "Kilo / jcode (AGENTS.md)"
 check_rulebook ".github/copilot-instructions.md"    "GitHub Copilot"
 check_rulebook ".gemini"                            "Gemini / Antigravity"
 [ "$engines_found" -eq 0 ] && say "  (no rulebooks detected — is this a harness project?)"
@@ -53,7 +53,7 @@ say ""
 
 # ── Engine directories ──────────────────────────────────────────────────
 say "[ENGINE DIRS]"
-for pair in ".kilo:Kilo" ".opencode:OpenCode" ".claude:Claude Code" ".copilot:Copilot" ".gemini:Gemini"; do
+for pair in ".kilo:Kilo" ".claude:Claude Code" ".copilot:Copilot" ".gemini:Gemini"; do
   dir="${pair%%:*}"; label="${pair#*:}"
   [ -d "$dir" ] && say "  [x] $label ($dir/)"
 done

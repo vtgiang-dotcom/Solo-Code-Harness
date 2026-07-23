@@ -55,7 +55,7 @@ jobs:
         shell: bash
 
       - name: Harness Tests
-        run: python -m pytest tools/test_harness.py tools/test_claude_engine.py tools/test_claude_guard.py tools/test_claude_hooks.py -v --tb=short
+        run: python -m pytest tools/test_claude_engine.py tools/test_claude_guard.py tools/test_claude_hooks.py tools/test_shared_state.py -v --tb=short
         shell: bash
 
   ci-ok:
