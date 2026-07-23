@@ -36,7 +36,7 @@ Use /verify to validate.`
 
 - **Subagents (14)** in `.claude/agents/` -- invoke via the Task tool or by name.
 - **Skills (47)** in `.claude/skills/` -- auto-discovered `SKILL.md` capabilities.
-- **Slash commands (13)** in `.claude/commands/` -- `/verify`, `/plan`, `/decide`, `/ship`, and more.
+- **Slash commands (14)** in `.claude/commands/` -- `/verify`, `/plan`, `/decide`, `/ship`, and more.
 - **Guard hook** in `.claude/hooks/guard.py` (`PreToolUse`) -- blocks destructive
   commands, secret leaks, and protected-config edits.
 - **Quality-gate hook** in `.claude/hooks/quality_gate.py` (`PostToolUse` Edit/Write)

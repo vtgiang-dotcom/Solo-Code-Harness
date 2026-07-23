@@ -14,7 +14,7 @@ Usage:
 
     # Deploy to an existing project
     python tools/deploy.py deploy /path/to/existing-project
-    python tools/deploy.py deploy /path/to/existing-project --engine opencode
+    python tools/deploy.py deploy /path/to/existing-project --engine kilo
     python tools/deploy.py deploy /path/to/existing-project --dry-run
 
     # Auto-detect: scaffold if target missing, deploy if exists
@@ -40,10 +40,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 # Files to copy (relative to ROOT)
+# NOTE (v3.7.0 deploy-optimization): a *deployed target project* only needs
+# enough to RUN the AI-CLI harness (agent/skill/command/hook definitions +
+# config). It does NOT need Solo-Code-CLI's own dev docs (CONTRIBUTING,
+# CODE_OF_CONDUCT, SECURITY, SPEC — these describe how to contribute to /
+# rebuild THIS repo, not how to use the harness in a target project) or a
+# deprecated engine (opencode.*). Those stay dev-only, never deployed.
 ROOT_FILES = [
     "AGENTS.md",
     "CLAUDE.md",
-    "opencode.json",
     "kilo.jsonc",
     ".mcp.json",
     ".gitleaks.toml",
@@ -52,26 +57,31 @@ ROOT_FILES = [
     "eslint.config.js",
     "pyproject.toml",
     "Makefile",
-    "opencode.ps1",
+    "jcode.ps1",
     "claude-env.ps1",
     "init.sh",
     ".env.template",
-    "SPEC.md",
     "verify.sh",
     "agent.yaml",
     "extensions_config.json",
     ".gitignore",
-    "CONTRIBUTING.md",
-    "CODE_OF_CONDUCT.md",
-    "SECURITY.md",
 ]
 
 # `.harness.lock` is NOT in ROOT_FILES — it is generated fresh
 # for each scaffold/deploy with its own timestamp.
 
+# Dev-only, Solo-Code-CLI-repo-specific meta files — NEVER deployed to a
+# target project (they document/govern THIS repo's own contribution process
+# and internal spec, not the target project).
+DEV_ONLY_ROOT_FILES = {
+    "SPEC.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "SECURITY.md",
+    "opencode.json", "opencode.ps1",  # deprecated engine, see .harness.lock
+}
+
 # Directories to copy (relative to ROOT)
+# .opencode/ intentionally omitted — deprecated as of v3.7.0 (100% content
+# mirror of .kilo/, no unique runtime value; see .harness.lock).
 DIRS_ALL = [
-    ".opencode",
     ".kilo",
     ".copilot",
     ".gemini",
@@ -83,8 +93,8 @@ DIRS_ALL = [
     "tools",
 ]
 
-DIRS_OPENCODE = [
-    ".opencode",
+DIRS_KILO = [
+    ".kilo",
     ".github",
     ".contracts",
     "tools",
@@ -114,6 +124,8 @@ EXCLUDE_DIRS = {
     # Runtime state directories — never belong in a deploy
     "sessions",           # .kilo/state/sessions/
     "logs",               # .kilo/logs/
+    # Solo-Code-CLI's own CI/release pipeline — target project designs its own
+    "workflows",           # .github/workflows/ci.yml, release.yml
 }
 EXCLUDE_FILES = {
     ".env", "usage.log", "usage.jsonl",
@@ -123,12 +135,24 @@ EXCLUDE_FILES = {
     "token-log.jsonl",    # .kilo/state/token-log.jsonl
     "tool-count.json",    # .kilo/state/tool-count.json
     "edited-files.json",  # .kilo/state/edited-files.json
+    # Solo-Code-CLI dev tooling under tools/ — builds/tests/deploys THIS repo,
+    # not needed to just RUN the harness in a target project.
+    "deploy.py", "garden.py", "generate_harness.py", "claude_engine.py",
+    "validate_schemas.py", "migrate_to_shared_state.py", "harness_config.py",
+    "test_claude_engine.py", "test_claude_guard.py", "test_claude_hooks.py",
+    "test_harness.py", "test_integration.py", "test_shared_state.py",
+    # Solo-Code-CLI's OWN accumulated memory — describes THIS repo's design/
+    # conventions, not the target project's. Deploy writes fresh blank
+    # templates instead (see _write_blank_memory_templates()).
+    "MEMORY.md", "project-conventions.md", "harness-design-intent.md",
+    # Deprecated-engine-specific data file (garden.py skip-list for .opencode)
+    "opencode-skip-skills.txt",
 }
 
 # Default README template for scaffolded projects
 README_TEMPLATE = """# {project_name}
 
-> Scaffolded from [Solo-Code-CLI](https://github.com/Solo-Code-CLI) — AI agent harness with OpenCode + Claude Code + Kilo + Copilot + Gemini engines.
+> Scaffolded from [Solo-Code-CLI](https://github.com/Solo-Code-CLI) — AI agent harness with Kilo Code + Claude Code + jcode + Copilot + Gemini engines. This is a RUNTIME-ONLY copy: Solo-Code-CLI's own dev tooling, tests, and internal docs were intentionally excluded (see "Harness Boundaries" below).
 
 {description}
 
@@ -140,17 +164,14 @@ pip install -e .          # Python project
 # or
 npm install               # Node project
 
-# Generate harness artifacts
-python tools/generate_harness.py --harness all
-
-# Validate schemas
-python tools/validate_schemas.py
-
 # Run security scan
 python .github/scripts/security_scan.py .
 
 # Full verification
 python .github/scripts/checklist.py .
+
+# Boundary audit (harness dirs stayed clean of project files)
+python .github/scripts/boundary_audit.py .
 ```
 
 ## Verification Gates
@@ -159,16 +180,14 @@ python .github/scripts/checklist.py .
 |------|---------|
 | Security | `python .github/scripts/security_scan.py .` |
 | Lint | `ruff check .` |
-| Schema | `python tools/validate_schemas.py` |
-| Garden | `python tools/garden.py` |
-| Test | `python -m pytest tools/` |
+| Boundary | `python .github/scripts/boundary_audit.py .` |
 | Full | `python .github/scripts/checklist.py .` |
 
 ## Engines
 
-- **[OpenCode](https://opencode.ai)** — agents, plugins, MCP servers (primary)
-- **[Claude Code](https://claude.com/claude-code)** — subagents, skills, commands, hooks, `CLAUDE.md`
-- **[Kilo](https://kilo.ai)** — hooks, skills, memory, orchestrators
+- **[Kilo Code](https://kilo.ai)** — source-of-truth: agents, skills, commands, hooks, memory, orchestrators
+- **[Claude Code](https://claude.com/claude-code)** — orchestrator: subagents, skills, commands, hooks, `CLAUDE.md`
+- **jcode** — cost/latency-optimized worker engine (no dedicated dir; reads `AGENTS.md` + `.claude/skills/` + `.mcp.json` natively). Launch via `jcode.ps1`.
 - **[Copilot](https://github.com/features/copilot)** — agents, skills, commands, prompts
 - **[Gemini](https://gemini.google.com)** — additional AI assistant config
 
@@ -178,13 +197,17 @@ This project was scaffolded with **Solo-Code Harness** — an AI agent disciplin
 
 | Contains | Purpose |
 |----------|---------|
-| `.kilo/`, `.opencode/`, `.copilot/`, `.gemini/`, `.claude/` | AI agent rules, skills, hooks — NOT project logic |
-| `.github/scripts/` | Verification scripts (`security_scan.py`, `checklist.py`) |
-| `tools/` | Harness utilities (`deploy.py`, `garden.py`) |
+| `.kilo/`, `.copilot/`, `.gemini/`, `.claude/` | AI agent rules, skills, hooks — NOT project logic |
+| `.github/scripts/` | Verification scripts (`security_scan.py`, `checklist.py`, `boundary_audit.py`) |
+| `tools/` | Harness runtime deps (`shared_state.py`, `solocode_config.py`) — dev/test tooling deliberately NOT deployed |
 | `.vscode/` | Harness IDE config — NOT project config |
-| `AGENTS.md`, `CLAUDE.md`, `kilo.jsonc`, `opencode.json`, `SPEC.md`, `.harness.lock` | Agent behavior configuration |
+| `AGENTS.md`, `CLAUDE.md`, `kilo.jsonc`, `.harness.lock` | Agent behavior configuration |
 
 > **Read `.harness.lock`** for the authoritative boundary list. Never modify harness files to fix a project bug. Never modify project files to fix a harness issue.
+
+## Project Memory
+
+`.kilo/memory/`, `.claude/memory/`, `.copilot/memory/` start **blank** (project-specific templates only) — this project's own conventions/decisions belong here, not Solo-Code-CLI's. Use `/remember` (Claude/Kilo) to append as you go.
 
 ## License
 
@@ -208,7 +231,6 @@ generated_at = "{timestamp}"
 # Thư mục harness — KHÔNG chứa code dự án
 dirs = [
     ".kilo",
-    ".opencode",
     ".copilot",
     ".gemini",
     ".claude",
@@ -225,18 +247,16 @@ files = [
     "CLAUDE.md",
     "agent.yaml",
     "kilo.jsonc",
-    "opencode.json",
     ".mcp.json",
     ".ruff.toml",
     ".gitleaks.toml",
     "Makefile",
     "pyproject.toml",
-    "opencode.ps1",
+    "jcode.ps1",
     "claude-env.ps1",
     "init.sh",
     "verify.sh",
     "extensions_config.json",
-    "SPEC.md",
     ".gitignore",
     ".pre-commit-config.yaml",
 ]
@@ -432,6 +452,78 @@ def _copy_copilot_agents_to_github(
     return new_count, updated_count
 
 
+BLANK_MEMORY_MD = """# Memory Index
+
+> Persistent cross-session memory for THIS project. The AI reads this at
+> session start and writes to it via `/remember`. Starts blank — Solo-Code-
+> CLI's own accumulated memory is never deployed into target projects.
+
+## Project
+- [project] (add your branch naming / workflow conventions here)
+
+## Rules
+- [rules] Load AGENTS.md for all behavior rules -> [[AGENTS.md]]
+
+## Decisions
+- (record key architectural decisions here as they happen)
+"""
+
+BLANK_PROJECT_CONVENTIONS_MD = """---
+type: project
+created: {timestamp}
+updated: {timestamp}
+---
+
+# Project Conventions
+
+> Blank template — fill in as this project's own conventions emerge.
+> Do NOT copy Solo-Code-CLI's own conventions here; they belong to a
+> different codebase.
+
+## Git Workflow
+
+- (define branch naming / commit conventions for this project)
+
+## Code Style
+
+- (define this project's code style rules)
+"""
+
+# memory/ dirs that get a fresh blank template on scaffold/deploy instead of
+# Solo-Code-CLI's own accumulated memory content (MEMORY.md, project-
+# conventions.md excluded from copy via EXCLUDE_FILES; written fresh here).
+MEMORY_DIRS = [".kilo/memory", ".claude/memory", ".copilot/memory"]
+
+
+def _write_blank_memory_templates(target: Path, dirs: list[str], dry_run: bool) -> int:
+    """Write fresh blank MEMORY.md/project-conventions.md into each deployed
+    engine's memory/ dir, instead of letting Solo-Code-CLI's own accumulated
+    project memory leak into the target project."""
+    written = 0
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    engine_prefixes = {d.split("/")[0] for d in dirs}
+    for mem_rel in MEMORY_DIRS:
+        engine_dir = mem_rel.split("/")[0]
+        if engine_dir not in engine_prefixes:
+            continue
+        mem_dir = target / mem_rel
+        for fname, content in (
+            ("MEMORY.md", BLANK_MEMORY_MD),
+            ("project-conventions.md", BLANK_PROJECT_CONVENTIONS_MD.format(timestamp=timestamp)),
+        ):
+            dst = mem_dir / fname
+            if dst.exists():
+                continue  # never overwrite existing project memory
+            if dry_run:
+                print(f"  [DRY] {mem_rel}/{fname} — would write blank template")
+            else:
+                mem_dir.mkdir(parents=True, exist_ok=True)
+                dst.write_text(content, encoding="utf-8")
+                print(f"  [NEW] {mem_rel}/{fname} — blank template")
+            written += 1
+    return written
+
+
 def _generate_harness_lock(target: Path, dry_run: bool = False) -> None:
     """Generate .harness.lock with current timestamp and version."""
     if dry_run:
@@ -599,8 +691,8 @@ def scaffold(
         print(f"  [DRY] Would create: {target_path}")
 
     # ── Step 2: Copy harness files ───────────────────────────────
-    if engine == "opencode":
-        dirs = DIRS_OPENCODE
+    if engine == "kilo":
+        dirs = DIRS_KILO
     elif engine == "copilot":
         dirs = DIRS_COPILOT
     elif engine == "claude":
@@ -652,6 +744,10 @@ def scaffold(
         cn, cu = _copy_copilot_agents_to_github(target_path, dry_run)
         total_new += cn
         total_upd += cu
+
+    # ── Step 2.45: Blank memory templates (never leak our own memory) ──
+    print("\n--- Project Memory (blank templates) ---")
+    total_new += _write_blank_memory_templates(target_path, dirs, dry_run)
 
     # ── Step 2.5: Generate .harness.lock ─────────────────────────
     print("\n--- .harness.lock ---")
@@ -735,20 +831,22 @@ def scaffold(
         print()
         print(f"  cd {target_path}")
         print()
-        print("  1. Generate harness artifacts:")
-        print("     python tools/generate_harness.py --harness all")
+        print("  1. Fill in .env from .env.template (API keys)")
         print()
-        print("  2. Validate schemas:")
-        print("     python tools/validate_schemas.py")
-        print()
-        print("  3. Run security scan:")
+        print("  2. Run security scan:")
         print("     python .github/scripts/security_scan.py .")
         print()
-        print("  4. Run full checklist:")
+        print("  3. Run full checklist:")
         print("     python .github/scripts/checklist.py .")
         print()
-        print("  5. Open in your editor:")
+        print("  4. Open in your editor:")
         print("     code .")
+        print()
+        print("  Note: this is a runtime-only harness copy. Dev tooling for")
+        print("  REGENERATING harness artifacts (deploy.py, garden.py,")
+        print("  generate_harness.py) lives only in solo-code-io/solo-code-cli —")
+        print("  not deployed here on purpose. Edit .kilo/ (source of truth)")
+        print("  directly if you need to customize agents/skills/commands.")
         print()
         print("  " + "=" * 56)
         print("  Happy Solo-Coding!")
@@ -859,8 +957,8 @@ def deploy(target: str, *, engine: str = "all", dry_run: bool = False) -> int:
         print(f"[ERROR] Target is not a directory: {target_path}")
         return 1
 
-    if engine == "opencode":
-        dirs = DIRS_OPENCODE
+    if engine == "kilo":
+        dirs = DIRS_KILO
     elif engine == "copilot":
         dirs = DIRS_COPILOT
     elif engine == "claude":
@@ -934,6 +1032,10 @@ def deploy(target: str, *, engine: str = "all", dry_run: bool = False) -> int:
                         print(f"  [STALE] Removed: .github/agents/{existing.name}")
                     stale_removed += 1
 
+    # ── Step 2.45: Blank memory templates (never leak our own memory) ──
+    print("\n--- Project Memory (blank templates) ---")
+    _write_blank_memory_templates(target_path, dirs, dry_run)
+
     # ── Step 2.5: Cleanup stale files ────────────────────────────
     print("\n--- Stale Cleanup ---")
     removed = _cleanup_stale_files(target_path, dirs, dry_run)
@@ -958,9 +1060,8 @@ def deploy(target: str, *, engine: str = "all", dry_run: bool = False) -> int:
         print()
         print("  Next steps in target project:")
         print(f"    cd {target_path}")
-        print("    python tools/generate_harness.py --harness all")
-        print("    python tools/validate_schemas.py")
         print("    python .github/scripts/security_scan.py .")
+        print("    python .github/scripts/checklist.py .")
 
     return 0
 
@@ -992,13 +1093,13 @@ def interactive() -> int:
 
     # Ask engine
     while True:
-        engine = input("Engine (all/opencode/copilot/claude) [all]: ").strip().lower()
+        engine = input("Engine (all/kilo/copilot/claude) [all]: ").strip().lower()
         if not engine:
             engine = "all"
             break
-        if engine in ("all", "opencode", "copilot", "claude"):
+        if engine in ("all", "kilo", "copilot", "claude"):
             break
-        print("  Please enter 'all', 'opencode', 'copilot', or 'claude'.")
+        print("  Please enter 'all', 'kilo', 'copilot', or 'claude'.")
 
     # Ask dry-run
     dry_run_input = input("Dry run? (y/N): ").strip().lower()
@@ -1061,7 +1162,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--engine",
-        choices=["all", "opencode", "copilot", "claude"],
+        choices=["all", "kilo", "copilot", "claude"],
         default="all",
         help="Which engine harness to deploy (default: all)",
     )

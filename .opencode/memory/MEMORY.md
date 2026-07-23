@@ -35,3 +35,26 @@
 - [gotcha] E501 globally ignored in .ruff.toml [lint]; no per-file E501 needed
 - [gotcha] Dead dir refs: ECC-main, agents-main, hermes-agent-main, etc. are stale — never restore
 - [gotcha] jsonschema not in .venv; schema validation via tools/validate_schemas.py
+
+## Decisions
+- [decision] 2026-07-23: `.opencode/` deprecated (v3.7.0). Verified via `diff`:
+  agents (14/14) and skills (47/47) are a 100% content mirror of `.kilo/` —
+  zero unique capability. Only non-mirrored asset was `command/ship.md`,
+  ported to `.kilo/command/` + `.claude/commands/`. Physical removal planned
+  for v4.0.0 after one green CI cycle. See `.harness.lock` for boundary status.
+- [decision] 2026-07-23: adopted **jcode** as the cost/latency-optimized worker
+  engine (DeepSeek v4 via CommandCode gateway), orchestrated by Claude Code.
+  Empirical benchmark (not vendor claims): jcode ~2-9x faster startup/latency,
+  ~15-63x lower RAM than OpenCode for concurrent worker sessions. No dedicated
+  `.jcode/` dir needed — reads `AGENTS.md` + `.claude/skills/` (fallback) +
+  `.mcp.json` natively. Launcher: `jcode.ps1` (syncs `COMMANDCODE_API_KEY`
+  from `.env` on every launch).
+- [decision] 2026-07-23: `tools/deploy.py` scaffold/deploy manifest trimmed —
+  target projects only get RUNTIME harness assets (agents/skills/commands/
+  hooks/config), never Solo-Code-CLI's own dev tooling (deploy.py, garden.py,
+  generate_harness.py, test_*.py), meta docs (SPEC.md, CONTRIBUTING.md,
+  CODE_OF_CONDUCT.md, SECURITY.md), CI workflows, or this repo's own
+  accumulated memory (MEMORY.md/project-conventions.md/harness-design-intent.md
+  — replaced with blank per-engine templates so target projects start clean).
+  Result: -21% scaffold size (1036->845 files, 6.1MB->4.8MB), verified via
+  live scaffold to a temp dir + `boundary_audit.py` + `checklist.py`.

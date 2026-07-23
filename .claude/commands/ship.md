@@ -1,6 +1,5 @@
 ---
-description: "Pre-launch checklist: security scan, test suite, lint, schema validation, garden drift detection. Gate all changes before deployment."
-task: security-auditor, test-engineer
+description: Pre-launch checklist: security scan, test suite, lint, schema validation, garden drift detection. Gate all changes before deployment.
 ---
 Run the complete pre-launch checklist:
 
