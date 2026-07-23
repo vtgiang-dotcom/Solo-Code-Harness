@@ -39,6 +39,16 @@
         ]
       }
     ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/pre_compact.py"
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "hooks": [

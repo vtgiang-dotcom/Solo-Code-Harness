@@ -126,6 +126,31 @@ def test_session_end_malformed_stdin_exits_zero():
     assert r.returncode == 0
 
 
+# ─── pre_compact.py ─────────────────────────────────────────────────────────
+
+def test_pre_compact_exists():
+    assert (HOOKS / "pre_compact.py").exists()
+
+
+def test_pre_compact_emits_context_json():
+    r = _run("pre_compact.py", {"session_id": "t1", "trigger": "auto", "model": "claude"})
+    assert r.returncode == 0
+    out = json.loads(r.stdout)
+    hso = out["hookSpecificOutput"]
+    assert hso["hookEventName"] == "PreCompact"
+    assert "MEMORY.md" in hso["additionalContext"]
+
+
+def test_pre_compact_empty_stdin_exits_zero():
+    r = _run("pre_compact.py", "")
+    assert r.returncode == 0
+
+
+def test_pre_compact_malformed_stdin_exits_zero():
+    r = _run("pre_compact.py", "not-json")
+    assert r.returncode == 0
+
+
 # ─── settings.json wiring ───────────────────────────────────────────────────
 
 def test_settings_registers_all_lifecycle_hooks():
@@ -134,10 +159,11 @@ def test_settings_registers_all_lifecycle_hooks():
     commands = json.dumps(hooks)
     assert "PreToolUse" in hooks
     assert "PostToolUse" in hooks
+    assert "PreCompact" in hooks
     assert "SessionStart" in hooks
     assert "SessionEnd" in hooks
     for hook_file in ("guard.py", "quality_gate.py", "security_post.py",
-                      "session_start.py", "session_end.py"):
+                      "pre_compact.py", "session_start.py", "session_end.py"):
         assert hook_file in commands, f"{hook_file} not wired in settings.json"
 
 

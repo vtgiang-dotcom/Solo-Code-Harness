@@ -203,6 +203,33 @@ call this automatically — you rarely need to touch it by hand.
 3. `session_end.py` calls this automatically on Claude Code; other engines call
    `tools/shared_state.py` directly if no lifecycle hook exists for that engine.
 
+### Context Compaction Continuity (CRITICAL — read this before/after any compaction)
+
+Long sessions eventually get their context auto-summarized ("compacted"). A
+compaction summary lives only in the current session's context — it is NOT
+automatically written into the project's durable memory. **Any settled
+architectural/scope decision must be appended to `.kilo/memory/MEMORY.md`'s
+`## Decisions` section (source of truth) BEFORE it would only exist inside a
+soon-to-be-compacted summary.** Do this proactively, not just when reminded:
+
+1. Whenever a real decision is settled (not just "in progress" work) —
+   architecture choice, engine/tool adoption, a fix that changes established
+   behavior, a policy change — append a one-entry bullet to `.kilo/memory/MEMORY.md`
+   `## Decisions` immediately, don't wait until end of session.
+2. Regenerate/sync after: `python tools/generate_harness.py --harness claude`
+   (updates `.claude/memory/`), then manually copy to `.copilot/memory/`
+   (no auto-generator exists for Copilot; `.gemini/` has no comparable
+   memory mirror — see `tools/garden.py`'s `check_gemini()`).
+3. Claude Code has a `PreCompact` hook (`.claude/hooks/pre_compact.py`) that
+   fires right before compaction: it logs an objective checkpoint (git
+   branch/sha, trigger type, timestamp) to `.solocode/shared-state.db` and
+   emits a reminder — but it CANNOT write your decision prose for you (a
+   hook is a deterministic script, not the model). Treat its reminder as a
+   prompt to check step 1, not a substitute for it.
+4. Other engines without a compaction-specific hook should apply this rule
+   manually: whenever a session naturally runs long, checkpoint decisions to
+   `MEMORY.md` rather than relying on the engine's own summarization.
+
 ---
 
 ## Git Commit Convention

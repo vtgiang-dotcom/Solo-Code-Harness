@@ -180,6 +180,7 @@ python tools/generate_harness.py --harness claude
 | Guard hook | `.claude/hooks/guard.py` + `.claude/settings.json` | `PreToolUse` — blocks destructive commands, secret leaks, protected-config edits |
 | Quality-gate hook | `.claude/hooks/quality_gate.py` | `PostToolUse` (Edit/Write) — advisory ruff/prettier/biome/gofmt format check |
 | Security-post hook | `.claude/hooks/security_post.py` | `PostToolUse` (Bash) — scans `git diff` for secrets after commit/push |
+| Pre-compact hook | `.claude/hooks/pre_compact.py` | `PreCompact` — logs a git-state checkpoint to shared-state and reminds Claude to persist any settled decision to `.kilo/memory/MEMORY.md` before context is summarized/cleared |
 | Session hooks | `.claude/hooks/session_start.py`, `session_end.py` | `SessionStart`/`SessionEnd` — load git + cross-engine context; log session to shared-state |
 
 The guard hook is a stdlib-only Python port of the Kilo `gate-guard.js`/`secret-scan.js`
@@ -382,7 +383,9 @@ python tools/generate_harness.py --harness claude
 Guard hook là bản port stdlib-only Python từ `gate-guard.js`/`secret-scan.js` của
 Kilo (33 mẫu lệnh nguy hiểm + 15 mẫu secret + danh sách file config được bảo vệ).
 PostToolUse/Session hooks chỉ mang tính khuyến nghị (luôn exit 0) — đưa Claude
-Code lên ngang hàng enforcement với Kilo.
+Code lên ngang hàng enforcement với Kilo. `PreCompact` hook (`pre_compact.py`)
+ghi checkpoint git-state vào shared-state và nhắc lưu quyết định đã chốt vào
+`.kilo/memory/MEMORY.md` trước khi context bị nén/tóm tắt.
 
 ```bash
 # Test bộ guard + lifecycle hook

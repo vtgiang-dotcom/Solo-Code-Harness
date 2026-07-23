@@ -120,3 +120,27 @@
   accumulating. Verified: garden.py 0 drift (4-engine check now, not 3),
   pytest tools/ 75 passed, validate_schemas.py 0 errors, test_integration.py
   187/188 (1 pre-existing unrelated failure), ruff clean.
+- [decision] 2026-07-23: added a `PreCompact` lifecycle hook for Claude Code
+  (`.claude/hooks/pre_compact.py`) to address context-compaction continuity —
+  the user noticed Claude Code auto-summarizes long conversations and asked
+  whether that could be captured into the harness memory mechanism so
+  sessions can pick up seamlessly. Design: a hook cannot write good decision
+  prose itself (it's a deterministic script, not the model), so it does two
+  reliable things instead: (1) logs an objective checkpoint (git branch/sha/
+  dirty count, trigger type, timestamp) to `.solocode/shared-state.db` via
+  `add_session_entry`, unconditionally, before every compaction; (2) emits an
+  `additionalContext` reminder telling Claude to append any settled decision
+  to `.kilo/memory/MEMORY.md` 'Decisions' (this file) if not already done.
+  Wired into `.claude/settings.json`. Added a matching required-hook check
+  to `tools/garden.py`'s `check_claude()` (so a missing pre_compact.py is
+  now flagged as drift) and 4 new tests to `tools/test_claude_hooks.py`
+  (exists, emits correct JSON, empty/malformed stdin -> exit 0). Added an
+  explicit "Context Compaction Continuity" rule to `AGENTS.md` (source of
+  truth, regenerated into CLAUDE.md) instructing proactive logging of
+  decisions as they settle, not just at session end, plus guidance for
+  engines without a compaction-specific hook (Kilo Code has no PreCompact-
+  equivalent lifecycle event in `.kilo/hooks/hooks.json` -- apply the rule
+  manually there instead of faking a hook that doesn't correspond to a real
+  engine event). Updated README (EN+VI) Claude Code Setup section.
+  Verified: garden.py 0 drift, pytest tools/ 79 passed (75+4 new),
+  validate_schemas.py 0 errors, checklist.py 5/5 pass.

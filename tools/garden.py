@@ -206,6 +206,7 @@ def check_claude(src: Path, dst: Path, *, skip_set: set[str] | None = None) -> l
         ("hooks/guard.py", "guard hook (PreToolUse)"),
         ("hooks/quality_gate.py", "quality-gate hook (PostToolUse)"),
         ("hooks/security_post.py", "security-post hook (PostToolUse)"),
+        ("hooks/pre_compact.py", "pre-compact hook (PreCompact)"),
         ("hooks/session_start.py", "session-start hook (SessionStart)"),
         ("hooks/session_end.py", "session-end hook (SessionEnd)"),
         ("settings.json", "settings (hook registration)"),
