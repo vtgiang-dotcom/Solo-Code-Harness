@@ -170,3 +170,22 @@
   (source of truth, regenerated into CLAUDE.md). Updated README (EN+VI).
   Verified: garden.py 0 drift, pytest tools/ 80 passed, validate_schemas.py
   0 errors, boundary_audit.py clean, checklist.py 5/5 pass.
+- [decision] 2026-07-23: re-verified deploy.py end-to-end after all of
+  today's changes (2 new skills, PreCompact hook, Gemini handoff protocol)
+  per direct user request ("does deploy guarantee a clean framework +
+  inherits the right docs for new-project support?"). Found and closed one
+  real gap before it could bite: `.gemini/antigravity/handoff/{inbox,
+  outbox}/` accumulated task files (*-plan.md/*-report.md) were NOT
+  excluded from deploy -- they would have carried Solo-Code-CLI's own
+  Claude<->Gemini collaboration history into every target project (same
+  class of bug as the MEMORY.md leak fixed earlier, just not yet triggered
+  since only .gitkeep existed so far). Fixed `should_copy()` in
+  tools/deploy.py: exclude files under inbox/outbox matching *-plan.md or
+  *-report.md, while still deploying the protocol itself (README.md,
+  .gitkeep) so target projects get a ready-to-use empty inbox/outbox.
+  Verified with a live scaffold test using FAKE accumulated plan/report
+  files (not just empty dirs) to actually exercise the exclusion: confirmed
+  excluded in the scaffold output, while README.md/.gitkeep/49 skills/
+  pre_compact.py/PreCompact settings.json entry/Gemini AGENTS.md handoff
+  section all deployed correctly. boundary_audit.py clean, checklist.py
+  5/5 pass on the scaffolded copy itself.

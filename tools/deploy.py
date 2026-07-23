@@ -562,6 +562,15 @@ def should_copy(path: Path) -> bool:
             return False
     if path.is_file() and name in EXCLUDE_FILES:
         return False
+    if path.is_file() and path.parent.name in ("inbox", "outbox") and (
+        name.endswith("-plan.md") or name.endswith("-report.md")
+    ):
+        # Solo-Code-CLI's own accumulated Claude<->Gemini task handoffs
+        # (.gemini/antigravity/handoff/{inbox,outbox}/) -- per-task history
+        # specific to THIS repo's own development, not the target project's.
+        # The protocol itself (README.md, .gitkeep) still deploys; only
+        # accumulated *-plan.md/*-report.md instances are excluded.
+        return False
     return not (path.is_file() and name.endswith(".pyc"))
 
 
