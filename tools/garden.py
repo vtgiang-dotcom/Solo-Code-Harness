@@ -253,6 +253,44 @@ def check_shared_state() -> list[str]:
     return issues
 
 
+def check_gemini(src: Path, dst: Path, *, skip_set: set[str] | None = None) -> list[str]:
+    """Parity checks for the Gemini/Antigravity engine (.gemini/antigravity/).
+
+    Gemini uses different directory names/paths than the other engines:
+      .kilo/agents      -> .gemini/antigravity/agents
+      .kilo/skill       -> .gemini/antigravity/skills   (plural, nested under antigravity/)
+      .kilo/instruction -> .gemini/antigravity/instruction
+    No memory/ parity check: Gemini stores project knowledge under
+    knowledge/ (artifacts + metadata.json), not a MEMORY.md/project-
+    conventions.md mirror like the other engines -- not a comparable shape.
+    """
+    issues: list[str] = []
+    skip_set = skip_set or set()
+
+    # Agents (same subdir name)
+    issues.extend(_check_parity_dir(src, dst, ".gemini/antigravity", "agents"))
+
+    # Skills: .kilo/skill/* dirs must exist in .gemini/antigravity/skills/*
+    src_skills = src / "skill"
+    dst_skills = dst / "skills"
+    if src_skills.is_dir():
+        src_names = {p.name for p in src_skills.iterdir() if p.is_dir()} - skip_set
+        dst_names = {p.name for p in dst_skills.iterdir() if p.is_dir()} if dst_skills.is_dir() else set()
+        for name in sorted(src_names - dst_names):
+            issues.append(f"Missing skill: .gemini/antigravity/skills/{name}/")
+        for name in sorted(dst_names - src_names):
+            issues.append(f"Stale skill (no source): .gemini/antigravity/skills/{name}/")
+        if dst_skills.is_dir():
+            for entry in sorted(dst_skills.iterdir()):
+                if entry.is_dir() and not (entry / "SKILL.md").exists():
+                    issues.append(f"Skill missing SKILL.md: .gemini/antigravity/skills/{entry.name}")
+
+    # Instructions (direct copy, same filename)
+    issues.extend(check_instructions(src, dst, ".gemini/antigravity"))
+
+    return issues
+
+
 def run_engine_checks(
     src: Path, dst: Path, dst_label: str,
     *,
@@ -396,6 +434,17 @@ def main() -> int:
         all_issues.extend(claude_issues)
     else:
         print("[OK] Claude engine (.claude)")
+
+    # .gemini/antigravity/ engine — nested path + skills/ plural, no memory check
+    print("\n--- .gemini/ ---")
+    gemini_issues = check_gemini(kilo, ROOT / ".gemini" / "antigravity", skip_set=skip_skills)
+    if gemini_issues:
+        print("[DRIFT] Gemini engine (.gemini):")
+        for i in gemini_issues:
+            print(f"  {i}")
+        all_issues.extend(gemini_issues)
+    else:
+        print("[OK] Gemini engine (.gemini)")
 
     # Shared state health (không thuộc riêng engine nào)
     print("\n--- Shared State ---")

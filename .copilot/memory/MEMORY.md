@@ -101,3 +101,22 @@
   test_copilot_skills(). Verified: garden.py 0 drift, validate_schemas.py
   0 errors (63 files), pytest tools/ 75 passed, test_integration.py
   187/188 pass (1 pre-existing unrelated failure).
+- [decision] 2026-07-23: closed the Gemini parity gap flagged in the previous
+  entry. `.gemini/antigravity/skills/` was missing 3 skills (`research`,
+  `resolving-merge-conflicts`, `wayfinder` -- plus a nested reference file,
+  `code-review-expert/references/security-categories.md`) and `.gemini/
+  antigravity/instruction/` was missing 3 files (`api-providers.md`,
+  `harness-boundaries.md`, `harness-checklist.md`) versus `.kilo/` -- pre-
+  existing gaps never caught because `garden.py` only ever checked `.kilo`
+  <-> `.claude`/`.copilot`, never `.gemini`. Fixed both: copied the missing
+  files, and added a new `check_gemini()` function to `tools/garden.py`
+  (models `.gemini/antigravity/` structure: `agents` same name, `skills`
+  plural like Claude, `instruction` same name, no `memory` parity check --
+  Gemini stores project knowledge under `knowledge/artifacts` instead, not a
+  comparable MEMORY.md-shaped mirror) wired into `main()` alongside the
+  Kilo/Claude/Copilot checks. Gemini is now genuinely full parity (49
+  skills, all instructions) and will stay that way going forward since
+  `garden.py` will catch drift immediately instead of silently
+  accumulating. Verified: garden.py 0 drift (4-engine check now, not 3),
+  pytest tools/ 75 passed, validate_schemas.py 0 errors, test_integration.py
+  187/188 (1 pre-existing unrelated failure), ruff clean.
