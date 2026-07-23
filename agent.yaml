@@ -1,6 +1,6 @@
 spec_version: "0.1.0"
 name: solo-code-harness
-version: 3.6.0
+version: 3.7.0
 description: "AI coding harness biến agent thành Solo-Code Engineer có kỷ luật. Multi-platform: Claude, Copilot, Gemini, Cursor, Kilo."
 author: "Solo-Code Team"
 license: MIT

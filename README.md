@@ -2,13 +2,18 @@
 
 AI coding agent harness — rules, skills, hooks, and verification gates for disciplined Solo-Code engineering.
 
-Five-engine support: **OpenCode** (`.opencode/`, primary), **Claude Code** (`.claude/` + `CLAUDE.md`), **Kilo Code** (`.kilo/`), **GitHub Copilot** (`.copilot/`), **Gemini/Antigravity** (`.gemini/`).
+Engine support: **Kilo Code** (`.kilo/`, source-of-truth — all other engine artifacts are generated from here), **Claude Code** (`.claude/` + `CLAUDE.md`, orchestrator), **jcode** (worker engine, DeepSeek v4 via CommandCode — no dedicated dir, reads `AGENTS.md`/`.claude/skills/`/`.mcp.json` natively), **GitHub Copilot** (`.copilot/`), **Gemini/Antigravity** (`.gemini/`).
+
+> **`.opencode/` is deprecated as of v3.7.0.** It was a 100%-parity generated mirror of `.kilo/` (verified via diff — zero content difference in agents/skills) and added no unique capability once Claude Code (full agent/command parity) and jcode (faster, ~15-60x lighter RAM for concurrent DeepSeek workers) covered its runtime role. Scheduled for physical removal in v4.0.0. See `.harness.lock` for details.
 
 ## Quick Start
 
 ```bash
-# Launch OpenCode
-opencode
+# Launch Claude Code (orchestrator)
+# see claude-env.ps1
+
+# Launch jcode (DeepSeek worker, cost-saving)
+./jcode.ps1
 
 # Generate harness artifacts
 make generate
@@ -87,10 +92,11 @@ python tools/deploy.py
 
 | Directory | Purpose |
 |---|---|
-| `.opencode/` | **Primary** — OpenCode: agents (14), skills (47), plugin v2.5, commands (4), tools (2), state (5) |
-| `.claude/` | Claude Code: agents (14), skills (47), commands (13), instruction (10), guard + lifecycle hooks + `settings.json`; rulebook `CLAUDE.md` at root |
+| `.opencode/` | **Deprecated (v3.7.0)** — OpenCode: agents (14), skills (47), plugin v2.5, commands (4), tools (2), state (5). Kept for CI parity only; do not extend. |
+| `.claude/` | **Orchestrator** — Claude Code: agents (14), skills (47), commands (14, incl. `ship`), instruction (10), guard + lifecycle hooks + `settings.json`; rulebook `CLAUDE.md` at root |
 | `.copilot/` | GitHub Copilot: agents (14), skills (47), commands (13), instruction (10), memory (4) |
-| `.kilo/` | Kilo Code: agents (14), skills (47), hooks, memory, instruction |
+| `.kilo/` | **Source of truth** — Kilo Code: agents (14), skills (47), commands (14, incl. `ship`), hooks, memory, instruction. All other engine artifacts are generated from here via `tools/generate_harness.py`. |
+| *(jcode)* | **Worker engine** — no dedicated dir; auto-loads `AGENTS.md` + `.claude/skills/` (fallback) + `.mcp.json` natively. Launcher: `jcode.ps1`. Used for cheap/fast concurrent DeepSeek sub-tasks delegated by Claude Code. |
 | `.gemini/` | Gemini/Antigravity: agents (14), skills (47), commands (12), knowledge |
 | `.github/` | Shared scripts: `security_scan.py`, `checklist.py`, `check_skips.py`, `eval_harness.py`, `security-allowlist.txt` + `copilot-instructions.md`, `prompts/` |
 | `tools/` | Generator, validator, drift detector, integration tests |
@@ -270,7 +276,9 @@ Open new PowerShell → `opencode`. No file changes needed.
 
 Bộ harness (dây cương) cho AI coding agent — rules, skills, hooks và verification gates dành cho kỹ thuật Solo-Code có kỷ luật.
 
-Hỗ trợ 5 engine: **OpenCode** (`.opencode/`, chính), **Claude Code** (`.claude/` + `CLAUDE.md`), **Kilo Code** (`.kilo/`), **GitHub Copilot** (`.copilot/`), **Gemini/Antigravity** (`.gemini/`).
+Hỗ trợ engine: **Kilo Code** (`.kilo/`, nguồn gốc — mọi engine khác được sinh ra từ đây), **Claude Code** (`.claude/` + `CLAUDE.md`, điều phối), **jcode** (worker chạy DeepSeek v4 qua CommandCode — không cần thư mục riêng), **GitHub Copilot** (`.copilot/`), **Gemini/Antigravity** (`.gemini/`).
+
+> **`.opencode/` đã deprecated từ v3.7.0** — là bản mirror sinh 100% từ `.kilo/` (đã verify bằng diff, không khác biệt nội dung), không còn giá trị riêng khi Claude Code (parity đầy đủ agent/command) và jcode (nhanh hơn, nhẹ RAM hơn ~15-60x cho worker DeepSeek đồng thời) đã lấp vai trò runtime của nó. Sẽ gỡ vật lý ở v4.0.0. Xem `.harness.lock`.
 
 ## Quick Start
 
