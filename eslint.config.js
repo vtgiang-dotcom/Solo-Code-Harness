@@ -2,9 +2,7 @@ import globals from "globals";
 
 export default [
   {
-    files: [".opencode/plugins/**/*.js",
-            ".opencode/tool/**/*.js",
-            ".opencode/tests/**/*.js"
+    files: [".kilo/hooks/**/*.js"
     ],
     languageOptions: {
       ecmaVersion: 2022,

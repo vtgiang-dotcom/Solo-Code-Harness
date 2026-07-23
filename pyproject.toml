@@ -40,6 +40,6 @@ version-file = "tools/_version.py"
 packages = ["tools"]
 
 [tool.hatch.build.targets.sdist]
-include = ["/tools", "/.kilo", "/.opencode", "/.github", "/README.md", "/LICENSE", "/AGENTS.md", "/SPEC.md"]
+include = ["/tools", "/.kilo", "/.claude", "/.github", "/README.md", "/LICENSE", "/AGENTS.md", "/SPEC.md"]
 
 
