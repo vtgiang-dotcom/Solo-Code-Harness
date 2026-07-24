@@ -114,8 +114,31 @@ def check_instructions_opencode(src: Path, dst: Path, dst_label: str) -> list[st
 
 
 def check_memory(src: Path, dst: Path, dst_label: str) -> list[str]:
-    """Check that all src/memory/ files have dst/ copy."""
-    return _check_parity_dir(src, dst, dst_label, "memory")
+    """Check that all src/memory/ files have a dst/ copy AND identical content.
+
+    .kilo/memory/ is the source of truth for the project's own accumulated
+    memory (MEMORY.md, project-conventions.md, harness-design-intent.md);
+    .claude/memory/ and .copilot/memory/ are manually-kept mirrors (no
+    auto-generator regenerates them). File-existence parity alone previously
+    let content silently drift out of sync (one engine's writer updates its
+    own copy but forgets the others) without garden.py ever catching it.
+    """
+    issues = _check_parity_dir(src, dst, dst_label, "memory")
+    src_dir = src / "memory"
+    dst_dir = dst / "memory"
+    if not src_dir.is_dir() or not dst_dir.is_dir():
+        return issues
+    src_files = {f.name for f in src_dir.iterdir() if f.is_file() and f.suffix == ".md"}
+    dst_files = {f.name for f in dst_dir.iterdir() if f.is_file()}
+    for name in sorted(src_files & dst_files):
+        src_text = (src_dir / name).read_text(encoding="utf-8")
+        dst_text = (dst_dir / name).read_text(encoding="utf-8")
+        if src_text != dst_text:
+            issues.append(
+                f"Content drift: {dst_label}/memory/{name} differs from "
+                f".kilo/memory/{name} (out of sync — resync from source of truth)"
+            )
+    return issues
 
 
 def check_skills(dst: Path, dst_label: str) -> list[str]:
@@ -209,6 +232,7 @@ def check_claude(src: Path, dst: Path, *, skip_set: set[str] | None = None) -> l
         ("hooks/pre_compact.py", "pre-compact hook (PreCompact)"),
         ("hooks/session_start.py", "session-start hook (SessionStart)"),
         ("hooks/session_end.py", "session-end hook (SessionEnd)"),
+        ("hooks/memory_gate.py", "memory-gate hook (PostToolUse size cap)"),
         ("settings.json", "settings (hook registration)"),
     ):
         if not (dst / rel).exists():

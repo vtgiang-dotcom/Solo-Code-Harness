@@ -175,10 +175,11 @@ python tools/generate_harness.py --harness claude
 |---|---|---|
 | Rulebook | `CLAUDE.md` | Auto-loaded project memory (boundaries + rules) |
 | Subagents (14) | `.claude/agents/*.md` | Invoke via Task tool or by name |
-| Skills (47) | `.claude/skills/<name>/SKILL.md` | Auto-discovered capabilities |
+| Skills (49) | `.claude/skills/<name>/SKILL.md` | Auto-discovered capabilities |
 | Slash commands (14) | `.claude/commands/*.md` | `/verify`, `/plan`, `/decide`, `/ship`, `/debug`, `/commit`, … |
 | Guard hook | `.claude/hooks/guard.py` + `.claude/settings.json` | `PreToolUse` — blocks destructive commands, secret leaks, protected-config edits |
 | Quality-gate hook | `.claude/hooks/quality_gate.py` | `PostToolUse` (Edit/Write) — advisory ruff/prettier/biome/gofmt format check |
+| Memory-gate hook | `.claude/hooks/memory_gate.py` | `PostToolUse` (Edit/Write) — caps `.claude/memory/*.md` size (WARN 4k / **hard-block 8k** chars) so memory never silently bloats every session's context; Python port of Kilo's `memory-manager.js` |
 | Security-post hook | `.claude/hooks/security_post.py` | `PostToolUse` (Bash) — scans `git diff` for secrets after commit/push |
 | Pre-compact hook | `.claude/hooks/pre_compact.py` | `PreCompact` — logs a git-state checkpoint to shared-state and reminds Claude to persist any settled decision to `.kilo/memory/MEMORY.md` before context is summarized/cleared |
 | Session hooks | `.claude/hooks/session_start.py`, `session_end.py` | `SessionStart`/`SessionEnd` — load git + cross-engine context; log session to shared-state |
@@ -186,8 +187,12 @@ python tools/generate_harness.py --harness claude
 The guard hook is a stdlib-only Python port of the Kilo `gate-guard.js`/`secret-scan.js`
 lifecycle hooks (33 destructive patterns + 15 secret patterns + protected config
 files). It blocks a tool call by returning a `PreToolUse` deny decision and exit
-code 2. The PostToolUse and Session hooks are advisory (always exit 0, never
-block) — bringing Claude Code to enforcement parity with the Kilo engine.
+code 2. The memory-gate hook can also hard-block (exit code 2) when a memory
+file exceeds 8,000 chars. The remaining PostToolUse/Session hooks are advisory
+(always exit 0, never block) — together bringing Claude Code to enforcement
+parity with the Kilo engine. `garden.py`'s memory-drift check also diffs
+`.claude/memory/*.md` content against `.kilo/memory/` (the source of truth),
+not just filenames, so a silently out-of-sync mirror is always caught.
 
 ```bash
 # Test the guard + lifecycle hook suites
@@ -393,10 +398,15 @@ python tools/generate_harness.py --harness claude
 
 Guard hook là bản port stdlib-only Python từ `gate-guard.js`/`secret-scan.js` của
 Kilo (33 mẫu lệnh nguy hiểm + 15 mẫu secret + danh sách file config được bảo vệ).
-PostToolUse/Session hooks chỉ mang tính khuyến nghị (luôn exit 0) — đưa Claude
-Code lên ngang hàng enforcement với Kilo. `PreCompact` hook (`pre_compact.py`)
-ghi checkpoint git-state vào shared-state và nhắc lưu quyết định đã chốt vào
-`.kilo/memory/MEMORY.md` trước khi context bị nén/tóm tắt.
+Hook mới `memory_gate.py` (`PostToolUse`, bản port của `memory-manager.js`)
+chặn cứng (exit 2) khi `.claude/memory/*.md` vượt 8.000 ký tự, tránh memory
+phình to âm thầm và tốn context mỗi phiên. Các PostToolUse/Session hook còn
+lại chỉ mang tính khuyến nghị (luôn exit 0) — đưa Claude Code lên ngang hàng
+enforcement với Kilo. `PreCompact` hook (`pre_compact.py`) ghi checkpoint
+git-state vào shared-state và nhắc lưu quyết định đã chốt vào
+`.kilo/memory/MEMORY.md` trước khi context bị nén/tóm tắt. `garden.py` nay
+cũng so khớp nội dung (không chỉ tên file) giữa `.claude/memory/` và
+`.kilo/memory/` (nguồn gốc sự thật) để bắt drift âm thầm.
 
 ```bash
 # Test bộ guard + lifecycle hook

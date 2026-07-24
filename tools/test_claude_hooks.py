@@ -179,6 +179,68 @@ def test_pre_compact_malformed_stdin_exits_zero():
 
 # ─── settings.json wiring ───────────────────────────────────────────────────
 
+# ─── memory_gate.py ─────────────────────────────────────────────────────────
+
+def test_memory_gate_exists():
+    assert (HOOKS / "memory_gate.py").exists()
+
+
+def test_memory_gate_ignores_non_write_tools():
+    r = _run("memory_gate.py", {"tool_name": "Read"})
+    assert r.returncode == 0
+    assert r.stderr == ""
+
+
+def test_memory_gate_empty_stdin_exits_zero():
+    r = _run("memory_gate.py", "")
+    assert r.returncode == 0
+
+
+def test_memory_gate_malformed_stdin_exits_zero():
+    r = _run("memory_gate.py", "not-json")
+    assert r.returncode == 0
+
+
+def test_memory_gate_current_memory_under_hard_limit():
+    """Regression guard: .claude/memory/MEMORY.md must stay under the hard
+    cap (8,000 chars) so this hook never blocks a routine session."""
+    r = _run("memory_gate.py", {"tool_name": "Edit",
+                                 "tool_input": {"file_path": ".claude/memory/MEMORY.md"}})
+    assert r.returncode == 0, r.stderr
+
+
+def test_memory_gate_blocks_oversized_file(tmp_path, monkeypatch):
+    mem_dir = tmp_path / ".claude" / "memory"
+    mem_dir.mkdir(parents=True)
+    (mem_dir / "MEMORY.md").write_text("x" * 8500, encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    r = subprocess.run(
+        [sys.executable, str(HOOKS / "memory_gate.py")],
+        input=json.dumps({"tool_name": "Write",
+                          "tool_input": {"file_path": ".claude/memory/MEMORY.md"}}),
+        capture_output=True, text=True, timeout=30,
+    )
+    assert r.returncode == 2
+    assert "BLOCKED" in r.stderr
+
+
+def test_memory_gate_warns_but_passes_between_thresholds(tmp_path, monkeypatch):
+    mem_dir = tmp_path / ".claude" / "memory"
+    mem_dir.mkdir(parents=True)
+    (mem_dir / "MEMORY.md").write_text("x" * 5000, encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    r = subprocess.run(
+        [sys.executable, str(HOOKS / "memory_gate.py")],
+        input=json.dumps({"tool_name": "Edit",
+                          "tool_input": {"file_path": ".claude/memory/MEMORY.md"}}),
+        capture_output=True, text=True, timeout=30,
+    )
+    assert r.returncode == 0
+    assert "WARN" in r.stderr
+
+
+# ─── settings.json wiring ───────────────────────────────────────────────────
+
 def test_settings_registers_all_lifecycle_hooks():
     settings = json.loads((ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"))
     hooks = settings["hooks"]
@@ -189,7 +251,8 @@ def test_settings_registers_all_lifecycle_hooks():
     assert "SessionStart" in hooks
     assert "SessionEnd" in hooks
     for hook_file in ("guard.py", "quality_gate.py", "security_post.py",
-                      "pre_compact.py", "session_start.py", "session_end.py"):
+                      "pre_compact.py", "session_start.py", "session_end.py",
+                      "memory_gate.py"):
         assert hook_file in commands, f"{hook_file} not wired in settings.json"
 
 

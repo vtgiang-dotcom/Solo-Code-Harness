@@ -36,156 +36,73 @@
 - [gotcha] Dead dir refs: ECC-main, agents-main, hermes-agent-main, etc. are stale — never restore
 - [gotcha] jsonschema not in .venv; schema validation via tools/validate_schemas.py
 
+
 ## Decisions
-- [decision] 2026-07-23: `.opencode/` deprecated (v3.7.0). Verified via `diff`:
-  agents (14/14) and skills (47/47) are a 100% content mirror of `.kilo/` —
-  zero unique capability. Only non-mirrored asset was `command/ship.md`,
-  ported to `.kilo/command/` + `.claude/commands/`. Physical removal planned
-  for v4.0.0 after one green CI cycle. See `.harness.lock` for boundary status.
-- [decision] 2026-07-23: adopted **jcode** as the cost/latency-optimized worker
-  engine (DeepSeek v4 via CommandCode gateway), orchestrated by Claude Code.
-  Empirical benchmark (not vendor claims): jcode ~2-9x faster startup/latency,
-  ~15-63x lower RAM than OpenCode for concurrent worker sessions. No dedicated
-  `.jcode/` dir needed — reads `AGENTS.md` + `.claude/skills/` (fallback) +
-  `.mcp.json` natively. Launcher: `jcode.ps1` (syncs `COMMANDCODE_API_KEY`
-  from `.env` on every launch).
-- [decision] 2026-07-23: `tools/deploy.py` scaffold/deploy manifest trimmed —
-  target projects only get RUNTIME harness assets (agents/skills/commands/
-  hooks/config), never Solo-Code-CLI's own dev tooling (deploy.py, garden.py,
-  generate_harness.py, test_*.py), meta docs (SPEC.md, CONTRIBUTING.md,
-  CODE_OF_CONDUCT.md, SECURITY.md), CI workflows, or this repo's own
-  accumulated memory (MEMORY.md/project-conventions.md/harness-design-intent.md
-  — replaced with blank per-engine templates so target projects start clean).
-  Result: -21% scaffold size (1036->845 files, 6.1MB->4.8MB), verified via
-  live scaffold to a temp dir + `boundary_audit.py` + `checklist.py`.
-- [decision] 2026-07-23: Phase 3 executed — `.opencode/` physically removed
-  (agents/skills/commands/plugins/state/tests/tool, root `opencode.json`,
-  `opencode.ps1`, `package.json`, `package-lock.json`, `node_modules/`), all
-  deleted via `git rm` (reversible via git history, not raw `rm -rf`) per an
-  explicit user confirmation gate from the auto-mode safety classifier.
-  `jcode-master/` (vendored third-party source checkout) also deleted after
-  installing the compiled `jcode.exe` to `~/.cargo/bin/` (on PATH) so
-  `jcode.ps1` keeps working without the source tree. Updated in lockstep:
-  `.harness.lock`/`agent.yaml` -> v4.0.0, `tools/generate_harness.py`
-  (stripped ~530 lines of dead OpenCode-generation code, kept only the Claude
-  engine generator), `tools/garden.py`, `tools/validate_schemas.py` (re-pointed
-  `.opencode` -> `.kilo` as validation source), `tools/test_integration.py`
-  (removed 8 OpenCode-specific test functions), `.github/scripts/{check_skips,
-  boundary_audit,checklist}.py`, `AGENTS.md`/`CLAUDE.md`/all engines'
-  `harness-boundaries.md`/`harness-checklist.md`/`shared-state.md`, README
-  (both languages). Deleted `tools/migrate_to_shared_state.py` and
-  `tools/test_harness.py` (both tested/migrated OpenCode-only artifacts that
-  no longer exist). `.copilot/memory/` + `.copilot/instruction/*.md` manually
-  synced from `.kilo/` (no auto-generator exists for Copilot; parity is
-  check-only via `garden.py`). Verified clean: `garden.py` 0 drift, `pytest
-  tools/` 75 passed, `validate_schemas.py` 0 errors, `test_integration.py`
-  183/184 pass (1 pre-existing unrelated failure), `boundary_audit.py` clean,
-  `checklist.py` 5/5 pass — all re-verified on a fresh live scaffold to a
-  temp dir, not just in this repo.
-- [decision] 2026-07-23: reviewed Anthropic's official Claude Code Prompt
-  Library (scraped ref doc `promt_claude_code`, deleted after review — not
-  harness content). ~90% of its 52 prompt categories were already covered by
-  existing `.kilo/skill/` entries (Onboard->wayfinder, Debug->systematic-
-  debugging, Git->git-workflow-master, etc.). Found 2 genuine gaps and added
-  them as new skills: `steering-and-course-correction` (redirect an agent
-  mid-task without derailing/losing valid partial work) and
-  `incident-investigation` (production incident/log-analysis workflow,
-  distinct from single-bug debugging). Skill count: 47->49 in `.kilo/`,
-  `.claude/`, `.copilot/` (all in parity); `.gemini/antigravity/skills/`
-  manually updated too but still lags `.kilo/` by 3 (pre-existing gap,
-  unrelated to this change — `garden.py` does not check Gemini parity).
-  Synced: agent.yaml skills list, `.claude/skills/` (regenerated via
-  generate_harness.py --harness claude), `.copilot/skill/` (manual copy,
-  no auto-generator exists), `.gemini/antigravity/skills/` (manual copy).
-  Fixed a stale hardcoded "expect 47" assertion in test_integration.py's
-  test_copilot_skills(). Verified: garden.py 0 drift, validate_schemas.py
-  0 errors (63 files), pytest tools/ 75 passed, test_integration.py
-  187/188 pass (1 pre-existing unrelated failure).
-- [decision] 2026-07-23: closed the Gemini parity gap flagged in the previous
-  entry. `.gemini/antigravity/skills/` was missing 3 skills (`research`,
-  `resolving-merge-conflicts`, `wayfinder` -- plus a nested reference file,
-  `code-review-expert/references/security-categories.md`) and `.gemini/
-  antigravity/instruction/` was missing 3 files (`api-providers.md`,
-  `harness-boundaries.md`, `harness-checklist.md`) versus `.kilo/` -- pre-
-  existing gaps never caught because `garden.py` only ever checked `.kilo`
-  <-> `.claude`/`.copilot`, never `.gemini`. Fixed both: copied the missing
-  files, and added a new `check_gemini()` function to `tools/garden.py`
-  (models `.gemini/antigravity/` structure: `agents` same name, `skills`
-  plural like Claude, `instruction` same name, no `memory` parity check --
-  Gemini stores project knowledge under `knowledge/artifacts` instead, not a
-  comparable MEMORY.md-shaped mirror) wired into `main()` alongside the
-  Kilo/Claude/Copilot checks. Gemini is now genuinely full parity (49
-  skills, all instructions) and will stay that way going forward since
-  `garden.py` will catch drift immediately instead of silently
-  accumulating. Verified: garden.py 0 drift (4-engine check now, not 3),
-  pytest tools/ 75 passed, validate_schemas.py 0 errors, test_integration.py
-  187/188 (1 pre-existing unrelated failure), ruff clean.
-- [decision] 2026-07-23: added a `PreCompact` lifecycle hook for Claude Code
-  (`.claude/hooks/pre_compact.py`) to address context-compaction continuity —
-  the user noticed Claude Code auto-summarizes long conversations and asked
-  whether that could be captured into the harness memory mechanism so
-  sessions can pick up seamlessly. Design: a hook cannot write good decision
-  prose itself (it's a deterministic script, not the model), so it does two
-  reliable things instead: (1) logs an objective checkpoint (git branch/sha/
-  dirty count, trigger type, timestamp) to `.solocode/shared-state.db` via
-  `add_session_entry`, unconditionally, before every compaction; (2) emits an
-  `additionalContext` reminder telling Claude to append any settled decision
-  to `.kilo/memory/MEMORY.md` 'Decisions' (this file) if not already done.
-  Wired into `.claude/settings.json`. Added a matching required-hook check
-  to `tools/garden.py`'s `check_claude()` (so a missing pre_compact.py is
-  now flagged as drift) and 4 new tests to `tools/test_claude_hooks.py`
-  (exists, emits correct JSON, empty/malformed stdin -> exit 0). Added an
-  explicit "Context Compaction Continuity" rule to `AGENTS.md` (source of
-  truth, regenerated into CLAUDE.md) instructing proactive logging of
-  decisions as they settle, not just at session end, plus guidance for
-  engines without a compaction-specific hook (Kilo Code has no PreCompact-
-  equivalent lifecycle event in `.kilo/hooks/hooks.json` -- apply the rule
-  manually there instead of faking a hook that doesn't correspond to a real
-  engine event). Updated README (EN+VI) Claude Code Setup section.
-  Verified: garden.py 0 drift, pytest tools/ 79 passed (75+4 new),
-  validate_schemas.py 0 errors, checklist.py 5/5 pass.
-- [decision] 2026-07-23: added a file-based Claude<->Gemini/Antigravity
-  handoff protocol. User's manual "vibe code" workflow: ask Claude for a
-  plan, hand-relay it to Gemini via Antigravity IDE (Claude cannot control
-  that IDE), Antigravity produces a report artifact, user brings it back for
-  Claude to evaluate. Verified before building anything: `antigravity-ide.cmd
-  --help` only exposes GUI window/diff/extension flags, no headless
-  prompt-execution subcommand -- unlike jcode, true CLI-level orchestration
-  isn't possible with the currently installed tooling (no separate scriptable
-  `gemini` CLI is installed either). So a human relay step is unavoidable for
-  now; the goal was reducing it to "read file X, write file Y" instead of
-  copy-pasting full plan/result text through chat.
-  Built: `.gemini/antigravity/handoff/{inbox,outbox}/` (git-tracked, durable
-  audit trail -- deliberately separate from `.gemini/antigravity/knowledge/`,
-  which is a STATIC rules corpus indexed by metadata.json, not a per-task
-  inbox). Protocol documented in `handoff/README.md`. Extended
-  `.claude/hooks/session_start.py` to auto-detect new `outbox/*-report.md`
-  files at next session start (tracked via a local-only, gitignored
-  `.solocode/gemini-handoff-seen.json` marker so each report is announced
-  once, not every session) -- added 1 new pytest covering announce-once
-  behavior. Added a "Claude Code Handoff Protocol" section to
-  `.gemini/antigravity/AGENTS.md` (auto-loaded by Gemini in Antigravity) so
-  Gemini itself knows to check inbox/ and where to write outbox/. Added a
-  "Delegating a task to Gemini/Antigravity" section to root AGENTS.md
-  (source of truth, regenerated into CLAUDE.md). Updated README (EN+VI).
-  Verified: garden.py 0 drift, pytest tools/ 80 passed, validate_schemas.py
-  0 errors, boundary_audit.py clean, checklist.py 5/5 pass.
-- [decision] 2026-07-23: re-verified deploy.py end-to-end after all of
-  today's changes (2 new skills, PreCompact hook, Gemini handoff protocol)
-  per direct user request ("does deploy guarantee a clean framework +
-  inherits the right docs for new-project support?"). Found and closed one
-  real gap before it could bite: `.gemini/antigravity/handoff/{inbox,
-  outbox}/` accumulated task files (*-plan.md/*-report.md) were NOT
-  excluded from deploy -- they would have carried Solo-Code-CLI's own
-  Claude<->Gemini collaboration history into every target project (same
-  class of bug as the MEMORY.md leak fixed earlier, just not yet triggered
-  since only .gitkeep existed so far). Fixed `should_copy()` in
-  tools/deploy.py: exclude files under inbox/outbox matching *-plan.md or
-  *-report.md, while still deploying the protocol itself (README.md,
-  .gitkeep) so target projects get a ready-to-use empty inbox/outbox.
-  Verified with a live scaffold test using FAKE accumulated plan/report
-  files (not just empty dirs) to actually exercise the exclusion: confirmed
-  excluded in the scaffold output, while README.md/.gitkeep/49 skills/
-  pre_compact.py/PreCompact settings.json entry/Gemini AGENTS.md handoff
-  section all deployed correctly. boundary_audit.py clean, checklist.py
-  5/5 pass on the scaffolded copy itself.
+- [decision] 2026-07-23: `.opencode/` deprecated (v3.7.0) — verified via `diff` a
+  100% content mirror of `.kilo/` (14 agents, 47 skills); only unique asset
+  (`command/ship.md`) ported to `.kilo/command/` + `.claude/commands/`.
+  Physical removal planned for v4.0.0.
+- [decision] 2026-07-23: adopted **jcode** (DeepSeek v4 via CommandCode) as the
+  cost/latency-optimized worker engine, orchestrated by Claude Code. Benchmarked
+  ~2-9x faster startup, ~15-63x lower RAM than OpenCode for concurrent workers.
+  No dedicated dir — reads `AGENTS.md` + `.claude/skills/` + `.mcp.json`
+  natively. Launch via `jcode.ps1`.
+- [decision] 2026-07-23: `tools/deploy.py` manifest trimmed — target projects
+  get only RUNTIME harness assets (agents/skills/commands/hooks/config), never
+  Solo-Code-CLI's own dev tooling, meta docs, CI workflows, or this repo's
+  accumulated memory (blank per-engine templates instead). -21% scaffold size
+  (1036->845 files).
+- [decision] 2026-07-23: Phase 3 — `.opencode/` physically removed via `git rm`
+  (reversible), vendored `jcode-master/` source removed after installing
+  compiled `jcode.exe` to PATH. Version bumped to v4.0.0 across
+  `.harness.lock`/`agent.yaml`/`garden.py`/`generate_harness.py`/
+  `validate_schemas.py`/docs. `.copilot/memory` synced manually (no
+  auto-generator; parity is check-only via `garden.py`). Verified: 0 drift,
+  full test suite green on a fresh live scaffold.
+- [decision] 2026-07-23: reviewed Anthropic's official Claude Code prompt
+  library — ~90% of categories already covered by existing `.kilo/skill/`
+  entries; added 2 genuine gaps as new skills: `steering-and-course-
+  correction`, `incident-investigation`. Skill count 47->49, synced across
+  kilo/claude/copilot (gemini lagged by 3 — flagged as a gap, closed next).
+- [decision] 2026-07-23: closed the Gemini parity gap — added the missing 3
+  skills + 3 instruction files, added `check_gemini()` to `garden.py` (Gemini
+  models `.gemini/antigravity/` structure; uses `knowledge/artifacts` instead
+  of a MEMORY.md-shaped mirror, so no memory parity check applies there). All
+  4 engines now genuinely at parity (49 skills, all instructions).
+- [decision] 2026-07-23: added a `PreCompact` lifecycle hook
+  (`.claude/hooks/pre_compact.py`) for context-compaction continuity — logs an
+  objective checkpoint (git branch/sha/dirty count) to `.solocode/shared-
+  state.db` before every compaction, and reminds Claude via `additionalContext`
+  to append any settled decision to `.kilo/memory/MEMORY.md` first. Added a
+  required-hook check to `garden.py`'s `check_claude()` + 4 new tests. Kilo Code
+  has no equivalent lifecycle event — rule applied manually there instead.
+- [decision] 2026-07-23: added a file-based Claude<->Gemini/Antigravity handoff
+  protocol (`.gemini/antigravity/handoff/{inbox,outbox}/`, git-tracked audit
+  trail, separate from the static `knowledge/` corpus). No headless CLI exists
+  for Antigravity, so a human relay step is unavoidable — reduced to "read
+  file X, write file Y" instead of copy-pasting. `session_start.py` auto-
+  announces new `outbox/*-report.md` files once via a local seen-marker.
+- [decision] 2026-07-23: re-verified `deploy.py` end-to-end after the day's
+  changes; found and fixed one real gap: handoff `inbox/outbox/` accumulated
+  task files (`*-plan.md`/`*-report.md`) were NOT excluded from deploy — same
+  leak class as the earlier MEMORY.md leak, just not yet triggered. Fixed
+  `should_copy()` to exclude task instances while still deploying the empty
+  protocol scaffold (README.md, .gitkeep).
+- [decision] 2026-07-24: audited the memory system after a direct user
+  question ("does SQLite belong in project memory too?"). Found two real
+  gaps: (1) `garden.py`'s `check_memory()` only checked filename parity, not
+  content — `.claude/memory/MEMORY.md` had silently drifted 19 lines behind
+  this file (source of truth) with no drift ever reported; (2) Kilo's
+  `memory-manager.js` size gate (WARN 4k/HARD 8k chars) was never ported to
+  Claude Code, so writes to `.claude/memory/` had no size cap at all — this
+  file had already grown past both thresholds (13.4k chars) undetected.
+  Fixed both: `check_memory()` now diffs file content byte-for-byte, not just
+  existence; added `.claude/hooks/memory_gate.py` (Python port of memory-
+  manager.js, exit(2) hard-blocks PostToolUse on Edit/Write/MultiEdit past
+  8k chars) wired into `.claude/settings.json` + required in `garden.py`'s
+  `check_claude()`. Also compacted this Decisions section itself (verbose
+  paragraphs -> concise one-liners; full detail already durable in git commit
+  history) to bring all three memory mirrors back under the WARN threshold.
+  Confirmed: SQLite (`.solocode/shared-state.db`) is correctly scoped to
+  cross-engine coordination state (locks/feature status) only, never
+  project memory/decisions — that split is intentional, not a gap.

@@ -26,6 +26,10 @@
           {
             "type": "command",
             "command": "python .claude/hooks/quality_gate.py"
+          },
+          {
+            "type": "command",
+            "command": "python .claude/hooks/memory_gate.py"
           }
         ]
       },
