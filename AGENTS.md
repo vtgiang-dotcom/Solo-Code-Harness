@@ -47,7 +47,7 @@ This project is powered by **Solo-Code Harness** — an AI agent discipline laye
 ## Self-Verification Handshake
 
 When asked "Is Solo-Code Harness active?" or "What rules apply here?", answer:
-`Solo-Code Harness active: behavior rules, anti-hallucination rules, security rules, prose quality rules, 47 skills, 14 agents, hooks enabled (Kilo) / plugins enabled (OpenCode) / guard + lifecycle hooks enabled (Claude Code). Use /verify to validate.`
+`Solo-Code Harness active: behavior rules, anti-hallucination rules, security rules, prose quality rules, 48 skills, 14 agents, hooks enabled (Kilo) / plugins enabled (OpenCode) / guard + lifecycle hooks enabled (Claude Code). Use /verify to validate.`
 
 ## OpenCode-Specific Tools
 
@@ -246,12 +246,16 @@ pasting plan/result text through chat:
    files at the next session start and announces them — no need to ask the
    user to paste the result back.
 
-### Delegating a task to jcode (DeepSeek worker, cost/latency optimization)
+### Delegating a task to jcode (DeepSeek worker, two-tier cost optimization)
 
-`session_start.py` reports `jcode: available` in `additionalContext` when
-the `jcode` binary is on PATH and `~/.jcode/config.toml` has a
-`default_provider` configured — that's a signal it's *worth considering*,
-not an instruction to always use it.
+Claude Code / Kilo Code is **always the orchestrator**: jcode is a
+stateless, one-shot DeepSeek worker with no memory of this conversation —
+it never plans or decides what to do next, it only executes one subtask
+handed to it. `session_start.py` reports `jcode: available` in
+`additionalContext` when the `jcode` binary is on PATH and
+`~/.jcode/config.toml` has a `default_provider` configured — that's a
+signal it's *worth considering*, not an instruction to always use it. Full
+decision guide: `.kilo/skill/jcode-delegation/SKILL.md`.
 
 **When to delegate**: small, well-specified, self-contained subtasks with a
 clear acceptance criterion — write a test, mechanical refactor, formatting,
@@ -260,7 +264,28 @@ conversational context of this session (architecture judgment, root-cause
 analysis, multi-step back-and-forth) — jcode runs as a one-shot subprocess
 with no access to this conversation's history.
 
-**Invocation** (verified working 2026-07-24; flags matter a lot for cost):
+**Two-tier model routing** (default to the cheap tier; escalate only when
+the task clearly needs stronger reasoning — escalating unnecessarily
+quietly erases the point of tiering):
+
+| Tier | Model | Use for | Risk |
+|------|-------|---------|------|
+| `simple` | `deepseek/deepseek-v4-flash` | Formatting, boilerplate, a single well-defined test, mechanical refactors, extraction/summarization from inlined text | Low cost, low capability — fine for bounded work |
+| `code` | `deepseek/deepseek-v4-pro` | Real code-reasoning: bug fixes, algorithms, structured refactors | Stronger, but measured to ignore scope/style constraints ("phá luật") unless told explicitly right before the task — **never call without the guardrail preamble** |
+
+**Invocation** — prefer the wrapper script over calling `jcode` directly;
+it standardizes the token-optimized flags and auto-prepends the strict
+guardrail preamble for the `code` tier (see
+`tools/jcode_delegate.py::CODE_TIER_GUARDRAIL`):
+
+```bash
+python tools/jcode_delegate.py "<self-contained prompt with full context inlined>" --tier simple
+python tools/jcode_delegate.py "<self-contained prompt with full context inlined>" --tier code
+python tools/jcode_delegate.py "<prompt>"   # --tier auto: classifies from prompt, biased cheap
+```
+
+Direct invocation (verified working 2026-07-24; flags matter a lot for
+cost), if the subtask genuinely needs jcode's own tools:
 
 ```bash
 jcode run "<self-contained prompt with full context inlined>" \
@@ -273,11 +298,18 @@ jcode run "<self-contained prompt with full context inlined>" \
 scaffolding and repo self-dev detection — always pass both unless the
 delegated task genuinely needs jcode's own tools (bash/read/write). `--json`
 gives a parseable `{text, usage, ...}` result instead of streamed text.
+Every `tools/jcode_delegate.py` call logs `{tier, model, prompt size, token
+usage, latency}` to `.solocode/jcode-usage.jsonl` so the cost/latency
+payoff of this routing is auditable rather than assumed.
 
-**After delegating**: treat jcode's output as an untrusted draft — read the
-diff/result yourself, run the normal verification gates (`/verify` or
-targeted `pytest`/`ruff`) before accepting it. Never pipe its output
-straight into a commit without review.
+**After delegating**: treat jcode's output — from either tier — as an
+untrusted draft — read the diff/result yourself, run the normal
+verification gates (`/verify` or targeted `pytest`/`ruff`) before accepting
+it. Never pipe its output straight into a commit without review. Cost
+optimization is the goal here, not a trade-off against quality: if a
+`code`-tier result violates its guardrails (touches extra files, adds a
+dependency, ignores style), re-prompt narrower rather than hand-patching
+the drift.
 
 ---
 

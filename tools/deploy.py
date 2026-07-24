@@ -142,6 +142,7 @@ EXCLUDE_FILES = {
     "validate_schemas.py", "migrate_to_shared_state.py", "harness_config.py",
     "test_claude_engine.py", "test_claude_guard.py", "test_claude_hooks.py",
     "test_harness.py", "test_integration.py", "test_shared_state.py",
+    "test_jcode_delegate.py",
     # Solo-Code-CLI's OWN accumulated memory — describes THIS repo's design/
     # conventions, not the target project's. Deploy writes fresh blank
     # templates instead (see _write_blank_memory_templates()).

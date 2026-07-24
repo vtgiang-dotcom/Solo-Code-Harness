@@ -29,13 +29,13 @@ boundary list.
 
 When asked "Is Solo-Code Harness active?", answer:
 `Solo-Code Harness active: behavior rules, anti-hallucination rules, security rules,
-prose quality rules, 49 skills, 14 agents, guard + lifecycle hooks enabled (Claude Code).
+prose quality rules, 50 skills, 14 agents, guard + lifecycle hooks enabled (Claude Code).
 Use /verify to validate.`
 
 ## Claude Code Assets
 
 - **Subagents (14)** in `.claude/agents/` -- invoke via the Task tool or by name.
-- **Skills (49)** in `.claude/skills/` -- auto-discovered `SKILL.md` capabilities.
+- **Skills (50)** in `.claude/skills/` -- auto-discovered `SKILL.md` capabilities.
 - **Slash commands (14)** in `.claude/commands/` -- `/verify`, `/plan`, `/decide`, `/ship`, and more.
 - **Guard hook** in `.claude/hooks/guard.py` (`PreToolUse`) -- blocks destructive
   commands, secret leaks, and protected-config edits.
@@ -95,16 +95,37 @@ manually. Use the file-based handoff protocol instead of pasting text:
 3. `session_start.py` auto-detects new `outbox/*-report.md` files at the
    next session start and announces them once.
 
-## Delegating a task to jcode (DeepSeek worker, cost/latency optimization)
+## Delegating a task to jcode (DeepSeek worker, two-tier cost optimization)
 
-`session_start.py` reports `jcode: available` when the binary is on PATH
-and a provider profile is configured -- a signal it's worth considering,
-not an instruction to always use it.
+Claude Code is **always the orchestrator** -- jcode is a stateless,
+one-shot worker with no memory of this session; it never plans, only
+executes one subtask it's handed. `session_start.py` reports
+`jcode: available` when the binary is on PATH and a provider profile is
+configured -- a signal it's worth considering, not an instruction to
+always use it. See `.claude/skills/jcode-delegation/SKILL.md` for the full
+guide.
 
-Delegate only small, well-specified, self-contained subtasks (write a
-test, mechanical refactor, formatting) -- NOT anything needing this
-session's ongoing conversational context (jcode runs as a one-shot
-subprocess with no access to this conversation's history).
+Delegate only small, well-specified, self-contained subtasks with a clear
+acceptance criterion -- NOT anything needing this session's ongoing
+conversational context (architecture judgment, root-cause analysis).
+
+**Two tiers** -- default to the cheap one, escalate only when the task
+clearly needs stronger reasoning:
+
+| Tier | Model | Use for |
+|------|-------|---------|
+| `simple` | `deepseek/deepseek-v4-flash` | Formatting, boilerplate, a single well-defined test, mechanical refactors, extraction/summarization |
+| `code` | `deepseek/deepseek-v4-pro` | Real code-reasoning (bug fixes, algorithms, structured refactors) -- stronger, but measured to ignore scope/style constraints unless told explicitly; **never call without a guardrail preamble** |
+
+Prefer the wrapper over calling `jcode` directly -- it standardizes flags
+and auto-injects the `code`-tier guardrail:
+
+```bash
+python tools/jcode_delegate.py "<self-contained prompt>" --tier simple
+python tools/jcode_delegate.py "<self-contained prompt>" --tier code
+```
+
+Direct invocation, if needed:
 
 ```bash
 jcode run "<self-contained prompt>" --provider-profile commandcode \
@@ -114,8 +135,15 @@ jcode run "<self-contained prompt>" --provider-profile commandcode \
 
 `--tool-profile none --no-selfdev` cut measured input tokens ~65% (22,376
 -> 7,709) for the same prompt by skipping jcode's own tool scaffolding and
-repo self-dev detection. Treat its output as an untrusted draft -- run the
-normal verification gates before accepting it, never commit it unreviewed.
+repo self-dev detection. Every `tools/jcode_delegate.py` call logs
+tier/model/tokens/latency to `.solocode/jcode-usage.jsonl` for auditing.
+
+**Verification is mandatory, not optional**: treat jcode's output -- from
+either tier -- as an untrusted draft. Run the normal verification gates
+(`/verify`, targeted `pytest`/`ruff`) before accepting it, never commit it
+unreviewed. Cost optimization is the goal; it never trades away output
+quality -- if a `code`-tier result violates its guardrails, re-prompt
+narrower rather than hand-patching the drift.
 
 ## Language
 Respond in the user's language. Code, identifiers, and commit messages stay in English.
