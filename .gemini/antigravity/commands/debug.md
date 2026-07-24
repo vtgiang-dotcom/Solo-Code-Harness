@@ -16,9 +16,14 @@ allowed-tools: Read, Grep, Glob, Bash(*)
 - What subsystem is involved?
 
 ## 3. Diagnose
-- Trace the code path
+- Form **at least 2 candidate root causes** before testing any — a single
+  hypothesis "confirmed" on the first try is often confirmation bias, not
+  proof
+- Trace the code path for each candidate
 - Check assumptions at each step
 - Add targeted logging if needed
+- Rule out the wrong candidates with evidence, don't just skip to the one
+  that "feels right"
 
 ## 4. Fix
 - Root cause identified?

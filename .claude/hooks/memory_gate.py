@@ -34,6 +34,10 @@ from pathlib import Path
 
 WARN_CHARS = 4000
 HARD_CHARS = 8000
+# Intentionally an allowlist, not a glob of .claude/memory/*.md:
+# decisions-archive.md is cold storage for entries pruned out of MEMORY.md
+# (see its own header) -- it must NEVER be capped, since the whole point is
+# it isn't loaded into session context and can grow without a token cost.
 MEMORY_FILES = ("MEMORY.md", "project-conventions.md", "harness-design-intent.md")
 
 
@@ -75,8 +79,9 @@ def main() -> int:
         sys.stderr.write(
             f"\n[MemoryGate] WARN {name}: {count:,} chars "
             f"(limit {WARN_CHARS:,}, {HARD_CHARS - count:,} remaining before block).\n"
-            "  Suggest: prune stale entries, use brief links, move details to "
-            "dedicated files.\n"
+            "  Suggest: MOVE (don't delete) the oldest/least-referenced entry "
+            "to .kilo/memory/decisions-archive.md (uncapped, not auto-loaded), "
+            "keep only high-signal items here.\n"
         )
 
     if blocks:
@@ -84,10 +89,10 @@ def main() -> int:
             sys.stderr.write(
                 f"\n[MemoryGate] BLOCKED {name}: {count:,} chars exceeds hard "
                 f"limit {HARD_CHARS:,} by {count - HARD_CHARS:,}.\n"
-                "  Memory files load into EVERY session context. "
-                "Compact this file before continuing: keep only high-signal,\n"
-                "  frequently-referenced items; move verbose history to git "
-                "commit messages (already durable) instead of prose here.\n"
+                "  Memory files load into EVERY session context. Move (don't "
+                "delete) the oldest/least-referenced entries to\n"
+                "  .kilo/memory/decisions-archive.md (uncapped, not auto-"
+                "loaded -- still grep-able on demand) before continuing.\n"
             )
         return 2
 

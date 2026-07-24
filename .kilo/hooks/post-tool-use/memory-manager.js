@@ -25,6 +25,10 @@ const path = require('path');
 const MEMORY_DIR = path.join(process.cwd(), '.kilo', 'memory');
 const WARN_CHARS = 4000;
 const HARD_CHARS = 8000;
+// Intentionally an allowlist, not every .md in MEMORY_DIR:
+// decisions-archive.md is cold storage for entries pruned out of MEMORY.md
+// (see its own header) -- it must NEVER be capped, since the whole point is
+// it isn't loaded into session context and can grow without a token cost.
 const MEMORY_FILES = ['MEMORY.md', 'project-conventions.md', 'harness-design-intent.md'];
 
 // ─── Main ───────────────────────────────────────────────────────────────────
@@ -85,7 +89,7 @@ process.stdin.on('end', () => {
       process.stderr.write(
         `\n[MemoryManager] ⚠ ${w.file}: ${w.charCount} chars (${w.lineCount} lines)\n` +
         `  Warning threshold: ${w.limit} chars. ${w.remaining} chars remaining before hard block.\n` +
-        `  Suggest: prune stale entries, use brief links, move details to dedicated files.\n\n`
+        `  Suggest: MOVE (don't delete) the oldest/least-referenced entry to .kilo/memory/decisions-archive.md (uncapped, not auto-loaded).\n\n`
       );
     }
   }
@@ -97,8 +101,8 @@ process.stdin.on('end', () => {
         `\n[MemoryManager] 🛑 BLOCKED: ${b.file}: ${b.charCount} chars (${b.lineCount} lines)\n` +
         `  Hard limit: ${b.limit} chars exceeded by ${(parseInt(b.charCount.replace(/,/g, '')) - HARD_CHARS).toLocaleString()} chars.\n` +
         `  Memory files loaded into EVERY session context. Every 1,000 chars ≈ 250 tokens (≈ $0.00007).\n` +
-        `  Action: compact the file. Keep only high-signal, frequently-referenced items.\n` +
-        `  Move detailed docs to .kilo/instruction/ or external files.\n\n`
+        `  Action: move (don't delete) the oldest/least-referenced entries to .kilo/memory/decisions-archive.md (uncapped, not auto-loaded -- still grep-able on demand).\n` +
+        `  Detailed how-to docs still belong in .kilo/instruction/, not here.\n\n`
       );
     }
     process.exit(1); // Block the write

@@ -145,6 +145,7 @@ EXCLUDE_FILES = {
     # conventions, not the target project's. Deploy writes fresh blank
     # templates instead (see _write_blank_memory_templates()).
     "MEMORY.md", "project-conventions.md", "harness-design-intent.md",
+    "decisions-archive.md",
     # Deprecated-engine-specific data file (garden.py skip-list for .opencode)
     "opencode-skip-skills.txt",
 }
@@ -489,16 +490,39 @@ updated: {timestamp}
 - (define this project's code style rules)
 """
 
+BLANK_DECISIONS_ARCHIVE_MD = """---
+type: project
+created: {timestamp}
+---
+
+# Decisions Archive
+
+> Cold storage for decisions pruned out of `MEMORY.md` to stay under the
+> `memory_gate` hard cap (8,000 chars). NOT loaded automatically into any
+> session — unlike `MEMORY.md`, this file has no size limit and no
+> auto-injection. Grep this file on demand for the "why" behind an old
+> decision that `git log` alone makes hard to find.
+>
+> Workflow: when `MEMORY.md`'s Decisions section approaches the cap, MOVE
+> (don't delete) the oldest/least-referenced entry here verbatim, then keep
+> pruning until back under the WARN threshold (4,000 chars).
+
+## Decisions
+
+- (moved-out entries land here as this project's memory grows)
+"""
+
 # memory/ dirs that get a fresh blank template on scaffold/deploy instead of
 # Solo-Code-CLI's own accumulated memory content (MEMORY.md, project-
-# conventions.md excluded from copy via EXCLUDE_FILES; written fresh here).
+# conventions.md, decisions-archive.md excluded from copy via EXCLUDE_FILES;
+# written fresh here).
 MEMORY_DIRS = [".kilo/memory", ".claude/memory", ".copilot/memory"]
 
 
 def _write_blank_memory_templates(target: Path, dirs: list[str], dry_run: bool) -> int:
-    """Write fresh blank MEMORY.md/project-conventions.md into each deployed
-    engine's memory/ dir, instead of letting Solo-Code-CLI's own accumulated
-    project memory leak into the target project."""
+    """Write fresh blank MEMORY.md/project-conventions.md/decisions-archive.md
+    into each deployed engine's memory/ dir, instead of letting Solo-Code-
+    CLI's own accumulated project memory leak into the target project."""
     written = 0
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     engine_prefixes = {d.split("/")[0] for d in dirs}
@@ -510,6 +534,7 @@ def _write_blank_memory_templates(target: Path, dirs: list[str], dry_run: bool) 
         for fname, content in (
             ("MEMORY.md", BLANK_MEMORY_MD),
             ("project-conventions.md", BLANK_PROJECT_CONVENTIONS_MD.format(timestamp=timestamp)),
+            ("decisions-archive.md", BLANK_DECISIONS_ARCHIVE_MD.format(timestamp=timestamp)),
         ):
             dst = mem_dir / fname
             if dst.exists():

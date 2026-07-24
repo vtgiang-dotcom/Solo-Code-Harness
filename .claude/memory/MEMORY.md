@@ -43,11 +43,6 @@
   ~2-9x faster startup, ~15-63x lower RAM than OpenCode for concurrent workers.
   No dedicated dir — reads `AGENTS.md` + `.claude/skills/` + `.mcp.json`
   natively. Launch via `jcode.ps1`.
-- [decision] 2026-07-23: `tools/deploy.py` manifest trimmed — target projects
-  get only RUNTIME harness assets (agents/skills/commands/hooks/config), never
-  Solo-Code-CLI's own dev tooling, meta docs, CI workflows, or this repo's
-  accumulated memory (blank per-engine templates instead). -21% scaffold size
-  (1036->845 files).
 - [decision] 2026-07-23: Phase 3 — `.opencode/` physically removed via `git rm`
   (reversible), vendored `jcode-master/` source removed after installing
   compiled `jcode.exe` to PATH. Version bumped to v4.0.0 across
@@ -55,11 +50,6 @@
   `validate_schemas.py`/docs. `.copilot/memory` synced manually (no
   auto-generator; parity is check-only via `garden.py`). Verified: 0 drift,
   full test suite green on a fresh live scaffold.
-- [decision] 2026-07-23: reviewed Anthropic's official Claude Code prompt
-  library — ~90% of categories already covered by existing `.kilo/skill/`
-  entries; added 2 genuine gaps as new skills: `steering-and-course-
-  correction`, `incident-investigation`. Skill count 47->49, synced across
-  kilo/claude/copilot (gemini lagged by 3 — flagged as a gap, closed next).
 - [decision] 2026-07-23: closed the Gemini parity gap — added the missing 3
   skills + 3 instruction files, added `check_gemini()` to `garden.py` (Gemini
   models `.gemini/antigravity/` structure; uses `knowledge/artifacts` instead
@@ -111,3 +101,14 @@
   frontmatter. `garden.py` now diffs real content:
   `check_skill_content()` (frontmatter-agnostic) + `check_instruction_
   content()` (byte-for-byte). Added `tools/test_garden.py` (14 tests).
+- [decision] 2026-07-24: added Context Summary Struct to PreCompact +
+  decisions-archive.md tier. `pre_compact.py` asks Claude to write
+  `.solocode/context-checkpoint.json` (active_feature, unverified_changes,
+  settled_decisions, next_immediate_step); `session_start.py` surfaces it
+  once next session then deletes it (recovery aid, not mid-compaction
+  survival -- a hook can't guarantee that). Bigger context windows should
+  NOT raise MEMORY.md's cap: it's a recurring per-session cost across all 5
+  engines (sized for the weakest, jcode), not a one-time budget. Instead
+  added `.kilo/memory/decisions-archive.md` (uncapped, not auto-loaded) --
+  pruning now MOVES entries there, not deletes. Also `/debug` now requires
+  >=2 hypotheses (all 4 engines). Verified: 0 drift, 107 tests.

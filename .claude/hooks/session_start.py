@@ -19,6 +19,11 @@ Behavior (all best-effort, never blocks — always exits 0):
     .gemini/antigravity/handoff/outbox/ (see handoff/README.md) — tracked via
     a local-only "seen" marker at .solocode/gemini-handoff-seen.json so each
     report is announced once, not every session
+  - a pending PreCompact recovery checkpoint at
+    .solocode/context-checkpoint.json (written by pre_compact.py, see its
+    docstring) — surfaced once here then deleted, so a fresh session
+    resumes orientation (active feature, unverified changes, next step)
+    immediately instead of re-deriving it from git state alone
   - prints a SessionStart hookSpecificOutput JSON with additionalContext
 """
 
@@ -121,6 +126,26 @@ def _new_gemini_reports(cwd: Path) -> list[str]:
     return new
 
 
+def _pending_checkpoint(cwd: Path) -> dict | None:
+    """Best-effort: read + consume a pending PreCompact recovery checkpoint.
+
+    Deletes the file after reading (surfaced once, not every session) so a
+    stale checkpoint from a much earlier compaction never lingers forever.
+    Silent on any failure — advisory only, never required.
+    """
+    checkpoint_file = cwd / ".solocode" / "context-checkpoint.json"
+    if not checkpoint_file.is_file():
+        return None
+    data: dict | None = None
+    with suppress(Exception):
+        data = json.loads(checkpoint_file.read_text(encoding="utf-8"))
+    with suppress(OSError):
+        checkpoint_file.unlink()
+    if not isinstance(data, dict):
+        return None
+    return data
+
+
 def main() -> int:
     # Consume stdin if present (SessionStart payload) — we don't require it.
     with suppress(Exception):
@@ -132,6 +157,7 @@ def main() -> int:
         pm = _detect_package_manager(cwd)
         sessions = _recent_sessions(cwd)
         new_reports = _new_gemini_reports(cwd)
+        checkpoint = _pending_checkpoint(cwd)
     except Exception:  # noqa: BLE001 — never crash session startup
         return 0
 
@@ -149,6 +175,16 @@ def main() -> int:
             "in .gemini/antigravity/handoff/outbox/ — read them:"
         )
         lines.extend(f"  - .gemini/antigravity/handoff/outbox/{r}" for r in new_reports)
+    if checkpoint:
+        lines.append("Resuming from a PreCompact checkpoint left last session:")
+        if checkpoint.get("active_feature"):
+            lines.append(f"  - active_feature: {checkpoint['active_feature']}")
+        if checkpoint.get("unverified_changes"):
+            lines.append(f"  - unverified_changes: {checkpoint['unverified_changes']}")
+        if checkpoint.get("settled_decisions"):
+            lines.append(f"  - settled_decisions: {checkpoint['settled_decisions']}")
+        if checkpoint.get("next_immediate_step"):
+            lines.append(f"  - next_immediate_step: {checkpoint['next_immediate_step']}")
 
     print(json.dumps({
         "hookSpecificOutput": {

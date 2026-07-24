@@ -147,6 +147,18 @@ def test_live_repo_has_zero_memory_content_drift():
         assert issues == [], f"{label} memory drift: {issues}"
 
 
+def test_check_memory_covers_decisions_archive():
+    """check_memory() scans every *.md in memory/, so decisions-archive.md
+    (cold storage, uncapped by memory_gate) must still be parity-checked --
+    it's exempt from the SIZE cap, not from the drift check."""
+    kilo = ROOT / ".kilo"
+    assert (kilo / "memory" / "decisions-archive.md").is_file()
+    assert (ROOT / ".claude" / "memory" / "decisions-archive.md").is_file()
+    assert (ROOT / ".copilot" / "memory" / "decisions-archive.md").is_file()
+    issues = garden.check_memory(kilo, ROOT / ".claude", ".claude")
+    assert not any("decisions-archive" in i for i in issues)
+
+
 def test_live_repo_has_zero_skill_content_drift():
     kilo = ROOT / ".kilo"
     assert garden.check_skill_content(kilo, ROOT / ".copilot" / "skill", ".copilot") == []

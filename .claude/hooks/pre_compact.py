@@ -8,7 +8,7 @@ manually (`/compact`). This is the exact moment session detail is most at
 risk of being lost across a compaction boundary.
 
 This hook does NOT try to write the "Decisions" prose itself (a hook is a
-deterministic script, not the model) -- it does two things reliably:
+deterministic script, not the model) -- it does three things reliably:
 
   1. Writes an objective, factual checkpoint to `.solocode/shared-state.db`
      (git branch/sha/dirty count, trigger type, timestamp) so there is a
@@ -19,6 +19,18 @@ deterministic script, not the model) -- it does two things reliably:
      project's actual cross-session memory) *before* continuing, if it
      hasn't already -- so durable decisions survive compaction instead of
      living only in the about-to-be-summarized transcript.
+  3. Asks Claude to also write a small structured checkpoint --
+     `.solocode/context-checkpoint.json` (local-only, gitignored, ephemeral --
+     same tier as shared-state.db, NOT a MEMORY.md replacement) -- with
+     `active_feature`, `unverified_changes`, `settled_decisions`, and
+     `next_immediate_step`. `session_start.py` surfaces this once at the
+     start of the *next* session (then deletes it) so a fresh session can
+     resume orientation immediately instead of re-deriving it from git
+     state alone. This is deliberately a next-session recovery aid, not a
+     mid-compaction context-survival mechanism -- a hook cannot guarantee
+     its own `additionalContext` output survives the model's own summary,
+     so the reliable handoff point is the next SessionStart, which this
+     harness fully controls.
 
 Wired via .claude/settings.json:
     "PreCompact": [ { "hooks": [ { "type": "command",
@@ -111,10 +123,21 @@ def main() -> int:
     reminder = (
         "Context is about to be compacted"
         + (f" ({trigger})" if trigger else "")
-        + ". Before continuing: if any architectural/scope decision settled "
-        "this session isn't yet in .kilo/memory/MEMORY.md's 'Decisions' "
-        "section, append it now (source of truth; regenerate .claude/ + "
-        "sync .copilot/.gemini/ after). A durable checkpoint was "
+        + ". Before continuing, do two things:\n"
+        "1) If any architectural/scope decision settled this session isn't "
+        "yet in .kilo/memory/MEMORY.md's 'Decisions' section, append it now "
+        "(source of truth; regenerate .claude/ + sync .copilot/.gemini/ "
+        "after) -- durable, cross-session.\n"
+        "2) Write a next-session recovery checkpoint to "
+        ".solocode/context-checkpoint.json (create/overwrite; local-only, "
+        "gitignored, ephemeral) as JSON with exactly these keys: "
+        '{"active_feature": "<what you\'re working on, or null>", '
+        '"unverified_changes": ["<file paths edited but not yet verified/'
+        'tested>"], "settled_decisions": ["<short bullets of decisions made '
+        'this session, even ones already in MEMORY.md>"], '
+        '"next_immediate_step": "<the single next action to take>"}. '
+        "Keep it brief (this is a recovery cue, not a transcript). "
+        "A durable git-state checkpoint was "
         + ("logged" if logged else "attempted (shared-state unavailable)")
         + " to .solocode/shared-state.db."
     )

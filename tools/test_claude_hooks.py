@@ -135,6 +135,61 @@ def test_session_start_announces_new_gemini_report(tmp_path, monkeypatch):
             seen_file.unlink()
 
 
+def test_session_start_surfaces_and_consumes_checkpoint():
+    """A pending .solocode/context-checkpoint.json is surfaced once, then
+    deleted so it never leaks into a later, unrelated session."""
+    checkpoint_file = ROOT / ".solocode" / "context-checkpoint.json"
+    backup = checkpoint_file.read_text(encoding="utf-8") if checkpoint_file.is_file() else None
+    try:
+        checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
+        checkpoint_file.write_text(json.dumps({
+            "active_feature": "pytest-fixture-feature",
+            "unverified_changes": ["tools/example.py"],
+            "settled_decisions": ["use pytest fixture"],
+            "next_immediate_step": "run tests",
+        }), encoding="utf-8")
+
+        r1 = _run("session_start.py", {})
+        assert r1.returncode == 0
+        assert "pytest-fixture-feature" in r1.stdout
+        assert not checkpoint_file.exists(), "checkpoint must be consumed (deleted) after read"
+
+        r2 = _run("session_start.py", {})
+        assert r2.returncode == 0
+        assert "pytest-fixture-feature" not in r2.stdout
+    finally:
+        if backup is not None:
+            checkpoint_file.write_text(backup, encoding="utf-8")
+        elif checkpoint_file.is_file():
+            checkpoint_file.unlink()
+
+
+def test_session_start_no_checkpoint_is_silent():
+    checkpoint_file = ROOT / ".solocode" / "context-checkpoint.json"
+    assert not checkpoint_file.exists()  # sanity: previous test cleaned up
+    r = _run("session_start.py", {})
+    assert r.returncode == 0
+    assert "Resuming from a PreCompact checkpoint" not in r.stdout
+
+
+def test_session_start_malformed_checkpoint_is_silent():
+    """A corrupt/malformed checkpoint file must never crash SessionStart —
+    advisory only. It's still consumed (deleted) so it doesn't linger."""
+    checkpoint_file = ROOT / ".solocode" / "context-checkpoint.json"
+    backup = checkpoint_file.read_text(encoding="utf-8") if checkpoint_file.is_file() else None
+    try:
+        checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
+        checkpoint_file.write_text("not-json{{{", encoding="utf-8")
+        r = _run("session_start.py", {})
+        assert r.returncode == 0
+        assert "Resuming from a PreCompact checkpoint" not in r.stdout
+    finally:
+        if backup is not None:
+            checkpoint_file.write_text(backup, encoding="utf-8")
+        elif checkpoint_file.is_file():
+            checkpoint_file.unlink()
+
+
 # ─── session_end.py ─────────────────────────────────────────────────────────
 
 def test_session_end_exists():
@@ -165,6 +220,17 @@ def test_pre_compact_emits_context_json():
     hso = out["hookSpecificOutput"]
     assert hso["hookEventName"] == "PreCompact"
     assert "MEMORY.md" in hso["additionalContext"]
+
+
+def test_pre_compact_requests_context_checkpoint_schema():
+    """The reminder must ask for the exact checkpoint schema session_start.py
+    knows how to read: active_feature, unverified_changes,
+    settled_decisions, next_immediate_step."""
+    r = _run("pre_compact.py", {"session_id": "t1", "trigger": "auto", "model": "claude"})
+    ctx = json.loads(r.stdout)["hookSpecificOutput"]["additionalContext"]
+    assert ".solocode/context-checkpoint.json" in ctx
+    for key in ("active_feature", "unverified_changes", "settled_decisions", "next_immediate_step"):
+        assert key in ctx, f"checkpoint schema key {key!r} missing from reminder"
 
 
 def test_pre_compact_empty_stdin_exits_zero():
@@ -206,6 +272,23 @@ def test_memory_gate_current_memory_under_hard_limit():
     cap (8,000 chars) so this hook never blocks a routine session."""
     r = _run("memory_gate.py", {"tool_name": "Edit",
                                  "tool_input": {"file_path": ".claude/memory/MEMORY.md"}})
+    assert r.returncode == 0, r.stderr
+
+
+def test_memory_gate_never_caps_decisions_archive(tmp_path, monkeypatch):
+    """decisions-archive.md is cold storage (not auto-loaded into session
+    context) and must be exempt from the size cap by design -- an entry
+    moved out of MEMORY.md must never get stuck unable to land here."""
+    mem_dir = tmp_path / ".claude" / "memory"
+    mem_dir.mkdir(parents=True)
+    (mem_dir / "decisions-archive.md").write_text("x" * 50000, encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    r = subprocess.run(
+        [sys.executable, str(HOOKS / "memory_gate.py")],
+        input=json.dumps({"tool_name": "Write",
+                          "tool_input": {"file_path": ".claude/memory/decisions-archive.md"}}),
+        capture_output=True, text=True, timeout=30,
+    )
     assert r.returncode == 0, r.stderr
 
 
