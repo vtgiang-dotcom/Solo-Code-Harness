@@ -100,7 +100,6 @@ python tools/deploy.py
 | `.github/` | Shared scripts: `security_scan.py`, `checklist.py`, `check_skips.py`, `eval_harness.py`, `boundary_audit.py`, `security-allowlist.txt` + `copilot-instructions.md`, `prompts/` |
 | `tools/` | Generator (`generate_harness.py`, `claude_engine.py`), validator, drift detector (`garden.py`), integration tests, `shared_state.py` (runtime dep of Claude session hooks) |
 | `.vscode/` | VS Code settings + MCP config for Copilot |
-| `docs/specs/` | Architecture specs, migration plans, historical decision records (never deployed — dev-only) |
 
 ## Shared State (Cross-Engine, Local-Only)
 
@@ -363,7 +362,6 @@ python tools/deploy.py
 | `.github/` | Script dùng chung: `security_scan.py`, `checklist.py`, `check_skips.py`, `eval_harness.py`, `boundary_audit.py` + `copilot-instructions.md`, `prompts/` |
 | `tools/` | Generator (`generate_harness.py`, `claude_engine.py`), validator, drift detector (`garden.py`), integration tests, `shared_state.py` (runtime dep của Claude session hooks) |
 | `.vscode/` | VS Code settings + MCP config cho Copilot |
-| `docs/specs/` | Architecture specs, migration plans, hồ sơ quyết định lịch sử (không deploy — chỉ dev nội bộ) |
 
 ## Verification Gates
 

@@ -18,7 +18,7 @@ Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`, `style`
 feat: add Stripe checkout webhook handler
 fix: resolve race condition in session create
 refactor: extract auth middleware to shared module
-security: upgrade bcrypt to v5.0.1 for CVE-2024-XXXXX
+security: upgrade bcrypt to v5.0.1 to patch authentication bypass
 ```
 
 ## Branch Naming

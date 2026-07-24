@@ -39,7 +39,8 @@ This skill needs a live, responsive user. **Do not invoke in non-interactive con
 
 1. **One question at a time.** Ask, wait for answer, then ask next. No batches.
 2. **Every question carries `GUESS:`** with your recommended answer. User reacts faster to a wrong guess than they generate from scratch.
-3. **Can you answer by exploring the codebase?** Read files instead of asking. Only ask for what *only* the user can provide: intent, priorities, trade-offs, domain context.
+3. **Facts vs. Decisions.** If a *fact* can be found by exploring the codebase, look it up rather than asking me. The *decisions*, though, are mine — put each one to me and wait for my answer. Distinguish sharply: facts are discoverable truths (file paths, existing patterns, API signatures, current behavior); decisions are choices only the human can make (priorities, trade-offs, what to optimize for, what to build first).
+4. **Can you answer by exploring the codebase?** Read files instead of asking. Only ask for what *only* the user can provide: intent, priorities, trade-offs, domain context.
 
 ---
 

@@ -95,6 +95,69 @@ def check_instructions(src: Path, dst: Path, dst_label: str) -> list[str]:
     return issues
 
 
+def check_instruction_content(src: Path, dst: Path, dst_label: str) -> list[str]:
+    """Check src/instruction/*.md content matches dst/instruction/*.md exactly.
+
+    Instructions have no per-engine frontmatter transform (unlike skills, whose
+    SKILL.md frontmatter legitimately differs per engine schema), so a byte-
+    for-byte diff is the correct check here -- any mismatch is real drift.
+    """
+    issues: list[str] = []
+    src_dir = src / "instruction"
+    dst_dir = dst / "instruction"
+    if not src_dir.is_dir() or not dst_dir.is_dir():
+        return issues
+    src_names = {f.name for f in src_dir.iterdir() if f.is_file()}
+    dst_names = {f.name for f in dst_dir.iterdir() if f.is_file()}
+    for name in sorted(src_names & dst_names):
+        if (src_dir / name).read_text(encoding="utf-8") != (dst_dir / name).read_text(encoding="utf-8"):
+            issues.append(
+                f"Content drift: {dst_label}/instruction/{name} differs from "
+                f".kilo/instruction/{name} (out of sync — resync from source of truth)"
+            )
+    return issues
+
+
+def _split_frontmatter(text: str) -> tuple[str, str]:
+    """Split a markdown file into (frontmatter incl. delimiters, body). Returns
+    ("", text) if there's no `---`-delimited frontmatter block."""
+    if text.startswith("---\n"):
+        end = text.find("\n---\n", 4)
+        if end != -1:
+            return text[: end + 5], text[end + 5 :]
+    return "", text
+
+
+def check_skill_content(src: Path, dst_skill_dir: Path, dst_label: str) -> list[str]:
+    """Check SKILL.md *body* content matches between .kilo/skill/ and a
+    manually-mirrored engine (dst_skill_dir), ignoring frontmatter.
+
+    Frontmatter legitimately differs per engine (e.g. Copilot requires quoted
+    `description` strings + a `license` field, Kilo doesn't) -- diffing it
+    would be a constant false positive. The body (actual skill instructions)
+    should be byte-identical though; any difference there is real content
+    drift/loss, not an intentional platform adaptation.
+    """
+    issues: list[str] = []
+    src_dir = src / "skill"
+    if not src_dir.is_dir() or not dst_skill_dir.is_dir():
+        return issues
+    for skill_dir in sorted(p for p in src_dir.iterdir() if p.is_dir()):
+        dst_skill_md = dst_skill_dir / skill_dir.name / "SKILL.md"
+        src_skill_md = skill_dir / "SKILL.md"
+        if not (src_skill_md.is_file() and dst_skill_md.is_file()):
+            continue
+        _, src_body = _split_frontmatter(src_skill_md.read_text(encoding="utf-8"))
+        _, dst_body = _split_frontmatter(dst_skill_md.read_text(encoding="utf-8"))
+        if src_body != dst_body:
+            issues.append(
+                f"Content drift: {dst_label}/skill/{skill_dir.name}/SKILL.md body "
+                f"differs from .kilo/skill/{skill_dir.name}/SKILL.md "
+                "(out of sync — resync body from source of truth, keep dst frontmatter)"
+            )
+    return issues
+
+
 def check_instructions_opencode(src: Path, dst: Path, dst_label: str) -> list[str]:
     """Check that all src/instruction/ files have dst/ copy with .instructions.md suffix."""
     issues: list[str] = []
@@ -310,8 +373,12 @@ def check_gemini(src: Path, dst: Path, *, skip_set: set[str] | None = None) -> l
                 if entry.is_dir() and not (entry / "SKILL.md").exists():
                     issues.append(f"Skill missing SKILL.md: .gemini/antigravity/skills/{entry.name}")
 
-    # Instructions (direct copy, same filename)
+    # Instructions (direct copy, same filename + identical content)
     issues.extend(check_instructions(src, dst, ".gemini/antigravity"))
+    issues.extend(check_instruction_content(src, dst, ".gemini/antigravity"))
+
+    # Skill body content (frontmatter-agnostic — see check_skill_content docstring)
+    issues.extend(check_skill_content(src, dst_skills, ".gemini/antigravity"))
 
     return issues
 
@@ -334,10 +401,18 @@ def run_engine_checks(
                 else check_instructions(src, dst, dst_label)
             ),
         ),
+        (
+            f"Instruction content drift ({dst_label})",
+            lambda: [] if instruction_suffix else check_instruction_content(src, dst, dst_label),
+        ),
         (f"Memory drift ({dst_label})", lambda: check_memory(src, dst, dst_label)),
         (
             f"Skill parity ({dst_label})",
             lambda: check_skill_parity(src, dst, dst_label, skip_set=skip_set),
+        ),
+        (
+            f"Skill content drift ({dst_label})",
+            lambda: check_skill_content(src, dst / "skill", dst_label),
         ),
         (f"Skill health ({dst_label})", lambda: check_skills(dst, dst_label)),
     ]
