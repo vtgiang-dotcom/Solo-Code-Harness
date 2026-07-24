@@ -190,6 +190,68 @@ def test_session_start_malformed_checkpoint_is_silent():
             checkpoint_file.unlink()
 
 
+def test_session_start_jcode_detection_never_crashes():
+    """_jcode_available() is best-effort: whatever the real result on this
+    machine, SessionStart must never crash and must exit 0 either way."""
+    r = _run("session_start.py", {})
+    assert r.returncode == 0
+    out = json.loads(r.stdout)
+    ctx = out["hookSpecificOutput"]["additionalContext"]
+    # Whichever branch fired, the mention (if any) must reference AGENTS.md,
+    # never silently claim availability without pointing to the how-to.
+    if "jcode" in ctx:
+        assert "AGENTS.md" in ctx
+
+
+def test_jcode_available_false_when_binary_missing(monkeypatch):
+    """No jcode on PATH -> must report unavailable, never crash."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "session_start_module", HOOKS / "session_start.py"
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    monkeypatch.setattr(mod.shutil, "which", lambda name: None)
+    assert mod._jcode_available() is False
+
+
+def test_jcode_available_false_when_config_missing(monkeypatch, tmp_path):
+    """jcode binary present but ~/.jcode/config.toml missing -> unavailable."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "session_start_module", HOOKS / "session_start.py"
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    monkeypatch.setattr(mod.shutil, "which", lambda name: "/usr/bin/jcode")
+    monkeypatch.setattr(mod.Path, "home", lambda: tmp_path)
+    assert mod._jcode_available() is False
+
+
+def test_jcode_available_true_when_configured(monkeypatch, tmp_path):
+    """jcode binary present + config.toml has default_provider -> available."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "session_start_module", HOOKS / "session_start.py"
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    jcode_dir = tmp_path / ".jcode"
+    jcode_dir.mkdir()
+    (jcode_dir / "config.toml").write_text(
+        '[provider]\ndefault_provider = "commandcode"\n', encoding="utf-8"
+    )
+    monkeypatch.setattr(mod.shutil, "which", lambda name: "/usr/bin/jcode")
+    monkeypatch.setattr(mod.Path, "home", lambda: tmp_path)
+    assert mod._jcode_available() is True
+
+
 # ─── session_end.py ─────────────────────────────────────────────────────────
 
 def test_session_end_exists():

@@ -37,3 +37,16 @@ created: 2026-07-24
   Solo-Code-CLI's own dev tooling, meta docs, CI workflows, or this repo's
   accumulated memory (blank per-engine templates instead). -21% scaffold size
   (1036->845 files).
+
+- [decision] 2026-07-23: closed the Gemini parity gap — added the missing 3
+  skills + 3 instruction files, added `check_gemini()` to `garden.py` (Gemini
+  models `.gemini/antigravity/` structure; uses `knowledge/artifacts` instead
+  of a MEMORY.md-shaped mirror, so no memory parity check applies there). All
+  4 engines now genuinely at parity (49 skills, all instructions).
+
+- [decision] 2026-07-23: re-verified `deploy.py` end-to-end after the day's
+  changes; found and fixed one real gap: handoff `inbox/outbox/` accumulated
+  task files (`*-plan.md`/`*-report.md`) were NOT excluded from deploy — same
+  leak class as the earlier MEMORY.md leak, just not yet triggered. Fixed
+  `should_copy()` to exclude task instances while still deploying the empty
+  protocol scaffold (README.md, .gitkeep).

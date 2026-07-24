@@ -50,11 +50,6 @@
   `validate_schemas.py`/docs. `.copilot/memory` synced manually (no
   auto-generator; parity is check-only via `garden.py`). Verified: 0 drift,
   full test suite green on a fresh live scaffold.
-- [decision] 2026-07-23: closed the Gemini parity gap — added the missing 3
-  skills + 3 instruction files, added `check_gemini()` to `garden.py` (Gemini
-  models `.gemini/antigravity/` structure; uses `knowledge/artifacts` instead
-  of a MEMORY.md-shaped mirror, so no memory parity check applies there). All
-  4 engines now genuinely at parity (49 skills, all instructions).
 - [decision] 2026-07-23: added a `PreCompact` lifecycle hook
   (`.claude/hooks/pre_compact.py`) for context-compaction continuity — logs an
   objective checkpoint (git branch/sha/dirty count) to `.solocode/shared-
@@ -68,12 +63,6 @@
   for Antigravity, so a human relay step is unavoidable — reduced to "read
   file X, write file Y" instead of copy-pasting. `session_start.py` auto-
   announces new `outbox/*-report.md` files once via a local seen-marker.
-- [decision] 2026-07-23: re-verified `deploy.py` end-to-end after the day's
-  changes; found and fixed one real gap: handoff `inbox/outbox/` accumulated
-  task files (`*-plan.md`/`*-report.md`) were NOT excluded from deploy — same
-  leak class as the earlier MEMORY.md leak, just not yet triggered. Fixed
-  `should_copy()` to exclude task instances while still deploying the empty
-  protocol scaffold (README.md, .gitkeep).
 - [decision] 2026-07-24: audited the memory system after a direct user
   question ("does SQLite belong in project memory too?"). Found two real
   gaps: (1) `garden.py`'s `check_memory()` only checked filename parity, not
@@ -112,3 +101,15 @@
   added `.kilo/memory/decisions-archive.md` (uncapped, not auto-loaded) --
   pruning now MOVES entries there, not deletes. Also `/debug` now requires
   >=2 hypotheses (all 4 engines). Verified: 0 drift, 107 tests.
+- [decision] 2026-07-24: verified jcode/DeepSeek delegation end-to-end
+  (real "pong" response); `--tool-profile none --no-selfdev` cuts input
+  tokens ~65% (22,376->7,709). Bigger finding: `CLAUDE.md` was NOT actually
+  generated from `AGENTS.md` -- `claude_engine.py`'s template is hand-
+  written, only parameterized by counts. The earlier Gemini-handoff section
+  (added to AGENTS.md) had silently never reached real CLAUDE.md. Fixed:
+  added Gemini + jcode delegation sections into the template + regenerated;
+  fixed a stale `tools/test_harness.py` ref (deleted v4.0.0) -> `pytest
+  tools/ -q`. Added `_jcode_available()` to `session_start.py`. Also fixed
+  CI/Makefile hardcoded test-file allowlist (missed test_garden.py/
+  test_integration.py), test_integration.py's machine-specific >=19-feature
+  assertion, rewrote stale SPEC.md (v3.3.0->v4.1.0), removed suggest.md.

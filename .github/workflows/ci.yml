@@ -54,8 +54,8 @@ jobs:
         run: bash init.sh --quiet
         shell: bash
 
-      - name: Harness Tests
-        run: python -m pytest tools/test_claude_engine.py tools/test_claude_guard.py tools/test_claude_hooks.py tools/test_shared_state.py -v --tb=short
+      - name: Harness Tests (auto-discovers all tools/test_*.py)
+        run: python -m pytest tools/ -v --tb=short
         shell: bash
 
   ci-ok:

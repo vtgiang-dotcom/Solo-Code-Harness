@@ -75,6 +75,7 @@ ROOT_FILES = [
 # and internal spec, not the target project).
 DEV_ONLY_ROOT_FILES = {
     "SPEC.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "SECURITY.md",
+    "LICENSE",  # Solo-Code-CLI's own license, not the target project's
     "opencode.json", "opencode.ps1",  # deprecated engine, see .harness.lock
 }
 

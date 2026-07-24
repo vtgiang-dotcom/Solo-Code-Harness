@@ -246,6 +246,39 @@ pasting plan/result text through chat:
    files at the next session start and announces them — no need to ask the
    user to paste the result back.
 
+### Delegating a task to jcode (DeepSeek worker, cost/latency optimization)
+
+`session_start.py` reports `jcode: available` in `additionalContext` when
+the `jcode` binary is on PATH and `~/.jcode/config.toml` has a
+`default_provider` configured — that's a signal it's *worth considering*,
+not an instruction to always use it.
+
+**When to delegate**: small, well-specified, self-contained subtasks with a
+clear acceptance criterion — write a test, mechanical refactor, formatting,
+boilerplate generation. NOT suited for anything needing the ongoing
+conversational context of this session (architecture judgment, root-cause
+analysis, multi-step back-and-forth) — jcode runs as a one-shot subprocess
+with no access to this conversation's history.
+
+**Invocation** (verified working 2026-07-24; flags matter a lot for cost):
+
+```bash
+jcode run "<self-contained prompt with full context inlined>" \
+  --provider-profile commandcode --model deepseek/deepseek-v4-flash \
+  --tool-profile none --no-selfdev --quiet --json
+```
+
+`--tool-profile none --no-selfdev` cut measured input tokens from 22,376 to
+7,709 (~65%) for the same trivial prompt by skipping jcode's own tool-use
+scaffolding and repo self-dev detection — always pass both unless the
+delegated task genuinely needs jcode's own tools (bash/read/write). `--json`
+gives a parseable `{text, usage, ...}` result instead of streamed text.
+
+**After delegating**: treat jcode's output as an untrusted draft — read the
+diff/result yourself, run the normal verification gates (`/verify` or
+targeted `pytest`/`ruff`) before accepting it. Never pipe its output
+straight into a commit without review.
+
 ---
 
 ## Git Commit Convention

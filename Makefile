@@ -17,8 +17,9 @@ help:
 	@echo "  make generate-claude    Same as 'make generate' (alias)"
 	@echo "  make validate           Validate agent/skill frontmatter schemas (.kilo/)"
 	@echo "  make garden             Drift detection (.kilo/ <-> .claude/ generated, .copilot/ parity)"
-	@echo "  make test               Run harness generator test suite"
-	@echo "  make check              Full CI gate: lint + validate + garden + test"
+	@echo "  make test               Run full test suite (auto-discovers tools/test_*.py)"
+	@echo "  make test-integration   Copilot structure + shared-state schema checks"
+	@echo "  make check              Full CI gate: lint + validate + garden + test + security"
 	@echo ""
 	@echo "Security:"
 	@echo "  make security-scan      Scan for hardcoded secrets"
@@ -38,7 +39,10 @@ garden:
 	$(PY) tools/garden.py
 
 test:
-	$(PY) -m pytest tools/test_claude_engine.py tools/test_claude_guard.py tools/test_claude_hooks.py tools/test_shared_state.py -v
+	$(PY) -m pytest tools/ -v
+
+test-integration:
+	$(PY) tools/test_integration.py
 
 check:
 	@echo "=== Lint (ruff) ==="
@@ -50,8 +54,8 @@ check:
 	@echo "=== Garden (drift detection) ==="
 	$(PY) tools/garden.py || exit 1
 	@echo ""
-	@echo "=== Harness Tests ==="
-	$(PY) -m pytest tools/test_claude_engine.py tools/test_claude_guard.py tools/test_claude_hooks.py tools/test_shared_state.py -q || exit 1
+	@echo "=== Harness Tests (auto-discovers all tools/test_*.py) ==="
+	$(PY) -m pytest tools/ -q || exit 1
 	@echo ""
 	@echo "=== Security Scan ==="
 	$(PY) .github/scripts/security_scan.py . || exit 1

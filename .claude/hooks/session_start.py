@@ -24,12 +24,18 @@ Behavior (all best-effort, never blocks — always exits 0):
     docstring) — surfaced once here then deleted, so a fresh session
     resumes orientation (active feature, unverified changes, next step)
     immediately instead of re-deriving it from git state alone
+  - whether the jcode (DeepSeek) worker engine is available on this
+    machine (binary on PATH + a configured provider profile) -- a signal
+    that delegating small, well-specified subtasks to it is *worth
+    considering* for cost/latency, not an instruction to always use it
+    (see AGENTS.md "Delegating a task to jcode")
   - prints a SessionStart hookSpecificOutput JSON with additionalContext
 """
 
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 from contextlib import suppress
@@ -146,6 +152,24 @@ def _pending_checkpoint(cwd: Path) -> dict | None:
     return data
 
 
+def _jcode_available() -> bool:
+    """Best-effort: is the jcode (DeepSeek worker) CLI usable on this
+    machine? Checks the binary is on PATH AND a default provider is
+    configured in ~/.jcode/config.toml -- presence of the binary alone
+    isn't enough (jcode.ps1 must have synced a working provider profile at
+    least once). Silent on any failure -- advisory only, never required.
+    """
+    if shutil.which("jcode") is None:
+        return False
+    config_path = Path.home() / ".jcode" / "config.toml"
+    if not config_path.is_file():
+        return False
+    with suppress(OSError):
+        text = config_path.read_text(encoding="utf-8")
+        return "default_provider" in text
+    return False
+
+
 def main() -> int:
     # Consume stdin if present (SessionStart payload) — we don't require it.
     with suppress(Exception):
@@ -158,6 +182,7 @@ def main() -> int:
         sessions = _recent_sessions(cwd)
         new_reports = _new_gemini_reports(cwd)
         checkpoint = _pending_checkpoint(cwd)
+        jcode_ready = _jcode_available()
     except Exception:  # noqa: BLE001 — never crash session startup
         return 0
 
@@ -185,6 +210,12 @@ def main() -> int:
             lines.append(f"  - settled_decisions: {checkpoint['settled_decisions']}")
         if checkpoint.get("next_immediate_step"):
             lines.append(f"  - next_immediate_step: {checkpoint['next_immediate_step']}")
+    if jcode_ready:
+        lines.append(
+            "jcode (DeepSeek worker) available — consider delegating small, "
+            "well-specified subtasks to it for cost/latency (see AGENTS.md "
+            "'Delegating a task to jcode')."
+        )
 
     print(json.dumps({
         "hookSpecificOutput": {

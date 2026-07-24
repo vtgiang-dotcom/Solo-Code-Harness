@@ -417,11 +417,44 @@ Run `/verify` (or `make check`) before declaring work complete:
 1. `ruff check .` -- Python lint
 2. `python tools/validate_schemas.py` -- frontmatter schema validation
 3. `python tools/garden.py` -- cross-engine parity / drift detection
-4. `python -m pytest tools/test_harness.py -q` -- generator tests
+4. `python -m pytest tools/ -q` -- full test suite (auto-discovers all
+   `tools/test_*.py`; do not hardcode a subset -- new test files must be
+   picked up automatically)
 5. `python .github/scripts/security_scan.py .` -- secret scan
 
 ## Git Commit Convention
 Use Conventional Commits: `type(scope): summary` (feat, fix, docs, test, refactor, chore).
+
+## Delegating a task to Gemini/Antigravity (manual handoff)
+
+Antigravity IDE has no headless CLI -- a human must relay tasks to it
+manually. Use the file-based handoff protocol instead of pasting text:
+1. Write the plan to `.gemini/antigravity/handoff/inbox/<slug>-plan.md`.
+2. Tell the user the one line to relay to Antigravity.
+3. `session_start.py` auto-detects new `outbox/*-report.md` files at the
+   next session start and announces them once.
+
+## Delegating a task to jcode (DeepSeek worker, cost/latency optimization)
+
+`session_start.py` reports `jcode: available` when the binary is on PATH
+and a provider profile is configured -- a signal it's worth considering,
+not an instruction to always use it.
+
+Delegate only small, well-specified, self-contained subtasks (write a
+test, mechanical refactor, formatting) -- NOT anything needing this
+session's ongoing conversational context (jcode runs as a one-shot
+subprocess with no access to this conversation's history).
+
+```bash
+jcode run "<self-contained prompt>" --provider-profile commandcode \\
+  --model deepseek/deepseek-v4-flash --tool-profile none --no-selfdev \\
+  --quiet --json
+```
+
+`--tool-profile none --no-selfdev` cut measured input tokens ~65% (22,376
+-> 7,709) for the same prompt by skipping jcode's own tool scaffolding and
+repo self-dev detection. Treat its output as an untrusted draft -- run the
+normal verification gates before accepting it, never commit it unreviewed.
 
 ## Language
 Respond in the user's language. Code, identifiers, and commit messages stay in English.

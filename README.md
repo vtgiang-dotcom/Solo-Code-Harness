@@ -456,3 +456,7 @@ kế tiếp. Chi tiết: `.gemini/antigravity/handoff/README.md`.
 |---|---|---|
 | `context7` | Đang chạy | Tra cứu tài liệu thư viện trực tiếp |
 | `playwright` | Tắt | Browser E2E testing |
+
+## License / Giấy phép
+
+MIT — see [`LICENSE`](LICENSE). / MIT — xem file [`LICENSE`](LICENSE).

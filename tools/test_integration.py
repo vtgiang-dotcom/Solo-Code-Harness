@@ -179,7 +179,11 @@ def test_shared_state() -> None:
         check("  integrity_check passes", errors == [], f"errors: {errors}")
 
         features = state.get_features()
-        check("  feature count >= 19", len(features) >= 19, f"got {len(features)}")
+        # No hardcoded minimum count: shared-state.db is local-only, machine-
+        # specific state (gitignored, not committed) -- how many features a
+        # given dev machine happens to have registered is not something a
+        # portable integration test should assert on. Just validate shape.
+        check("  get_features() returns a list", isinstance(features, list))
 
         for f in features:
             if f["status"] == "in-progress":
