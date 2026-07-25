@@ -113,3 +113,10 @@
   CI/Makefile hardcoded test-file allowlist (missed test_garden.py/
   test_integration.py), test_integration.py's machine-specific >=19-feature
   assertion, rewrote stale SPEC.md (v3.3.0->v4.1.0), removed suggest.md.
+- [decision] 2026-07-25: upgraded `claude-env.ps1` for FreeModel 4-domain
+  multi-tier support: normalize `/v1/messages` for api.freemodel.dev (canonical
+  from guide.md), cc.freemodel.dev, api-cc.freemodel.dev, cc-t2.freemodel.dev.
+  Added apiKeyHelper conflict detection: if `~/.claude/settings.json` has
+  `apiKeyHelper` configured, automatically unset `ANTHROPIC_API_KEY` to
+  eliminate the "Both apiKeyHelper and ANTHROPIC_API_KEY set" warning.
+  Updated `.env.template` with 3-tier VIP documentation (Standard/Mid/Top).
