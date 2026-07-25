@@ -216,7 +216,7 @@ Copy-Item .env.template .env
 ./claude-env.ps1 --help
 ```
 
-`.env.template` ships with the FreeModel defaults (`ANTHROPIC_BASE_URL=https://cc.freemodel.dev`)
+`.env.template` ships with 3 FreeModel VIP tiers (`cc.freemodel.dev`, `api-cc.freemodel.dev`, `cc-t2.freemodel.dev`)
 alongside a `COMMANDCODE_API_KEY` entry shared with jcode. Your real `.env` is gitignored and never deployed.
 
 ## jcode Setup (DeepSeek Worker Engine)
