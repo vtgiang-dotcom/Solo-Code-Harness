@@ -18,7 +18,7 @@ Fix any lint errors before proceeding.
 
 ### 2. Unit Tests
 ```bash
-python -m pytest tools/test_harness.py -q
+python -m pytest tools/ -q
 ```
 All tests must pass.
 

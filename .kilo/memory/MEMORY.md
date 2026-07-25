@@ -38,15 +38,22 @@
 
 
 ## Decisions
-- [decision] 2026-07-24: removed `docs/specs/` (8 files, obsolete OpenCode
-  planning docs + completed plans; history in git log). Fixed real content
-  drift in `.copilot`/`.gemini`: both mirrored from an older `.kilo/` and
-  never re-synced — missing the Fowler Smell Baseline section in
-  `code-review-expert/SKILL.md` + a point in `interview-me/SKILL.md`
-  (identical gap in both). Synced body content, kept each engine's own
-  frontmatter. `garden.py` now diffs real content:
-  `check_skill_content()` (frontmatter-agnostic) + `check_instruction_
-  content()` (byte-for-byte). Added `tools/test_garden.py` (14 tests).
+- [decision] 2026-07-25: repaired `verify.sh` (6/31 -> 31/31 PASS). Root
+  causes, all silent: (a) it probed `command -v python3`, which on Windows
+  resolves to a Microsoft Store *stub* that exits with an install prompt --
+  so every gated garden/test check "failed" while passing when run directly;
+  now probes by executing `-c "import sys"`. (b) stale paths: `.claude/
+  CLAUDE.md` -> `CLAUDE.md`, flat `.claude/skills/$sk.md` -> `$sk/SKILL.md`,
+  `pytest tools/test_harness.py` (deleted v4.0.0) -> `pytest tools/ -q`,
+  node guard test -> `pytest tools/test_claude_guard.py`. (c) the `socratic`
+  keyword check was NOT stale -- CLAUDE.md genuinely lacked AGENTS.md's
+  Complex Tasks section, so fixed the source template in `claude_engine.py`
+  rather than deleting the check. Security: whitelisted vendored
+  `antigravity-sdk-python-main` in security_scan SKIP_DIRS (fake fixture
+  string) and added a `bcrypt/scrypt/argon2` gitleaks regex allowlist (it
+  read password-hashing *prose* as an assignment). Fault-injected a real
+  fake secret into both scanners afterward to prove they still fire -- an
+  allowlist that disables detection is worse than the false positive.
 - [decision] 2026-07-24: added Context Summary Struct to PreCompact +
   decisions-archive.md tier. `pre_compact.py` asks Claude to write
   `.solocode/context-checkpoint.json` (active_feature, unverified_changes,

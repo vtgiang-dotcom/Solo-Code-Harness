@@ -23,6 +23,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 COPILOT = ROOT / ".copilot"
+KILO = ROOT / ".kilo"
 sys.path.insert(0, str(ROOT))
 
 PASS = 0
@@ -40,14 +41,16 @@ def check(label: str, condition: bool, detail: str = "") -> None:
 
 
 def test_copilot_agents() -> None:
-    print("\n--- Copilot Agents (expect 14) ---")
+    print("\n--- Copilot Agents (parity with .kilo/agents/) ---")
     agents_dir = COPILOT / "agents"
     check("agents/ directory exists", agents_dir.is_dir())
     if not agents_dir.is_dir():
         return
 
     agents = sorted(agents_dir.glob("*.md"))
-    check(f"agent count = {len(agents)}", len(agents) == 14, f"got {len(agents)}")
+    expected = len(list((KILO / "agents").glob("*.md")))
+    check(f"agent count = {len(agents)} (matches .kilo/)", len(agents) == expected,
+          f"got {len(agents)}, .kilo/ has {expected}")
 
     for f in agents:
         content = f.read_text(encoding="utf-8")
@@ -61,14 +64,19 @@ def test_copilot_agents() -> None:
 
 
 def test_copilot_skills() -> None:
-    print("\n--- Copilot Skills (expect 49) ---")
+    print("\n--- Copilot Skills (parity with .kilo/skill/) ---")
     skills_dir = COPILOT / "skill"
     check("skill/ directory exists", skills_dir.is_dir())
     if not skills_dir.is_dir():
         return
 
     skills = sorted([d for d in skills_dir.iterdir() if d.is_dir()])
-    check(f"skill count = {len(skills)}", len(skills) == 49, f"got {len(skills)}")
+    # Compare against .kilo/ (source of truth) rather than a hardcoded
+    # number -- the literal 49 silently rotted when the 50th skill landed,
+    # failing this suite for a drift that did not exist.
+    expected = len([d for d in (KILO / "skill").iterdir() if d.is_dir()])
+    check(f"skill count = {len(skills)} (matches .kilo/)", len(skills) == expected,
+          f"got {len(skills)}, .kilo/ has {expected}")
 
     for d in skills:
         skill_md = d / "SKILL.md"
@@ -95,14 +103,16 @@ def test_copilot_instructions() -> None:
 
 
 def test_copilot_commands() -> None:
-    print("\n--- Copilot Commands (expect 13) ---")
+    print("\n--- Copilot Commands (parity with .kilo/command/) ---")
     cmd_dir = COPILOT / "command"
     check("command/ directory exists", cmd_dir.is_dir())
     if not cmd_dir.is_dir():
         return
 
     cmds = sorted(cmd_dir.glob("*.md"))
-    check(f"command count = {len(cmds)}", len(cmds) == 13, f"got {len(cmds)}")
+    expected = len(list((KILO / "command").glob("*.md")))
+    check(f"command count = {len(cmds)} (matches .kilo/)", len(cmds) == expected,
+          f"got {len(cmds)}, .kilo/ has {expected}")
 
 
 def test_copilot_rulebook() -> None:

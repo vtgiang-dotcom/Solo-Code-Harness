@@ -2,6 +2,12 @@
 useDefault = true
 
 [allowlist]
+# Security *documentation* recommending password-hashing algorithms. The
+# generic-api-key rule reads "Passwords: bcrypt/scrypt/argon2" as an
+# assignment; it is prose in the harness rulebooks, not a credential.
+regexes = [
+    '''bcrypt/scrypt/argon2''',
+]
 paths = [
     '''\.venv''',
     '''node_modules''',

@@ -81,6 +81,7 @@ SKIP_DIRS = {
     "Solo-Code-Harness",          # SoloC-Harness worktree — third-party, not harness code
     "codebase-memory-mcp-main",   # Reference project — C MCP server for codebase memory
     "cocoindex-code-main",        # Reference project — Rust-based code indexing tool
+    "antigravity-sdk-python-main", # Reference project — vendored Antigravity SDK
 }
 # Files git-ignored in this repo — skip to avoid flagging local dev secrets
 SKIP_NAMES: set[str] = {".env"}

@@ -29,7 +29,7 @@ python tools/test_integration.py
 
 ## Gate 5: Harness Tests
 ```bash
-python -m pytest tools/test_harness.py -q
+python -m pytest tools/ -q
 ```
 
 ## Gate 6: Eval Score

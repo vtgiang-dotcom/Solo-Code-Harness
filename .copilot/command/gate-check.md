@@ -41,7 +41,7 @@ Expected: all gates green.
 
 ### Gate 5: Harness Tests
 ```bash
-python -m pytest tools/test_harness.py -q
+python -m pytest tools/ -q
 ```
 Expected: all tests pass.
 

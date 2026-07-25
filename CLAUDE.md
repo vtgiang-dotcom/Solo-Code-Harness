@@ -67,6 +67,11 @@ Use /verify to validate.`
 ### Prose Quality
 - Be concise and specific. No filler, no hedging, no marketing tone.
 
+### Complex Tasks
+- **Socratic Gate:** For complex requests ("build X", "create Y", "refactor Z"), ask at least 2 clarifying questions before coding. Confirm approach, tradeoffs, and edge cases.
+- **Plan before implement:** Break complex tasks into steps. Present the plan. Wait for approval. Then execute.
+- **Synthesize, don't delegate blindly:** When spawning sub-agents, read their findings and write specific implementation instructions with file paths and line numbers.
+
 ## Security Rules
 - Validate and sanitize all external input.
 - Never log secrets or PII.

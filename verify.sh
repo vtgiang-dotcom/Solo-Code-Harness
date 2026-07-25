@@ -27,7 +27,7 @@ echo "[STRUCTURE]"
 for d in .claude .github .vscode; do
   [ -d "$d" ] && ok "thu muc $d/ ton tai" || bad "thieu thu muc $d/"
 done
-for f in .claude/settings.json .claude/CLAUDE.md .mcp.json; do
+for f in .claude/settings.json CLAUDE.md .mcp.json; do
   [ -f "$f" ] && ok "$f ton tai" || bad "thieu file $f"
 done
 echo
@@ -35,16 +35,22 @@ echo
 # ---------- TESTS ----------
 echo "[TESTS]"
 if is_wsl; then
-  warn "guard.test.js (chay tu PowerShell)"
+  warn "guard tests (chay 'pytest tools/' tu PowerShell)"
   warn "ruff check (chay 'ruff check .' tu PowerShell)"
 else
   GUARD_LOG="$TEMP_DIR/guard.log"
-  if node .github/hooks/scripts/guard.test.js >"$GUARD_LOG" 2>&1; then
-    grep -q "29/29 passed" "$GUARD_LOG" && ok "guard.test.js  29/29" || bad "guard.test.js khong du 29/29"
+  if python -m pytest tools/test_claude_guard.py -q >"$GUARD_LOG" 2>&1; then
+    ok "guard hook tests  pass"
   else
-    bad "guard.test.js loi khi chay"
+    bad "guard hook tests fail"
   fi
-  if ruff check . >"$TEMP_DIR/ruff.log" 2>&1; then ok "ruff check  no errors"; else bad "ruff check co loi"; fi
+  # Lint only harness-owned Python; vendored SDKs live at the repo root and
+  # are not ours to lint (ruff's own exclude list can't know about them).
+  if ruff check tools/ .claude/hooks/ .github/scripts/ >"$TEMP_DIR/ruff.log" 2>&1; then
+    ok "ruff check  no errors"
+  else
+    bad "ruff check co loi"
+  fi
 fi
 echo
 
@@ -73,7 +79,7 @@ echo
 
 # ---------- RULEBOOK ----------
 echo "[RULEBOOK]"
-CL=.claude/CLAUDE.md
+CL=CLAUDE.md
 [ -f "$CL" ] && ok "CLAUDE.md ton tai" || bad "thieu CLAUDE.md"
 check_kw "$CL" "destructive" "CLAUDE.md: destructive guard"
 check_kw "$CL" "socratic"    "CLAUDE.md: Socratic Gate"
@@ -86,20 +92,23 @@ echo
 # ---------- SKILLS ----------
 echo "[SKILLS]"
 for sk in code-review-expert brainstorming systematic-debugging testing-patterns file-editor-pro git-workflow-master api-patterns permission-guard solo-code-harness block-no-verify; do
-  f=".claude/skills/$sk.md"
+  f=".claude/skills/$sk/SKILL.md"
   [ -f "$f" ] && ok "skill: $sk" || bad "thieu skill: $sk"
 done
 echo
 
 # ---------- GARDEN ----------
 echo "[GARDEN]"
+# Probe by running the interpreter, not just `command -v`: on Windows,
+# python3 is a Microsoft Store stub that resolves on PATH but exits with
+# an "install from the Store" message, so every gated check below failed.
 PY=""
-if command -v python3 >/dev/null 2>&1; then PY=python3
-elif command -v python >/dev/null 2>&1; then PY=python
-fi
+for cand in python3 python py; do
+  if "$cand" -c "import sys" >/dev/null 2>&1; then PY="$cand"; break; fi
+done
 if [ -n "$PY" ] && ! is_wsl; then
   if $PY tools/garden.py >"$TEMP_DIR/garden.log" 2>&1; then ok "garden  clean"; else bad "garden co drift"; fi
-  if $PY -m pytest tools/test_harness.py -q >"$TEMP_DIR/harness.log" 2>&1; then ok "harness tests  pass"; else bad "harness tests fail"; fi
+  if $PY -m pytest tools/ -q >"$TEMP_DIR/harness.log" 2>&1; then ok "harness tests  pass"; else bad "harness tests fail"; fi
   if $PY tools/test_integration.py >"$TEMP_DIR/integration.log" 2>&1; then ok "integration tests  pass"; else bad "integration tests fail"; fi
 else
   warn "garden + tests (chay tu PowerShell)"

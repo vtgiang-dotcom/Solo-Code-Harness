@@ -8,7 +8,7 @@ Run the complete pre-launch checklist:
 - If secrets found: BLOCK launch, report all findings
 
 **Gate 2 — Tests**
-- Run `python -m pytest tools/test_harness.py -q`
+- Run `python -m pytest tools/ -q`
 - If tests fail: BLOCK launch, report failures
 
 **Gate 3 — Lint**
@@ -23,8 +23,8 @@ Run the complete pre-launch checklist:
 - Run `python tools/garden.py`
 - If drift detected: BLOCK launch, show which files drifted
 
-**Gate 6 — Guard Plugin**
-- Run `node .opencode/tests/test-guard.mjs`
+**Gate 6 — Guard Hook**
+- Run `python -m pytest tools/test_claude_guard.py -q`
 - If tests fail: BLOCK launch
 
 Report a clear PASS/FAIL for each gate. Overall: READY or BLOCKED with specific reasons.

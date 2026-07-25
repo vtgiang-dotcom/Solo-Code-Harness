@@ -96,3 +96,12 @@ created: 2026-07-24
   Confirmed: SQLite (`.solocode/shared-state.db`) is correctly scoped to
   cross-engine coordination state (locks/feature status) only, never
   project memory/decisions — that split is intentional, not a gap.
+- [decision] 2026-07-24: removed `docs/specs/` (8 files, obsolete OpenCode
+  planning docs + completed plans; history in git log). Fixed real content
+  drift in `.copilot`/`.gemini`: both mirrored from an older `.kilo/` and
+  never re-synced — missing the Fowler Smell Baseline section in
+  `code-review-expert/SKILL.md` + a point in `interview-me/SKILL.md`
+  (identical gap in both). Synced body content, kept each engine's own
+  frontmatter. `garden.py` now diffs real content:
+  `check_skill_content()` (frontmatter-agnostic) + `check_instruction_
+  content()` (byte-for-byte). Added `tools/test_garden.py` (14 tests).

@@ -204,6 +204,29 @@ def check_memory(src: Path, dst: Path, dst_label: str) -> list[str]:
     return issues
 
 
+def check_commands(src: Path, dst: Path, dst_label: str) -> list[str]:
+    """Check that every .kilo/command/*.md has a counterpart in dst/command/.
+
+    `run_engine_checks` covered agents, skills, instructions and memory but
+    never commands, so .copilot/ silently lost `ship.md` with no drift ever
+    reported -- the hardcoded "expect 13" in test_integration.py masked it
+    from that side too. .claude/ has its own command check in check_claude()
+    (it uses the plural `commands/` directory name).
+    """
+    issues: list[str] = []
+    src_cmd = src / "command"
+    dst_cmd = dst / "command"
+    if not src_cmd.is_dir():
+        return issues
+    src_names = {f.name for f in src_cmd.iterdir() if f.suffix == ".md"}
+    dst_names = {f.name for f in dst_cmd.iterdir() if f.suffix == ".md"} if dst_cmd.is_dir() else set()
+    for name in sorted(src_names - dst_names):
+        issues.append(f"Missing command: {dst_label}/command/{name}")
+    for name in sorted(dst_names - src_names):
+        issues.append(f"Stale command (no source): {dst_label}/command/{name}")
+    return issues
+
+
 def check_skills(dst: Path, dst_label: str) -> list[str]:
     """Check each skill directory has a valid SKILL.md."""
     issues: list[str] = []
@@ -443,6 +466,7 @@ def run_engine_checks(
             lambda: [] if instruction_suffix else check_instruction_content(src, dst, dst_label),
         ),
         (f"Memory drift ({dst_label})", lambda: check_memory(src, dst, dst_label)),
+        (f"Command parity ({dst_label})", lambda: check_commands(src, dst, dst_label)),
         (
             f"Skill parity ({dst_label})",
             lambda: check_skill_parity(src, dst, dst_label, skip_set=skip_set),
