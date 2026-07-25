@@ -38,6 +38,21 @@ ROOT_DIR = TOOLS_DIR.parent
 
 NL = "\n"
 
+
+def _write_lf(path: Path, content: str) -> None:
+    """Write text with LF line endings on every platform.
+
+    `Path.write_text` opens in text mode, so on Windows Python rewrites
+    every "\\n" to "\\r\\n" -- generated artifacts then differ from the
+    LF-committed originals depending on which OS last ran the generator.
+    Git's own normalization hides this inside this repo, but `deploy.py`
+    copies these files verbatim into target projects that may not be git
+    repos at all, where the inconsistency is real and visible.
+    newline="" disables the translation.
+    """
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        fh.write(content)
+
 # Kilo permission tool -> Claude Code tool name(s).
 # `edit` maps to both Edit and Write (Claude splits file mutation into two tools).
 # `codesearch` has no Claude equivalent -> folds into Grep.
@@ -200,7 +215,7 @@ def generate_agents(kilo_root: Path, claude_root: Path) -> int:
         # `model` intentionally omitted -> session default model.
 
         new_content = f"---{NL}{fm}---{NL}{body.lstrip(NL)}"
-        (dst_dir / agent_file.name).write_text(new_content, encoding="utf-8")
+        _write_lf(dst_dir / agent_file.name, new_content)
         copied += 1
         print(f"  [GEN] agents/{agent_file.name}  tools=[{', '.join(tools) or 'inherit'}]")
 
@@ -268,7 +283,7 @@ def generate_commands(kilo_root: Path, claude_root: Path) -> int:
             if not description:
                 description = _derive_description(cmd_file.stem)
             new_content = f"---{NL}description: {description}{NL}---{NL}{body.lstrip(NL)}"
-        (dst_dir / cmd_file.name).write_text(new_content, encoding="utf-8")
+        _write_lf(dst_dir / cmd_file.name, new_content)
         copied += 1
         print(f"  [GEN] commands/{cmd_file.name}")
     print(f"Claude commands generated: {copied}")
@@ -320,19 +335,27 @@ def generate_memory(kilo_root: Path, claude_root: Path) -> int:
     return 0
 
 
-def generate_claude_md(root_dir: Path) -> int:
-    """Generate root CLAUDE.md -- Claude Code auto-loads this as project memory."""
+def _claude_md_counts(root_dir: Path) -> dict[str, int]:
+    """Asset counts interpolated into _CLAUDE_MD_TEMPLATE.
+
+    Shared with garden.py's CLAUDE.md drift check so the check renders the
+    template exactly the way the generator does -- duplicating this logic
+    there would let the two drift apart and produce false drift reports.
+    """
     agents_dir = root_dir / ".kilo" / "agents"
     skills_dir = root_dir / ".kilo" / "skill"
     commands_dir = root_dir / ".kilo" / "command"
-    n_agents = len(list(agents_dir.glob("*.md"))) if agents_dir.is_dir() else 0
-    n_skills = len([p for p in skills_dir.iterdir() if p.is_dir()]) if skills_dir.is_dir() else 0
-    n_commands = len(list(commands_dir.glob("*.md"))) if commands_dir.is_dir() else 0
+    return {
+        "n_agents": len(list(agents_dir.glob("*.md"))) if agents_dir.is_dir() else 0,
+        "n_skills": len([p for p in skills_dir.iterdir() if p.is_dir()]) if skills_dir.is_dir() else 0,
+        "n_commands": len(list(commands_dir.glob("*.md"))) if commands_dir.is_dir() else 0,
+    }
 
-    content = _CLAUDE_MD_TEMPLATE.format(
-        n_agents=n_agents, n_skills=n_skills, n_commands=n_commands
-    )
-    (root_dir / "CLAUDE.md").write_text(content, encoding="utf-8")
+
+def generate_claude_md(root_dir: Path) -> int:
+    """Generate root CLAUDE.md -- Claude Code auto-loads this as project memory."""
+    content = _CLAUDE_MD_TEMPLATE.format(**_claude_md_counts(root_dir))
+    _write_lf(root_dir / "CLAUDE.md", content)
     print("Claude rulebook generated: CLAUDE.md")
     return 0
 
@@ -436,25 +459,57 @@ manually. Use the file-based handoff protocol instead of pasting text:
 
 ## Delegating a task to jcode (DeepSeek worker, cost/latency optimization)
 
-`session_start.py` reports `jcode: available` when the binary is on PATH
-and a provider profile is configured -- a signal it's worth considering,
-not an instruction to always use it.
+Claude Code is **always the orchestrator** -- jcode is a stateless,
+one-shot worker with no memory of this session; it never plans, only
+executes one subtask it's handed. `session_start.py` reports
+`jcode: available` when the binary is on PATH and a provider profile is
+configured -- a signal it's worth considering, not an instruction to
+always use it. See `.claude/skills/jcode-delegation/SKILL.md` for the full
+guide.
 
-Delegate only small, well-specified, self-contained subtasks (write a
-test, mechanical refactor, formatting) -- NOT anything needing this
-session's ongoing conversational context (jcode runs as a one-shot
-subprocess with no access to this conversation's history).
+Delegate only small, well-specified, self-contained subtasks with a clear
+acceptance criterion -- NOT anything needing this session's ongoing
+conversational context (architecture judgment, root-cause analysis).
+
+**One model** -- every task goes to `deepseek/deepseek-v4-pro` with the
+guardrail preamble prepended. There is no tier to pick:
+
+| Model | Use for |
+|-------|---------|
+| `deepseek/deepseek-v4-pro` | All delegated subtasks -- formatting, boilerplate, a single well-defined test, mechanical refactors, plus real code-reasoning (bug fixes, algorithms, structured refactors). Measured to ignore scope/style constraints unless told explicitly; **never call without a guardrail preamble** |
+
+The cheap `deepseek-v4-flash` tier was removed 2026-07-25: unreliable in
+practice, with savings lost to re-prompting and rework. Cost savings now
+come from flag discipline, not model downgrading.
+
+Prefer the wrapper over calling `jcode` directly -- it standardizes flags
+and auto-injects the guardrail:
+
+```bash
+python tools/jcode_delegate.py "<self-contained prompt>"
+```
+
+`--tier` is still accepted but ignored (prints a deprecation notice).
+
+Direct invocation, if needed -- prepend the guardrail yourself:
 
 ```bash
 jcode run "<self-contained prompt>" --provider-profile commandcode \\
-  --model deepseek/deepseek-v4-flash --tool-profile none --no-selfdev \\
+  --model deepseek/deepseek-v4-pro --tool-profile none --no-selfdev \\
   --quiet --json
 ```
 
 `--tool-profile none --no-selfdev` cut measured input tokens ~65% (22,376
 -> 7,709) for the same prompt by skipping jcode's own tool scaffolding and
-repo self-dev detection. Treat its output as an untrusted draft -- run the
-normal verification gates before accepting it, never commit it unreviewed.
+repo self-dev detection. Every `tools/jcode_delegate.py` call logs
+model/tokens/latency to `.solocode/jcode-usage.jsonl` for auditing.
+
+**Verification is mandatory, not optional**: treat jcode's output as an
+untrusted draft. Run the normal verification gates
+(`/verify`, targeted `pytest`/`ruff`) before accepting it, never commit it
+unreviewed. Cost optimization is the goal; it never trades away output
+quality -- if a result violates its guardrails, re-prompt
+narrower rather than hand-patching the drift.
 
 ## Language
 Respond in the user's language. Code, identifiers, and commit messages stay in English.

@@ -246,7 +246,7 @@ pasting plan/result text through chat:
    files at the next session start and announces them — no need to ask the
    user to paste the result back.
 
-### Delegating a task to jcode (DeepSeek worker, two-tier cost optimization)
+### Delegating a task to jcode (DeepSeek worker, cost/latency optimization)
 
 Claude Code / Kilo Code is **always the orchestrator**: jcode is a
 stateless, one-shot DeepSeek worker with no memory of this conversation —
@@ -264,32 +264,40 @@ conversational context of this session (architecture judgment, root-cause
 analysis, multi-step back-and-forth) — jcode runs as a one-shot subprocess
 with no access to this conversation's history.
 
-**Two-tier model routing** (default to the cheap tier; escalate only when
-the task clearly needs stronger reasoning — escalating unnecessarily
-quietly erases the point of tiering):
+**One model** — every delegated task goes to `deepseek/deepseek-v4-pro`
+with the guardrail preamble prepended. There is no tier to pick:
 
-| Tier | Model | Use for | Risk |
-|------|-------|---------|------|
-| `simple` | `deepseek/deepseek-v4-flash` | Formatting, boilerplate, a single well-defined test, mechanical refactors, extraction/summarization from inlined text | Low cost, low capability — fine for bounded work |
-| `code` | `deepseek/deepseek-v4-pro` | Real code-reasoning: bug fixes, algorithms, structured refactors | Stronger, but measured to ignore scope/style constraints ("phá luật") unless told explicitly right before the task — **never call without the guardrail preamble** |
+| Model | Use for | Risk |
+|-------|---------|------|
+| `deepseek/deepseek-v4-pro` | All delegated subtasks: formatting, boilerplate, a single well-defined test, mechanical refactors, plus real code-reasoning (bug fixes, algorithms, structured refactors) | Measured to ignore scope/style constraints ("phá luật") unless told explicitly right before the task — **never call without the guardrail preamble** |
+
+The earlier cheap `deepseek-v4-flash` tier was removed 2026-07-25: in real
+use it was unreliable, and the tokens it saved were repeatedly lost to
+re-prompting and rework. Cost optimization now comes from flag discipline
+(`--tool-profile none --no-selfdev`, ~65% fewer input tokens), which costs
+nothing in quality — not from downgrading the model. Don't reintroduce a
+cheap tier without new evidence it holds up on real tasks.
 
 **Invocation** — prefer the wrapper script over calling `jcode` directly;
 it standardizes the token-optimized flags and auto-prepends the strict
-guardrail preamble for the `code` tier (see
-`tools/jcode_delegate.py::CODE_TIER_GUARDRAIL`):
+guardrail preamble on every call (see
+`tools/jcode_delegate.py::GUARDRAIL`):
 
 ```bash
-python tools/jcode_delegate.py "<self-contained prompt with full context inlined>" --tier simple
-python tools/jcode_delegate.py "<self-contained prompt with full context inlined>" --tier code
-python tools/jcode_delegate.py "<prompt>"   # --tier auto: classifies from prompt, biased cheap
+python tools/jcode_delegate.py "<self-contained prompt with full context inlined>"
+python tools/jcode_delegate.py "<prompt>" --with-tools   # only if jcode needs its own tools
 ```
 
-Direct invocation (verified working 2026-07-24; flags matter a lot for
-cost), if the subtask genuinely needs jcode's own tools:
+`--tier` is still accepted so older callers don't break, but it is ignored
+and prints a deprecation notice.
+
+Direct invocation (flags matter a lot for cost), if the subtask genuinely
+needs jcode's own tools — paste the guardrail preamble in front of the
+task yourself:
 
 ```bash
 jcode run "<self-contained prompt with full context inlined>" \
-  --provider-profile commandcode --model deepseek/deepseek-v4-flash \
+  --provider-profile commandcode --model deepseek/deepseek-v4-pro \
   --tool-profile none --no-selfdev --quiet --json
 ```
 
@@ -298,18 +306,17 @@ jcode run "<self-contained prompt with full context inlined>" \
 scaffolding and repo self-dev detection — always pass both unless the
 delegated task genuinely needs jcode's own tools (bash/read/write). `--json`
 gives a parseable `{text, usage, ...}` result instead of streamed text.
-Every `tools/jcode_delegate.py` call logs `{tier, model, prompt size, token
+Every `tools/jcode_delegate.py` call logs `{model, prompt size, token
 usage, latency}` to `.solocode/jcode-usage.jsonl` so the cost/latency
 payoff of this routing is auditable rather than assumed.
 
-**After delegating**: treat jcode's output — from either tier — as an
-untrusted draft — read the diff/result yourself, run the normal
-verification gates (`/verify` or targeted `pytest`/`ruff`) before accepting
-it. Never pipe its output straight into a commit without review. Cost
-optimization is the goal here, not a trade-off against quality: if a
-`code`-tier result violates its guardrails (touches extra files, adds a
-dependency, ignores style), re-prompt narrower rather than hand-patching
-the drift.
+**After delegating**: treat jcode's output as an untrusted draft — read the
+diff/result yourself, run the normal verification gates (`/verify` or
+targeted `pytest`/`ruff`) before accepting it. Never pipe its output
+straight into a commit without review. Cost optimization is the goal here,
+not a trade-off against quality: if a result violates its guardrails
+(touches extra files, adds a dependency, ignores style), re-prompt
+narrower rather than hand-patching the drift.
 
 ---
 

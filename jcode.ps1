@@ -38,7 +38,10 @@ if (Test-Path $envFile) {
 }
 
 # ── Model ───────────────────────────────────────────────────────────
-$model = if ($args[0]) { $args[0] } else { "deepseek/deepseek-v4-flash" }
+# deepseek-v4-pro is the only supported worker model. The cheaper
+# deepseek-v4-flash tier was dropped 2026-07-25: unreliable in practice,
+# with the token savings lost to re-prompting and rework.
+$model = if ($args[0]) { $args[0] } else { "deepseek/deepseek-v4-pro" }
 Write-Host "  Model: $model" -ForegroundColor Yellow
 Write-Host ""
 

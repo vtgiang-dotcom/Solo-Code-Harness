@@ -38,49 +38,6 @@
 
 
 ## Decisions
-- [decision] 2026-07-23: adopted **jcode** (DeepSeek v4 via CommandCode) as the
-  cost/latency-optimized worker engine, orchestrated by Claude Code. Benchmarked
-  ~2-9x faster startup, ~15-63x lower RAM than OpenCode for concurrent workers.
-  No dedicated dir — reads `AGENTS.md` + `.claude/skills/` + `.mcp.json`
-  natively. Launch via `jcode.ps1`.
-- [decision] 2026-07-23: Phase 3 — `.opencode/` physically removed via `git rm`
-  (reversible), vendored `jcode-master/` source removed after installing
-  compiled `jcode.exe` to PATH. Version bumped to v4.0.0 across
-  `.harness.lock`/`agent.yaml`/`garden.py`/`generate_harness.py`/
-  `validate_schemas.py`/docs. `.copilot/memory` synced manually (no
-  auto-generator; parity is check-only via `garden.py`). Verified: 0 drift,
-  full test suite green on a fresh live scaffold.
-- [decision] 2026-07-23: added a `PreCompact` lifecycle hook
-  (`.claude/hooks/pre_compact.py`) for context-compaction continuity — logs an
-  objective checkpoint (git branch/sha/dirty count) to `.solocode/shared-
-  state.db` before every compaction, and reminds Claude via `additionalContext`
-  to append any settled decision to `.kilo/memory/MEMORY.md` first. Added a
-  required-hook check to `garden.py`'s `check_claude()` + 4 new tests. Kilo Code
-  has no equivalent lifecycle event — rule applied manually there instead.
-- [decision] 2026-07-23: added a file-based Claude<->Gemini/Antigravity handoff
-  protocol (`.gemini/antigravity/handoff/{inbox,outbox}/`, git-tracked audit
-  trail, separate from the static `knowledge/` corpus). No headless CLI exists
-  for Antigravity, so a human relay step is unavoidable — reduced to "read
-  file X, write file Y" instead of copy-pasting. `session_start.py` auto-
-  announces new `outbox/*-report.md` files once via a local seen-marker.
-- [decision] 2026-07-24: audited the memory system after a direct user
-  question ("does SQLite belong in project memory too?"). Found two real
-  gaps: (1) `garden.py`'s `check_memory()` only checked filename parity, not
-  content — `.claude/memory/MEMORY.md` had silently drifted 19 lines behind
-  this file (source of truth) with no drift ever reported; (2) Kilo's
-  `memory-manager.js` size gate (WARN 4k/HARD 8k chars) was never ported to
-  Claude Code, so writes to `.claude/memory/` had no size cap at all — this
-  file had already grown past both thresholds (13.4k chars) undetected.
-  Fixed both: `check_memory()` now diffs file content byte-for-byte, not just
-  existence; added `.claude/hooks/memory_gate.py` (Python port of memory-
-  manager.js, exit(2) hard-blocks PostToolUse on Edit/Write/MultiEdit past
-  8k chars) wired into `.claude/settings.json` + required in `garden.py`'s
-  `check_claude()`. Also compacted this Decisions section itself (verbose
-  paragraphs -> concise one-liners; full detail already durable in git commit
-  history) to bring all three memory mirrors back under the WARN threshold.
-  Confirmed: SQLite (`.solocode/shared-state.db`) is correctly scoped to
-  cross-engine coordination state (locks/feature status) only, never
-  project memory/decisions — that split is intentional, not a gap.
 - [decision] 2026-07-24: removed `docs/specs/` (8 files, obsolete OpenCode
   planning docs + completed plans; history in git log). Fixed real content
   drift in `.copilot`/`.gemini`: both mirrored from an older `.kilo/` and
@@ -120,3 +77,28 @@
   `apiKeyHelper` configured, automatically unset `ANTHROPIC_API_KEY` to
   eliminate the "Both apiKeyHelper and ANTHROPIC_API_KEY set" warning.
   Updated `.env.template` with 3-tier VIP documentation (Standard/Mid/Top).
+- [decision] 2026-07-25: **removed the jcode two-tier model split** — real
+  usage showed `deepseek-v4-flash` unreliable, its token savings lost to
+  re-prompting and orchestrator rework, and the routing choice itself a
+  recurring source of judgment error. `tools/jcode_delegate.py` is now
+  single-model: `deepseek-v4-pro` on every call with the guardrail preamble
+  (renamed `CODE_TIER_GUARDRAIL` -> `GUARDRAIL`) always prepended; dropped
+  `MODELS`/`classify_tier`; `--tier` kept as an ignored, deprecation-warning
+  no-op so older callers don't break; usage log no longer writes `tier`.
+  Cost optimization now comes only from flag discipline (`--tool-profile
+  none --no-selfdev`, ~65% fewer input tokens), which costs no quality.
+  Synced jcode.ps1 default, README, AGENTS.md, CLAUDE.md + its generator
+  template, and the skill across all 4 engines.
+- [decision] 2026-07-25: fixed the `CLAUDE.md` generator gap found while
+  doing the above. `claude_engine.py`'s `_CLAUDE_MD_TEMPLATE` had silently
+  fallen behind the hand-edited live `CLAUDE.md`, so regenerating would
+  have DELETED real content — exactly what the file's "do not edit by
+  hand" banner is meant to prevent, with nothing verifying it. Ported the
+  live content back into the template (regeneration is now lossless +
+  idempotent) and added `garden.check_claude_md_regenerable()` so the
+  divergence is loud drift instead of a silent landmine; extracted
+  `_claude_md_counts()` so the checker renders the template exactly as the
+  generator does. Also made generator writes LF-explicit (`_write_lf`):
+  `Path.write_text` emits CRLF on Windows, which git hides here but
+  `deploy.py` copies verbatim into non-git target projects. +3 tests (123).
+

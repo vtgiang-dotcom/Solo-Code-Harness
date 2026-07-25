@@ -1,36 +1,31 @@
 #!/usr/bin/env python3
 """
-jcode_delegate.py — Token-optimized, two-tier delegation wrapper for the
-jcode (DeepSeek) worker engine.
+jcode_delegate.py — Token-optimized, single-model delegation wrapper for
+the jcode (DeepSeek) worker engine.
 
 ORCHESTRATION MODEL (important): Claude Code / Kilo Code is ALWAYS the
 orchestrator. This script never runs on its own initiative — it is invoked
-by the planner engine for exactly one well-specified subtask at a time,
-picks the cheapest model tier that can plausibly do that subtask, and
+by the planner engine for exactly one well-specified subtask at a time and
 returns a draft the orchestrator must still read and verify. jcode has no
 memory of this conversation between calls; it is a stateless worker, not a
 delegate that can be "trusted and forgotten".
 
-Two tiers (see AGENTS.md "Delegating a task to jcode" for the full guide):
-    simple -> deepseek/deepseek-v4-flash  cheap/fast; mechanical, bounded,
-              low-risk-of-drift tasks (formatting, boilerplate, a single
-              well-defined test, summarizing/extracting from provided text).
-    code   -> deepseek/deepseek-v4-pro    materially stronger at code
-              reasoning/refactors, but measured to ignore scope/style
-              constraints unless told explicitly and immediately before the
-              task — this script always prepends a strict guardrail
-              preamble (CODE_TIER_GUARDRAIL) for this tier. Never call the
-              pro model without it.
+ONE MODEL: deepseek/deepseek-v4-pro, always with the strict guardrail
+preamble (GUARDRAIL) prepended. An earlier version of this wrapper routed
+"mechanical" subtasks to the cheaper deepseek-v4-flash tier; in real use
+that tier proved unreliable (2026-07-25) — the token saved was repeatedly
+lost to re-prompting and orchestrator rework, so the cheap tier was
+removed rather than left as a footgun. Cost optimization here now comes
+entirely from the flag discipline below (--tool-profile none --no-selfdev,
+~65% fewer input tokens), not from model downgrading.
 
 Usage:
-    python tools/jcode_delegate.py "<self-contained prompt>"              # auto-tier
-    python tools/jcode_delegate.py "<prompt>" --tier simple
-    python tools/jcode_delegate.py "<prompt>" --tier code
+    python tools/jcode_delegate.py "<self-contained prompt>"
     python tools/jcode_delegate.py "<prompt>" --with-tools   # let jcode use its own tools
 
-Every call is logged (tier, model, prompt size, token usage, latency) to
-.solocode/jcode-usage.jsonl so the cost/latency payoff of this routing is
-auditable rather than assumed.
+Every call is logged (model, prompt size, token usage, latency) to
+.solocode/jcode-usage.jsonl so the cost/latency payoff is auditable rather
+than assumed.
 """
 
 from __future__ import annotations
@@ -47,42 +42,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 USAGE_LOG = ROOT / ".solocode" / "jcode-usage.jsonl"
 
-MODELS = {
-    "simple": "deepseek/deepseek-v4-flash",
-    "code": "deepseek/deepseek-v4-pro",
-}
-
-# Keyword heuristics for --tier auto. Deliberately biased toward "simple"
-# (the cheaper tier) — only escalate to "code" when the prompt clearly
-# signals real code-reasoning work. This is a convenience default; the
-# orchestrator (Claude Code) can always override with an explicit --tier.
-_CODE_TIER_HINTS = (
-    "refactor", "implement", "algorithm", "bug", "fix", "architecture",
-    "design pattern", "concurren", "race condition", "performance",
-    "optimi", "recursive", "state machine", "edge case", "logic",
-)
+MODEL = "deepseek/deepseek-v4-pro"
 
 
-def classify_tier(prompt: str) -> str:
-    """Best-effort auto-classification of which model tier a prompt needs.
-    Biased toward the cheap tier -- false negatives (sending a code-shaped
-    task to flash) are cheap to notice and re-run with --tier code; false
-    positives (sending trivial tasks to the pricier pro model) quietly
-    erase the whole point of tiering, so the bar to escalate is kept high.
-    """
-    lowered = prompt.lower()
-    if any(hint in lowered for hint in _CODE_TIER_HINTS):
-        return "code"
-    return "simple"
-
-
-# Injected verbatim before the task when tier == "code". deepseek-v4-pro is
-# stronger at code-reasoning than the flash tier but has a measured
-# tendency to go out of scope (touch unrelated files, add dependencies,
-# "helpfully" refactor nearby code, invent requirements) unless constraints
-# are stated explicitly and right next to the task -- this is the
-# mitigation, not optional boilerplate. Never call the pro model without it.
-CODE_TIER_GUARDRAIL = """\
+# Injected verbatim before every task. deepseek-v4-pro is the only model
+# this wrapper uses, but it has a measured tendency to go out of scope
+# (touch unrelated files, add dependencies, "helpfully" refactor nearby
+# code, invent requirements) unless constraints are stated explicitly and
+# right next to the task -- this is the mitigation, not optional
+# boilerplate. Never call the model without it.
+GUARDRAIL = """\
 STRICT OPERATING CONSTRAINTS (must follow, no exceptions):
 1. Modify ONLY the files explicitly named in the task below. Do not touch
    any other file, and do not "helpfully" refactor nearby code.
@@ -102,15 +71,11 @@ TASK:
 """
 
 
-def build_command(
-    prompt: str, tier: str, *, with_tools: bool, json_out: bool
-) -> list[str]:
-    model = MODELS[tier]
-    full_prompt = CODE_TIER_GUARDRAIL + prompt if tier == "code" else prompt
+def build_command(prompt: str, *, with_tools: bool, json_out: bool) -> list[str]:
     cmd = [
-        "jcode", "run", full_prompt,
+        "jcode", "run", GUARDRAIL + prompt,
         "--provider-profile", "commandcode",
-        "--model", model,
+        "--model", MODEL,
         "--quiet",
     ]
     if not with_tools:
@@ -123,12 +88,11 @@ def build_command(
 
 
 def _log_usage(
-    tier: str, model: str, prompt_len: int, result: dict | None, elapsed: float
+    model: str, prompt_len: int, result: dict | None, elapsed: float
 ) -> None:
     USAGE_LOG.parent.mkdir(parents=True, exist_ok=True)
     entry = {
         "ts": datetime.now(timezone.utc).isoformat(),
-        "tier": tier,
         "model": model,
         "prompt_chars": prompt_len,
         "elapsed_s": round(elapsed, 2),
@@ -144,8 +108,10 @@ def main(argv: list[str] | None = None) -> int:
         "prompt", help="Self-contained task prompt (inline all needed context)"
     )
     parser.add_argument(
-        "--tier", choices=["simple", "code", "auto"], default="auto",
-        help="Model tier. 'auto' classifies from the prompt (biased cheap).",
+        "--tier", choices=["simple", "code", "auto"], default=None,
+        help="DEPRECATED and ignored. The flash/simple tier was removed "
+             "(unreliable in practice); every call now uses "
+             f"{MODEL} with the guardrail preamble.",
     )
     parser.add_argument(
         "--with-tools", action="store_true",
@@ -157,17 +123,21 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    if args.tier is not None:
+        print(
+            f"[jcode_delegate] --tier is deprecated and ignored; using {MODEL}.",
+            file=sys.stderr,
+        )
+
     if shutil.which("jcode") is None:
         print("jcode binary not found on PATH -- cannot delegate.", file=sys.stderr)
         return 1
 
-    tier = classify_tier(args.prompt) if args.tier == "auto" else args.tier
-    model = MODELS[tier]
     cmd = build_command(
-        args.prompt, tier, with_tools=args.with_tools, json_out=not args.no_json
+        args.prompt, with_tools=args.with_tools, json_out=not args.no_json
     )
 
-    print(f"[jcode_delegate] tier={tier} model={model}", file=sys.stderr)
+    print(f"[jcode_delegate] model={MODEL}", file=sys.stderr)
 
     start = time.monotonic()
     proc = subprocess.run(cmd, capture_output=True, text=True)
@@ -181,7 +151,7 @@ def main(argv: list[str] | None = None) -> int:
         except json.JSONDecodeError:
             result = None
 
-    _log_usage(tier, model, len(args.prompt), result, elapsed)
+    _log_usage(MODEL, len(args.prompt), result, elapsed)
 
     if proc.returncode != 0:
         print(proc.stderr or "jcode exited non-zero with no stderr", file=sys.stderr)

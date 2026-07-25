@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Tests for tools/jcode_delegate.py — the two-tier jcode delegation wrapper.
+Tests for tools/jcode_delegate.py — the single-model jcode delegation wrapper.
 
 Covers the parts that don't require the jcode binary to be installed
-(classification heuristic, command building, usage logging) with the real
+(command building, guardrail injection, usage logging) with the real
 subprocess call mocked out. Dev-only harness self-test — not deployed to
 target projects (see tools/deploy.py EXCLUDE_FILES).
 """
@@ -20,46 +20,42 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 import jcode_delegate as jd  # noqa: E402
 
-# ─── classify_tier ──────────────────────────────────────────────────────────
+# ─── model selection ────────────────────────────────────────────────────────
 
-def test_classify_simple_default():
-    assert jd.classify_tier("Format this JSON file consistently.") == "simple"
-
-
-def test_classify_code_on_refactor_keyword():
-    assert jd.classify_tier("Refactor this function to remove duplication.") == "code"
-
-
-def test_classify_code_on_bug_keyword():
-    assert jd.classify_tier("There is a bug causing a race condition here.") == "code"
+def test_only_pro_model_is_used():
+    # The flash/simple tier was removed 2026-07-25 (unreliable in practice);
+    # guard against it silently reappearing.
+    assert jd.MODEL == "deepseek/deepseek-v4-pro"
+    assert "flash" not in jd.MODEL
 
 
-def test_classify_biased_toward_cheap_tier():
-    # Ambiguous/neutral prompt with no code-tier hints -> stays cheap.
-    assert jd.classify_tier("Write a short summary of this changelog entry.") == "simple"
+def test_no_tier_routing_api_remains():
+    for removed in ("MODELS", "classify_tier", "CODE_TIER_GUARDRAIL"):
+        assert not hasattr(jd, removed), f"{removed} should be gone"
 
 
 # ─── build_command ──────────────────────────────────────────────────────────
 
-def test_build_command_simple_tier_no_guardrail():
-    cmd = jd.build_command("do X", "simple", with_tools=False, json_out=True)
-    assert jd.MODELS["simple"] in cmd
-    assert "do X" in cmd
+def test_build_command_always_uses_pro_model():
+    cmd = jd.build_command("do X", with_tools=False, json_out=True)
+    assert jd.MODEL in cmd
     assert "--tool-profile" in cmd and "none" in cmd
     assert "--no-selfdev" in cmd
     assert "--json" in cmd
 
 
-def test_build_command_code_tier_prepends_guardrail():
-    cmd = jd.build_command("do Y", "code", with_tools=False, json_out=True)
-    assert jd.MODELS["code"] in cmd
-    prompt_arg = cmd[2]
-    assert prompt_arg.startswith("STRICT OPERATING CONSTRAINTS")
-    assert prompt_arg.endswith("do Y")
+def test_build_command_always_prepends_guardrail():
+    # Even a trivial/mechanical prompt gets the guardrail now -- there is no
+    # unguarded path left.
+    for prompt in ("do Y", "Format this JSON file consistently."):
+        cmd = jd.build_command(prompt, with_tools=False, json_out=True)
+        prompt_arg = cmd[2]
+        assert prompt_arg.startswith("STRICT OPERATING CONSTRAINTS")
+        assert prompt_arg.endswith(prompt)
 
 
 def test_build_command_with_tools_skips_tool_profile_flags():
-    cmd = jd.build_command("do Z", "simple", with_tools=True, json_out=False)
+    cmd = jd.build_command("do Z", with_tools=True, json_out=False)
     assert "--tool-profile" not in cmd
     assert "--no-selfdev" not in cmd
     assert "--json" not in cmd
@@ -91,15 +87,31 @@ def test_main_success_logs_usage(monkeypatch, tmp_path):
         jd.subprocess, "run",
         return_value=_FakeCompletedProcess(0, fake_result),
     ) as mock_run:
-        rc = jd.main(["Format this JSON file.", "--tier", "simple"])
+        rc = jd.main(["Format this JSON file."])
 
     assert rc == 0
     assert mock_run.called
     assert fake_log.is_file()
     logged = json.loads(fake_log.read_text(encoding="utf-8").splitlines()[0])
-    assert logged["tier"] == "simple"
-    assert logged["model"] == jd.MODELS["simple"]
+    assert logged["model"] == jd.MODEL
+    assert "tier" not in logged
     assert logged["usage"] == {"input_tokens": 10}
+
+
+def test_main_accepts_but_ignores_deprecated_tier_flag(monkeypatch, tmp_path, capsys):
+    # Old callers passing --tier simple must not break, and must NOT get the
+    # removed cheap model.
+    monkeypatch.setattr(jd.shutil, "which", lambda _name: "/usr/bin/jcode")
+    monkeypatch.setattr(jd, "USAGE_LOG", tmp_path / "usage.jsonl")
+    with patch.object(
+        jd.subprocess, "run",
+        return_value=_FakeCompletedProcess(0, json.dumps({"text": "ok"})),
+    ) as mock_run:
+        rc = jd.main(["do something", "--tier", "simple"])
+
+    assert rc == 0
+    assert jd.MODEL in mock_run.call_args[0][0]
+    assert "deprecated" in capsys.readouterr().err.lower()
 
 
 def test_main_nonzero_exit_propagates(monkeypatch, tmp_path):
@@ -109,5 +121,5 @@ def test_main_nonzero_exit_propagates(monkeypatch, tmp_path):
         jd.subprocess, "run",
         return_value=_FakeCompletedProcess(2, "", "boom"),
     ):
-        rc = jd.main(["do something", "--tier", "code"])
+        rc = jd.main(["do something"])
     assert rc == 2

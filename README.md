@@ -232,7 +232,7 @@ worker, orchestrated by Claude Code for high-concurrency sub-tasks. It syncs
 ./jcode.ps1
 
 # 3. Or run a single non-interactive task (used by Claude Code as orchestrator)
-jcode run --provider-profile commandcode --model deepseek/deepseek-v4-flash "your task"
+jcode run --provider-profile commandcode --model deepseek/deepseek-v4-pro "your task"
 ```
 
 jcode has no dedicated harness directory — it auto-loads `AGENTS.md` (project
@@ -432,7 +432,7 @@ Tự đồng bộ `COMMANDCODE_API_KEY` từ `.env` vào provider profile của 
 ./jcode.ps1
 
 # 3. Hoặc chạy 1 task không tương tác (Claude Code dùng khi điều phối)
-jcode run --provider-profile commandcode --model deepseek/deepseek-v4-flash "task của bạn"
+jcode run --provider-profile commandcode --model deepseek/deepseek-v4-pro "task của bạn"
 ```
 
 jcode không có thư mục harness riêng — tự load `AGENTS.md` + fallback sang

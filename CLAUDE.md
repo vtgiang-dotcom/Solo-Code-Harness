@@ -95,7 +95,7 @@ manually. Use the file-based handoff protocol instead of pasting text:
 3. `session_start.py` auto-detects new `outbox/*-report.md` files at the
    next session start and announces them once.
 
-## Delegating a task to jcode (DeepSeek worker, two-tier cost optimization)
+## Delegating a task to jcode (DeepSeek worker, cost/latency optimization)
 
 Claude Code is **always the orchestrator** -- jcode is a stateless,
 one-shot worker with no memory of this session; it never plans, only
@@ -109,40 +109,44 @@ Delegate only small, well-specified, self-contained subtasks with a clear
 acceptance criterion -- NOT anything needing this session's ongoing
 conversational context (architecture judgment, root-cause analysis).
 
-**Two tiers** -- default to the cheap one, escalate only when the task
-clearly needs stronger reasoning:
+**One model** -- every task goes to `deepseek/deepseek-v4-pro` with the
+guardrail preamble prepended. There is no tier to pick:
 
-| Tier | Model | Use for |
-|------|-------|---------|
-| `simple` | `deepseek/deepseek-v4-flash` | Formatting, boilerplate, a single well-defined test, mechanical refactors, extraction/summarization |
-| `code` | `deepseek/deepseek-v4-pro` | Real code-reasoning (bug fixes, algorithms, structured refactors) -- stronger, but measured to ignore scope/style constraints unless told explicitly; **never call without a guardrail preamble** |
+| Model | Use for |
+|-------|---------|
+| `deepseek/deepseek-v4-pro` | All delegated subtasks -- formatting, boilerplate, a single well-defined test, mechanical refactors, plus real code-reasoning (bug fixes, algorithms, structured refactors). Measured to ignore scope/style constraints unless told explicitly; **never call without a guardrail preamble** |
+
+The cheap `deepseek-v4-flash` tier was removed 2026-07-25: unreliable in
+practice, with savings lost to re-prompting and rework. Cost savings now
+come from flag discipline, not model downgrading.
 
 Prefer the wrapper over calling `jcode` directly -- it standardizes flags
-and auto-injects the `code`-tier guardrail:
+and auto-injects the guardrail:
 
 ```bash
-python tools/jcode_delegate.py "<self-contained prompt>" --tier simple
-python tools/jcode_delegate.py "<self-contained prompt>" --tier code
+python tools/jcode_delegate.py "<self-contained prompt>"
 ```
 
-Direct invocation, if needed:
+`--tier` is still accepted but ignored (prints a deprecation notice).
+
+Direct invocation, if needed -- prepend the guardrail yourself:
 
 ```bash
 jcode run "<self-contained prompt>" --provider-profile commandcode \
-  --model deepseek/deepseek-v4-flash --tool-profile none --no-selfdev \
+  --model deepseek/deepseek-v4-pro --tool-profile none --no-selfdev \
   --quiet --json
 ```
 
 `--tool-profile none --no-selfdev` cut measured input tokens ~65% (22,376
 -> 7,709) for the same prompt by skipping jcode's own tool scaffolding and
 repo self-dev detection. Every `tools/jcode_delegate.py` call logs
-tier/model/tokens/latency to `.solocode/jcode-usage.jsonl` for auditing.
+model/tokens/latency to `.solocode/jcode-usage.jsonl` for auditing.
 
-**Verification is mandatory, not optional**: treat jcode's output -- from
-either tier -- as an untrusted draft. Run the normal verification gates
+**Verification is mandatory, not optional**: treat jcode's output as an
+untrusted draft. Run the normal verification gates
 (`/verify`, targeted `pytest`/`ruff`) before accepting it, never commit it
 unreviewed. Cost optimization is the goal; it never trades away output
-quality -- if a `code`-tier result violates its guardrails, re-prompt
+quality -- if a result violates its guardrails, re-prompt
 narrower rather than hand-patching the drift.
 
 ## Language

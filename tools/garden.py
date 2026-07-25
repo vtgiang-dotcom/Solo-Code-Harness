@@ -302,8 +302,45 @@ def check_claude(src: Path, dst: Path, *, skip_set: set[str] | None = None) -> l
             issues.append(f"Missing {desc}: .claude/{rel}")
     if not (ROOT / "CLAUDE.md").exists():
         issues.append("Missing rulebook: CLAUDE.md (run 'python tools/generate_harness.py --harness claude')")
+    else:
+        issues.extend(check_claude_md_regenerable())
 
     return issues
+
+
+def check_claude_md_regenerable() -> list[str]:
+    """Check the committed CLAUDE.md matches what its generator produces.
+
+    CLAUDE.md is generated from `claude_engine.py`'s template, but nothing
+    used to verify that. The two silently diverged: the live file was
+    hand-edited and the template was left behind, so regenerating would
+    have SILENTLY DELETED real content -- the exact failure mode the
+    "GENERATED ... do not edit by hand" banner is supposed to prevent.
+    Comparing here makes that divergence a loud drift error instead.
+
+    Compared on normalized line endings: the point is content parity, and
+    git checks out CRLF on Windows for a LF-committed file, which would
+    otherwise make this fail for everyone on Windows.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "claude_engine", ROOT / "tools" / "claude_engine.py"
+    )
+    claude_engine = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(claude_engine)
+
+    live = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+    expected = claude_engine._CLAUDE_MD_TEMPLATE.format(
+        **claude_engine._claude_md_counts(ROOT)
+    )
+    if live.replace("\r\n", "\n") != expected.replace("\r\n", "\n"):
+        return [
+            "Content drift: CLAUDE.md differs from claude_engine.py's template "
+            "(regenerating would overwrite hand edits -- port them into the "
+            "template, then run 'python tools/generate_harness.py --harness claude')"
+        ]
+    return []
 
 
 def check_shared_state() -> list[str]:

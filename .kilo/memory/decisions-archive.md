@@ -50,3 +50,49 @@ created: 2026-07-24
   leak class as the earlier MEMORY.md leak, just not yet triggered. Fixed
   `should_copy()` to exclude task instances while still deploying the empty
   protocol scaffold (README.md, .gitkeep).
+
+- [decision] 2026-07-23: adopted **jcode** (DeepSeek v4 via CommandCode) as the
+  cost/latency-optimized worker engine, orchestrated by Claude Code. Benchmarked
+  ~2-9x faster startup, ~15-63x lower RAM than OpenCode for concurrent workers.
+  No dedicated dir — reads `AGENTS.md` + `.claude/skills/` + `.mcp.json`
+  natively. Launch via `jcode.ps1`.
+- [decision] 2026-07-23: Phase 3 — `.opencode/` physically removed via `git rm`
+  (reversible), vendored `jcode-master/` source removed after installing
+  compiled `jcode.exe` to PATH. Version bumped to v4.0.0 across
+  `.harness.lock`/`agent.yaml`/`garden.py`/`generate_harness.py`/
+  `validate_schemas.py`/docs. `.copilot/memory` synced manually (no
+  auto-generator; parity is check-only via `garden.py`). Verified: 0 drift,
+  full test suite green on a fresh live scaffold.
+
+- [decision] 2026-07-23: added a `PreCompact` lifecycle hook
+  (`.claude/hooks/pre_compact.py`) for context-compaction continuity — logs an
+  objective checkpoint (git branch/sha/dirty count) to `.solocode/shared-
+  state.db` before every compaction, and reminds Claude via `additionalContext`
+  to append any settled decision to `.kilo/memory/MEMORY.md` first. Added a
+  required-hook check to `garden.py`'s `check_claude()` + 4 new tests. Kilo Code
+  has no equivalent lifecycle event — rule applied manually there instead.
+- [decision] 2026-07-23: added a file-based Claude<->Gemini/Antigravity handoff
+  protocol (`.gemini/antigravity/handoff/{inbox,outbox}/`, git-tracked audit
+  trail, separate from the static `knowledge/` corpus). No headless CLI exists
+  for Antigravity, so a human relay step is unavoidable — reduced to "read
+  file X, write file Y" instead of copy-pasting. `session_start.py` auto-
+  announces new `outbox/*-report.md` files once via a local seen-marker.
+
+- [decision] 2026-07-24: audited the memory system after a direct user
+  question ("does SQLite belong in project memory too?"). Found two real
+  gaps: (1) `garden.py`'s `check_memory()` only checked filename parity, not
+  content — `.claude/memory/MEMORY.md` had silently drifted 19 lines behind
+  this file (source of truth) with no drift ever reported; (2) Kilo's
+  `memory-manager.js` size gate (WARN 4k/HARD 8k chars) was never ported to
+  Claude Code, so writes to `.claude/memory/` had no size cap at all — this
+  file had already grown past both thresholds (13.4k chars) undetected.
+  Fixed both: `check_memory()` now diffs file content byte-for-byte, not just
+  existence; added `.claude/hooks/memory_gate.py` (Python port of memory-
+  manager.js, exit(2) hard-blocks PostToolUse on Edit/Write/MultiEdit past
+  8k chars) wired into `.claude/settings.json` + required in `garden.py`'s
+  `check_claude()`. Also compacted this Decisions section itself (verbose
+  paragraphs -> concise one-liners; full detail already durable in git commit
+  history) to bring all three memory mirrors back under the WARN threshold.
+  Confirmed: SQLite (`.solocode/shared-state.db`) is correctly scoped to
+  cross-engine coordination state (locks/feature status) only, never
+  project memory/decisions — that split is intentional, not a gap.

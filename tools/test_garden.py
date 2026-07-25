@@ -173,3 +173,33 @@ def test_live_repo_has_zero_instruction_content_drift():
     assert garden.check_instruction_content(
         kilo, ROOT / ".gemini" / "antigravity", ".gemini/antigravity"
     ) == []
+
+
+def test_live_repo_claude_md_matches_template():
+    """CLAUDE.md and its generator template silently diverged once, so
+    regenerating would have DELETED real hand-edited content. Guard that."""
+    assert garden.check_claude_md_regenerable() == []
+
+
+def test_claude_md_drift_is_detected():
+    """The check must actually fail on divergence -- a drift check that can
+    never fail is what let the template fall behind unnoticed."""
+    claude_path = ROOT / "CLAUDE.md"
+    original = claude_path.read_bytes()
+    try:
+        claude_path.write_bytes(original + b"\n# JUNK-DRIFT-LINE\n")
+        assert garden.check_claude_md_regenerable() != []
+    finally:
+        claude_path.write_bytes(original)
+
+
+def test_claude_md_check_ignores_line_ending_differences():
+    """Git checks out CRLF on Windows for this LF-committed file, so a
+    byte-exact compare would fail for every Windows dev; only content counts."""
+    claude_path = ROOT / "CLAUDE.md"
+    original = claude_path.read_bytes()
+    try:
+        claude_path.write_bytes(original.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))
+        assert garden.check_claude_md_regenerable() == []
+    finally:
+        claude_path.write_bytes(original)
