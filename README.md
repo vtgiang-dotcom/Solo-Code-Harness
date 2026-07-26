@@ -252,6 +252,32 @@ to Antigravity ("read this plan, write your report to
 auto-detects the new report at Claude's next session start. Full protocol:
 `.gemini/antigravity/handoff/README.md`.
 
+### Which worker gets which job
+
+Claude Code proposes a worker on its own when the shape fits — you should
+not have to remember these exist. `session_start.py` announces each
+engine's availability at session start.
+
+| Work shape | Route to | Why |
+|---|---|---|
+| Read >5 files, then summarize/compare/audit | **Gemini** | ~20x context leverage (measured) |
+| Repo-wide survey — "where else does X appear?" | **Gemini** | Breadth is its edge |
+| Independent review of a design or diff | **Gemini** | A second model catches different things |
+| UI verification, screenshots, recordings | **Gemini** | Claude Code cannot do this at all |
+| Small mechanical edit, boilerplate, one test | **jcode** | Headless — costs you nothing |
+| Architecture / product / security decisions | **Neither** | Judgment is not delegable |
+| Anything needing the session's history | **Neither** | Both workers are context-blind |
+
+jcode is headless, so Claude just uses it. Gemini needs you to relay the
+task through the IDE, so Claude asks first.
+
+**Everything both workers return is verified.** In controlled tests each
+shipped an error that was invisible in its own summary — a wrong finding
+marked "Confident: Yes", and two false positives reported as "unsure
+about: nothing". Their evidence is reliable; their self-assessment is not.
+Full guides: `.kilo/skill/gemini-delegation/SKILL.md`,
+`.kilo/skill/jcode-delegation/SKILL.md`.
+
 ## MCP Servers
 
 | Server | Status | Purpose |
@@ -449,6 +475,31 @@ file trong `.gemini/antigravity/handoff/`: Claude ghi kế hoạch vào
 ("đọc plan này, ghi report vào `handoff/outbox/<slug>-report.md`"), và
 `.claude/hooks/session_start.py` sẽ tự phát hiện report mới ở phiên Claude
 kế tiếp. Chi tiết: `.gemini/antigravity/handoff/README.md`.
+
+### Giao việc cho ai
+
+Claude Code tự đề xuất worker khi gặp việc phù hợp — bạn không cần nhớ là
+chúng tồn tại. `session_start.py` thông báo engine nào đang sẵn sàng ở đầu
+mỗi phiên.
+
+| Dạng công việc | Giao cho | Lý do |
+|---|---|---|
+| Đọc >5 file rồi tóm tắt/so sánh/rà soát | **Gemini** | Đòn bẩy ngữ cảnh ~20x (đã đo) |
+| Khảo sát toàn repo — "chỗ nào khác dùng X?" | **Gemini** | Bề rộng là thế mạnh của nó |
+| Review độc lập một thiết kế hoặc diff | **Gemini** | Model khác bắt được lỗi khác |
+| Kiểm chứng UI, chụp màn hình, quay video | **Gemini** | Claude Code hoàn toàn không làm được |
+| Sửa cơ học nhỏ, boilerplate, một test | **jcode** | Headless — không tốn công bạn |
+| Quyết định kiến trúc / sản phẩm / bảo mật | **Không giao** | Phán đoán không ủy quyền được |
+| Việc cần lịch sử hội thoại của phiên | **Không giao** | Cả hai worker đều mù ngữ cảnh |
+
+jcode chạy headless nên Claude dùng luôn. Gemini cần bạn chuyển đề bài qua
+IDE nên Claude sẽ hỏi trước.
+
+**Mọi kết quả từ cả hai worker đều được kiểm chứng.** Trong các bài test có
+kiểm soát, mỗi bên đều trả về ít nhất một lỗi mà chính bản tóm tắt của nó
+không hề lộ ra — một phát hiện sai bị đánh dấu "Confident: Yes", và hai
+false positive kèm câu "không có gì không chắc". Bằng chứng nó đưa ra thì
+đáng tin; phần nó tự đánh giá thì không.
 
 ## MCP Servers
 
