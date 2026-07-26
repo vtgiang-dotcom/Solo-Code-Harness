@@ -105,3 +105,26 @@ created: 2026-07-24
   frontmatter. `garden.py` now diffs real content:
   `check_skill_content()` (frontmatter-agnostic) + `check_instruction_
   content()` (byte-for-byte). Added `tools/test_garden.py` (14 tests).
+- [decision] 2026-07-24: added Context Summary Struct to PreCompact +
+  decisions-archive.md tier. `pre_compact.py` asks Claude to write
+  `.solocode/context-checkpoint.json` (active_feature, unverified_changes,
+  settled_decisions, next_immediate_step); `session_start.py` surfaces it
+  once next session then deletes it (recovery aid, not mid-compaction
+  survival -- a hook can't guarantee that). Bigger context windows should
+  NOT raise MEMORY.md's cap: it's a recurring per-session cost across all 5
+  engines (sized for the weakest, jcode), not a one-time budget. Instead
+  added `.kilo/memory/decisions-archive.md` (uncapped, not auto-loaded) --
+  pruning now MOVES entries there, not deletes. Also `/debug` now requires
+  >=2 hypotheses (all 4 engines). Verified: 0 drift, 107 tests.
+- [decision] 2026-07-24: verified jcode/DeepSeek delegation end-to-end
+  (real "pong" response); `--tool-profile none --no-selfdev` cuts input
+  tokens ~65% (22,376->7,709). Bigger finding: `CLAUDE.md` was NOT actually
+  generated from `AGENTS.md` -- `claude_engine.py`'s template is hand-
+  written, only parameterized by counts. The earlier Gemini-handoff section
+  (added to AGENTS.md) had silently never reached real CLAUDE.md. Fixed:
+  added Gemini + jcode delegation sections into the template + regenerated;
+  fixed a stale `tools/test_harness.py` ref (deleted v4.0.0) -> `pytest
+  tools/ -q`. Added `_jcode_available()` to `session_start.py`. Also fixed
+  CI/Makefile hardcoded test-file allowlist (missed test_garden.py/
+  test_integration.py), test_integration.py's machine-specific >=19-feature
+  assertion, rewrote stale SPEC.md (v3.3.0->v4.1.0), removed suggest.md.

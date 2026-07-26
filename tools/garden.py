@@ -15,6 +15,7 @@ Usage:
 
 from __future__ import annotations
 
+import re
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -573,6 +574,111 @@ def check_manifest(root: Path) -> list[str]:
     return issues
 
 
+# Where each engine keeps its artifacts. Engines genuinely diverge —
+# .gemini/ ships 12 commands, not .kilo/'s 14 — so a doc line describing
+# .gemini/ must be measured against .gemini/, never against the source of
+# truth. Comparing everything to .kilo/ produces false drift reports.
+_ENGINE_LAYOUT = {
+    ".kilo": {"skill": "skill", "agent": "agents", "command": "command", "instruction": "instruction"},
+    ".claude": {"skill": "skills", "agent": "agents", "command": "commands", "instruction": "instruction"},
+    ".copilot": {"skill": "skill", "agent": "agents", "command": "command", "instruction": "instruction"},
+    ".gemini": {"skill": "skills", "agent": "agents", "command": "commands", "instruction": "instruction"},
+}
+
+# .gemini/ nests its harness one level deeper.
+_ENGINE_ROOT = {".gemini": Path(".gemini") / "antigravity"}
+
+# Matches an engine mention anywhere on the line, e.g. "`.gemini/` commands (12)".
+_ENGINE_MENTION = re.compile(r'`?(\.(?:kilo|claude|copilot|gemini))/')
+
+
+def _measure_engine(root: Path, engine: str) -> dict[str, int]:
+    """Count skills/agents/commands/instructions actually present in an engine."""
+    base = root / _ENGINE_ROOT.get(engine, Path(engine))
+    layout = _ENGINE_LAYOUT[engine]
+    counts: dict[str, int] = {}
+
+    skills = base / layout["skill"]
+    counts["skill"] = len([d for d in skills.iterdir() if d.is_dir()]) if skills.is_dir() else 0
+
+    for kind in ("agent", "command", "instruction"):
+        d = base / layout[kind]
+        counts[kind] = len(list(d.glob("*.md"))) if d.is_dir() else 0
+
+    return counts
+
+
+def check_doc_counts(root: Path = ROOT) -> list[str]:
+    """Verify that hardcoded counts in documentation match reality.
+
+    Counts are resolved per-engine: a line that names `.gemini/` is checked
+    against `.gemini/antigravity/`, a line that names nothing falls back to
+    `.kilo/` (the source of truth).
+    """
+    issues: list[str] = []
+
+    engines = {name: _measure_engine(root, name) for name in _ENGINE_LAYOUT}
+    truth = engines[".kilo"]
+
+    files_to_scan = [
+        "AGENTS.md",
+        "CLAUDE.md",
+        "README.md",
+        ".github/copilot-instructions.md",
+        ".gemini/antigravity/AGENTS.md",
+        ".claude-plugin/plugin.json",
+        ".claude-plugin/marketplace.json",
+    ]
+
+    # (kind, label, patterns) — label is what appears in the drift message.
+    scanners = [
+        ("skill", "skills", [
+            re.compile(r'\b(\d+)\s+(?:specialized\s+|domain\s+)?skills?\b', re.IGNORECASE),
+            re.compile(r'\bskills?\s*\(\s*(\d+)\b', re.IGNORECASE),
+        ]),
+        ("agent", "agents", [
+            re.compile(r'\b(\d+)\s+(?:specialized\s+)?(?:sub)?agents?\b', re.IGNORECASE),
+            re.compile(r'\b(?:sub)?agents?\s*\(\s*(\d+)\b', re.IGNORECASE),
+        ]),
+        ("command", "commands", [
+            re.compile(r'\b(\d+)\s+(?:slash\s+)?commands?\b', re.IGNORECASE),
+            re.compile(r'\b(?:slash\s+)?commands?\s*\(\s*(\d+)\b', re.IGNORECASE),
+        ]),
+        ("instruction", "instructions", [
+            re.compile(r'\b(\d+)\s+instructions?\b', re.IGNORECASE),
+            re.compile(r'\binstructions?\s*\(\s*(\d+)\b', re.IGNORECASE),
+        ]),
+    ]
+
+    for rel_path in files_to_scan:
+        p = root / rel_path
+        if not p.is_file():
+            continue
+        try:
+            content = p.read_text(encoding="utf-8")
+        except OSError as e:
+            issues.append(f"Could not read file {rel_path}: {e}")
+            continue
+
+        for line_no, line in enumerate(content.splitlines(), 1):
+            mention = _ENGINE_MENTION.search(line)
+            expected = engines.get(mention.group(1), truth) if mention else truth
+            scope = f" (for {mention.group(1)}/)" if mention else ""
+
+            for kind, label, patterns in scanners:
+                want = expected[kind]
+                for pat in patterns:
+                    for m in pat.finditer(line):
+                        val = int(m.group(1))
+                        if val != want:
+                            issues.append(
+                                f"{rel_path}:{line_no}: claimed {val} {label}, "
+                                f"but ground truth is {want}{scope}"
+                            )
+
+    return issues
+
+
 def main() -> int:
     kilo = ROOT / ".kilo"
 
@@ -628,6 +734,17 @@ def main() -> int:
         all_issues.extend(manifest_issues)
     else:
         print("[OK] Manifest sync (agent.yaml)")
+
+    # Document counts checks
+    print("\n--- Document Counts ---")
+    doc_issues = check_doc_counts(ROOT)
+    if doc_issues:
+        print("[DRIFT] Stale counts in documentation:")
+        for i in doc_issues:
+            print(f"  {i}")
+        all_issues.extend(doc_issues)
+    else:
+        print("[OK] Document counts")
 
     print(f"\nTotal drift issues: {len(all_issues)}")
     if all_issues:

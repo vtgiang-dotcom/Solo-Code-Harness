@@ -170,6 +170,26 @@ def _jcode_available() -> bool:
     return False
 
 
+def _gemini_available(cwd: Path) -> bool:
+    """Best-effort: can a task be relayed to Gemini via Antigravity here?
+
+    Requires BOTH the handoff protocol in this repo AND the Antigravity IDE
+    installed locally -- the inbox alone means nothing if the human has no
+    IDE to open, and the IDE alone means this repo was never wired for
+    handoff. Unlike jcode, this delegation is *not* headless: it costs the
+    user a manual relay step, so it is announced as an option, not a default.
+    Silent on any failure -- advisory only, never required.
+    """
+    if not (cwd / ".gemini" / "antigravity" / "handoff" / "inbox").is_dir():
+        return False
+    if shutil.which("antigravity-ide") is not None:
+        return True
+    # Default Windows install location -- the IDE does not always add its
+    # bin/ directory to PATH.
+    ide = Path.home() / "AppData" / "Local" / "Programs" / "Antigravity IDE"
+    return ide.is_dir()
+
+
 def main() -> int:
     # Consume stdin if present (SessionStart payload) — we don't require it.
     with suppress(Exception):
@@ -183,6 +203,7 @@ def main() -> int:
         new_reports = _new_gemini_reports(cwd)
         checkpoint = _pending_checkpoint(cwd)
         jcode_ready = _jcode_available()
+        gemini_ready = _gemini_available(cwd)
     except Exception:  # noqa: BLE001 — never crash session startup
         return 0
 
@@ -215,6 +236,15 @@ def main() -> int:
             "jcode (DeepSeek worker) available — consider delegating small, "
             "well-specified subtasks to it for cost/latency (see AGENTS.md "
             "'Delegating a task to jcode')."
+        )
+    if gemini_ready:
+        lines.append(
+            "Gemini/Antigravity available (manual relay via "
+            ".gemini/antigravity/handoff/) — propose it for read-heavy work: "
+            "wide audits, multi-file surveys, independent review, UI "
+            "verification. Costs the user one relay step, so ask first; "
+            "verify 100% of what it returns (see AGENTS.md 'Delegating a "
+            "task to Gemini/Antigravity')."
         )
 
     print(json.dumps({

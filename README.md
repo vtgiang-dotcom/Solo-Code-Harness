@@ -92,11 +92,11 @@ python tools/deploy.py
 
 | Directory | Purpose |
 |---|---|
-| `.claude/` | **Orchestrator** — Claude Code: agents (14), skills (49), commands (14, incl. `ship`), instruction (10), guard + lifecycle hooks + `settings.json`; rulebook `CLAUDE.md` at root. Generated from `.kilo/` via `tools/generate_harness.py --harness claude`. |
-| `.copilot/` | GitHub Copilot: agents (14), skills (49), commands (13), instruction (10), memory (4). Manually kept in parity with `.kilo/`; checked (not generated) by `tools/garden.py`. |
-| `.kilo/` | **Source of truth** — Kilo Code: agents (14), skills (49), commands (14, incl. `ship`), hooks, memory, instruction. Edit here first. |
+| `.claude/` | **Orchestrator** — Claude Code: agents (14), skills (51), commands (14, incl. `ship`), instruction (10), guard + lifecycle hooks + `settings.json`; rulebook `CLAUDE.md` at root. Generated from `.kilo/` via `tools/generate_harness.py --harness claude`. |
+| `.copilot/` | GitHub Copilot: agents (14), skills (51), commands (14), instruction (10), memory (4). Manually kept in parity with `.kilo/`; checked (not generated) by `tools/garden.py`. |
+| `.kilo/` | **Source of truth** — Kilo Code: agents (14), skills (51), commands (14, incl. `ship`), hooks, memory, instruction. Edit here first. |
 | *(jcode)* | **Worker engine** — no dedicated dir; auto-loads `AGENTS.md` + `.claude/skills/` (fallback) + `.mcp.json` natively. Launcher: `jcode.ps1`. Used for cheap/fast concurrent DeepSeek sub-tasks delegated by Claude Code. |
-| `.gemini/` | Gemini/Antigravity: agents (14), skills (49), commands (12), knowledge. Manually kept in parity with `.kilo/`; checked by `tools/garden.py`. |
+| `.gemini/` | Gemini/Antigravity: agents (14), skills (51), commands (12), knowledge. Manually kept in parity with `.kilo/`; checked by `tools/garden.py`. |
 | `.github/` | Shared scripts: `security_scan.py`, `checklist.py`, `check_skips.py`, `eval_harness.py`, `boundary_audit.py`, `security-allowlist.txt` + `copilot-instructions.md`, `prompts/` |
 | `tools/` | Generator (`generate_harness.py`, `claude_engine.py`), validator, drift detector (`garden.py`), integration tests, `shared_state.py` (runtime dep of Claude session hooks) |
 | `.vscode/` | VS Code settings + MCP config for Copilot |
@@ -174,7 +174,7 @@ python tools/generate_harness.py --harness claude
 |---|---|---|
 | Rulebook | `CLAUDE.md` | Auto-loaded project memory (boundaries + rules) |
 | Subagents (14) | `.claude/agents/*.md` | Invoke via Task tool or by name |
-| Skills (49) | `.claude/skills/<name>/SKILL.md` | Auto-discovered capabilities |
+| Skills (51) | `.claude/skills/<name>/SKILL.md` | Auto-discovered capabilities |
 | Slash commands (14) | `.claude/commands/*.md` | `/verify`, `/plan`, `/decide`, `/ship`, `/debug`, `/commit`, … |
 | Guard hook | `.claude/hooks/guard.py` + `.claude/settings.json` | `PreToolUse` — blocks destructive commands, secret leaks, protected-config edits |
 | Quality-gate hook | `.claude/hooks/quality_gate.py` | `PostToolUse` (Edit/Write) — advisory ruff/prettier/biome/gofmt format check |
@@ -354,11 +354,11 @@ python tools/deploy.py
 
 | Thư mục | Mục đích |
 |---|---|
-| `.claude/` | **Điều phối** — Claude Code: agents (14), skills (49), commands (14, gồm `ship`), instruction (10), guard + lifecycle hooks + `settings.json`; rulebook `CLAUDE.md` ở root. Sinh từ `.kilo/` qua `tools/generate_harness.py --harness claude`. |
-| `.copilot/` | GitHub Copilot: agents (14), skills (49), commands (13), instruction (10), memory (4). Giữ song song thủ công với `.kilo/`; `tools/garden.py` chỉ kiểm tra, không tự sinh. |
-| `.kilo/` | **Nguồn gốc** — Kilo Code: agents (14), skills (49), commands (14, gồm `ship`), hooks, memory, instruction. Sửa ở đây trước tiên. |
+| `.claude/` | **Điều phối** — Claude Code: agents (14), skills (51), commands (14, gồm `ship`), instruction (10), guard + lifecycle hooks + `settings.json`; rulebook `CLAUDE.md` ở root. Sinh từ `.kilo/` qua `tools/generate_harness.py --harness claude`. |
+| `.copilot/` | GitHub Copilot: agents (14), skills (51), commands (14), instruction (10), memory (4). Giữ song song thủ công với `.kilo/`; `tools/garden.py` chỉ kiểm tra, không tự sinh. |
+| `.kilo/` | **Nguồn gốc** — Kilo Code: agents (14), skills (51), commands (14, gồm `ship`), hooks, memory, instruction. Sửa ở đây trước tiên. |
 | *(jcode)* | **Worker engine** — không có thư mục riêng; tự load `AGENTS.md` + `.claude/skills/` (fallback) + `.mcp.json`. Launcher: `jcode.ps1`. |
-| `.gemini/` | Gemini/Antigravity: agents (14), skills (49), commands (12), knowledge. Manually kept in parity with `.kilo/`; checked by `tools/garden.py`. |
+| `.gemini/` | Gemini/Antigravity: agents (14), skills (51), commands (12), knowledge. Manually kept in parity with `.kilo/`; checked by `tools/garden.py`. |
 | `.github/` | Script dùng chung: `security_scan.py`, `checklist.py`, `check_skips.py`, `eval_harness.py`, `boundary_audit.py` + `copilot-instructions.md`, `prompts/` |
 | `tools/` | Generator (`generate_harness.py`, `claude_engine.py`), validator, drift detector (`garden.py`), integration tests, `shared_state.py` (runtime dep của Claude session hooks) |
 | `.vscode/` | VS Code settings + MCP config cho Copilot |

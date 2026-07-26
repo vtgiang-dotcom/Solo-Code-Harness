@@ -203,3 +203,105 @@ def test_claude_md_check_ignores_line_ending_differences():
         assert garden.check_claude_md_regenerable() == []
     finally:
         claude_path.write_bytes(original)
+
+
+def test_check_doc_counts_detects_wrong_count(tmp_path):
+    # Set up .kilo/ structure
+    kilo = tmp_path / ".kilo"
+    (kilo / "skill" / "skill-a").mkdir(parents=True)
+    (kilo / "agents").mkdir(parents=True)
+    (kilo / "agents" / "agent-a.md").write_text("body", encoding="utf-8")
+    (kilo / "command").mkdir(parents=True)
+    (kilo / "command" / "command-a.md").write_text("body", encoding="utf-8")
+    (kilo / "instruction").mkdir(parents=True)
+    (kilo / "instruction" / "instruction-a.md").write_text("body", encoding="utf-8")
+
+    # Write a test file with a wrong count
+    (tmp_path / "AGENTS.md").write_text("Solo-Code Harness active: 2 skills, 1 agent.", encoding="utf-8")
+
+    issues = garden.check_doc_counts(root=tmp_path)
+    assert len(issues) > 0
+    assert any("claimed 2 skills, but ground truth is 1" in i for i in issues)
+
+
+def test_check_doc_counts_clean_when_correct(tmp_path):
+    # Set up .kilo/ structure
+    kilo = tmp_path / ".kilo"
+    (kilo / "skill" / "skill-a").mkdir(parents=True)
+    (kilo / "agents").mkdir(parents=True)
+    (kilo / "agents" / "agent-a.md").write_text("body", encoding="utf-8")
+    (kilo / "command").mkdir(parents=True)
+    (kilo / "command" / "command-a.md").write_text("body", encoding="utf-8")
+    (kilo / "instruction").mkdir(parents=True)
+    (kilo / "instruction" / "instruction-a.md").write_text("body", encoding="utf-8")
+
+    # Write a test file with correct count
+    (tmp_path / "AGENTS.md").write_text("Solo-Code Harness active: 1 skill, 1 agent.", encoding="utf-8")
+
+    issues = garden.check_doc_counts(root=tmp_path)
+    assert issues == []
+
+
+
+def _make_engines(tmp_path, *, gemini_commands: int = 2):
+    """Build a minimal multi-engine tree.
+
+    .kilo/ gets 1 skill + 1 agent + 1 command + 1 instruction;
+    .gemini/antigravity/ gets the same but a configurable command count, so a
+    genuine per-engine divergence can be exercised.
+    """
+    kilo = tmp_path / ".kilo"
+    (kilo / "skill" / "skill-a").mkdir(parents=True)
+    for sub, name in (("agents", "agent-a.md"), ("command", "command-a.md"),
+                      ("instruction", "instruction-a.md")):
+        (kilo / sub).mkdir(parents=True, exist_ok=True)
+        (kilo / sub / name).write_text("body", encoding="utf-8")
+
+    gem = tmp_path / ".gemini" / "antigravity"
+    (gem / "skills" / "skill-a").mkdir(parents=True)
+    (gem / "agents").mkdir(parents=True)
+    (gem / "agents" / "agent-a.md").write_text("body", encoding="utf-8")
+    (gem / "commands").mkdir(parents=True)
+    for i in range(gemini_commands):
+        (gem / "commands" / f"cmd-{i}.md").write_text("body", encoding="utf-8")
+    return kilo, gem
+
+
+def test_check_doc_counts_respects_engine_divergence(tmp_path):
+    """A line describing `.gemini/` is measured against .gemini/, not .kilo/.
+
+    Engines legitimately differ — .gemini/ ships fewer commands than .kilo/ —
+    so comparing every number to the source of truth reports false drift.
+    """
+    _make_engines(tmp_path, gemini_commands=2)
+
+    (tmp_path / "README.md").write_text(
+        "| `.gemini/` | Gemini: skills (1), commands (2) |\n", encoding="utf-8"
+    )
+
+    assert garden.check_doc_counts(root=tmp_path) == []
+
+
+def test_check_doc_counts_flags_wrong_count_for_named_engine(tmp_path):
+    """Per-engine resolution must still catch a count that is wrong *for that engine*."""
+    _make_engines(tmp_path, gemini_commands=2)
+
+    (tmp_path / "README.md").write_text(
+        "| `.gemini/` | Gemini: skills (1), commands (7) |\n", encoding="utf-8"
+    )
+
+    issues = garden.check_doc_counts(root=tmp_path)
+    assert any(
+        "claimed 7 commands" in i and "ground truth is 2" in i and ".gemini/" in i
+        for i in issues
+    ), issues
+
+
+def test_check_doc_counts_unnamed_line_falls_back_to_kilo(tmp_path):
+    """A line naming no engine is checked against .kilo/, the source of truth."""
+    _make_engines(tmp_path, gemini_commands=2)
+
+    (tmp_path / "AGENTS.md").write_text("Harness active: 1 skill, 2 commands.", encoding="utf-8")
+
+    issues = garden.check_doc_counts(root=tmp_path)
+    assert any("claimed 2 commands, but ground truth is 1" in i for i in issues), issues

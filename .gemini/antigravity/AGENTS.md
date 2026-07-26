@@ -24,7 +24,7 @@ This project is powered by **Solo-Code Harness** — an AI agent discipline laye
 ## Self-Verification Handshake
 
 When asked "Is Solo-Code Harness active?" or "What rules apply here?", answer:
-`Solo-Code Harness active: behavior rules, anti-hallucination rules, security rules, prose quality rules, 32 skills, 15 agents. Use /verify to validate.`
+`Solo-Code Harness active: behavior rules, anti-hallucination rules, security rules, prose quality rules, 51 skills, 14 agents. Use /verify to validate.`
 
 ## Escape Hatch (Meta-Principle)
 
@@ -183,9 +183,38 @@ When given a plan file to execute:
 3. Write your report to `.gemini/antigravity/handoff/outbox/<same-slug>-report.md`
    with a frontmatter header (`slug`, `completed`, `from: gemini`) — Claude
    Code auto-detects new files here at its next session start.
-4. Do NOT delete or edit the plan file in `inbox/` — it's the durable record
-   of what was asked. Update its `status:` to `done` if you want, but leave
-   the file itself intact.
+4. Do NOT delete or edit the plan file in `inbox/` — including its
+   `status:` field. Leave it exactly as written. The report file appearing
+   in `outbox/` is the completion signal; a second status flag can only
+   drift out of agreement with it.
+
+### Concurrent editing — you are not alone in this tree
+
+Claude Code may be editing the same working tree while you run. Before
+writing to any file:
+
+- Touch **only** the paths the plan file names explicitly. If the plan does
+  not name a file, you may read it but not write it.
+- If a plan asks you to modify shared code, check
+  `.solocode/shared-state.db` via `tools/shared_state.py` for an active
+  lock; `acquire_lock()` returns `False` when another engine holds it. If
+  it does, stop and report the conflict instead of writing anyway.
+- Never run `git commit`, `git push`, or any destructive command. Leave the
+  working tree dirty — Claude Code reviews and commits.
+
+### Reporting standard — evidence, not confidence
+
+Do not write self-assessed confidence ("Confident: Yes", "unsure about:
+nothing"). Measured on real tasks, those fields were 100% uninformative:
+they read identically on correct and incorrect findings. Instead, for every
+claim give the command you ran and its output:
+
+| Claim | Command run | Output (trimmed) |
+|---|---|---|
+
+**Do not write a claim you did not actually run a command for.** If you
+could not verify something, say so as its own row with an empty output
+cell — that is far more useful than an unearned "Yes".
 
 ---
 

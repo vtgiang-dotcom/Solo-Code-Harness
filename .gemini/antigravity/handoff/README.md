@@ -66,6 +66,24 @@ from: gemini
 <report content>
 ```
 
+## Who may edit what
+
+The plan file is **written by Claude Code and read-only for Gemini**,
+including its `status:` field. An earlier version of this README implied
+Gemini should flip `status: pending` -> `done`; that contradicted the briefs,
+which fence Gemini to writing only the report. The report file's existence
+in `outbox/` *is* the completion signal — a duplicate status flag can only
+disagree with it.
+
+| File | Claude Code | Gemini |
+|---|---|---|
+| `inbox/<slug>-plan.md` | writes | reads only — do not edit, leave `status: pending` |
+| `outbox/<slug>-report.md` | reads | writes |
+| everything else | per the brief | only paths the brief names explicitly |
+
+Restate this fence in every brief. Gemini follows an explicit written scope
+well, but does not infer one from this README.
+
 ## Workflow
 
 1. Ask Claude Code to draft a plan for a task you want to delegate to Gemini.

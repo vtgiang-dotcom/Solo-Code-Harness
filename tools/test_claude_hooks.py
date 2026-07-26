@@ -252,6 +252,70 @@ def test_jcode_available_true_when_configured(monkeypatch, tmp_path):
     assert mod._jcode_available() is True
 
 
+def _load_session_start():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "session_start_module", HOOKS / "session_start.py"
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_gemini_available_false_without_handoff_dir(monkeypatch, tmp_path):
+    """No handoff/inbox/ in the repo -> this project was never wired for
+    Gemini relay, so it must not be announced even if the IDE is installed."""
+    mod = _load_session_start()
+    monkeypatch.setattr(mod.shutil, "which", lambda name: "/usr/bin/antigravity-ide")
+    assert mod._gemini_available(tmp_path) is False
+
+
+def test_gemini_available_false_without_ide(monkeypatch, tmp_path):
+    """Handoff dir present but no Antigravity IDE anywhere -> unavailable.
+
+    The relay needs a human with the IDE open; announcing it on a machine
+    without the IDE would send the user on an errand they cannot run.
+    """
+    mod = _load_session_start()
+    (tmp_path / ".gemini" / "antigravity" / "handoff" / "inbox").mkdir(parents=True)
+    monkeypatch.setattr(mod.shutil, "which", lambda name: None)
+    monkeypatch.setattr(mod.Path, "home", lambda: tmp_path)
+    assert mod._gemini_available(tmp_path) is False
+
+
+def test_gemini_available_true_with_handoff_and_ide(monkeypatch, tmp_path):
+    """Handoff dir + IDE on PATH -> available."""
+    mod = _load_session_start()
+    (tmp_path / ".gemini" / "antigravity" / "handoff" / "inbox").mkdir(parents=True)
+    monkeypatch.setattr(mod.shutil, "which", lambda name: "/usr/bin/antigravity-ide")
+    assert mod._gemini_available(tmp_path) is True
+
+
+def test_gemini_available_true_via_default_install_dir(monkeypatch, tmp_path):
+    """IDE not on PATH but present at the default Windows location.
+
+    The Antigravity installer does not reliably add its bin/ to PATH, so
+    PATH-only detection would report unavailable on a working machine.
+    """
+    mod = _load_session_start()
+    (tmp_path / ".gemini" / "antigravity" / "handoff" / "inbox").mkdir(parents=True)
+    (tmp_path / "AppData" / "Local" / "Programs" / "Antigravity IDE").mkdir(parents=True)
+    monkeypatch.setattr(mod.shutil, "which", lambda name: None)
+    monkeypatch.setattr(mod.Path, "home", lambda: tmp_path)
+    assert mod._gemini_available(tmp_path) is True
+
+
+def test_session_start_gemini_mention_points_to_agents_md():
+    """Like jcode, an availability claim must carry a pointer to the how-to,
+    never advertise a capability the reader cannot look up."""
+    r = _run("session_start.py", {})
+    assert r.returncode == 0
+    ctx = json.loads(r.stdout)["hookSpecificOutput"]["additionalContext"]
+    if "Gemini/Antigravity available" in ctx:
+        assert "AGENTS.md" in ctx
+
+
 # ─── session_end.py ─────────────────────────────────────────────────────────
 
 def test_session_end_exists():

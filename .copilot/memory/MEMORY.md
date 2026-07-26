@@ -38,6 +38,31 @@
 
 
 ## Decisions
+- [decision] 2026-07-26: made Gemini/Antigravity a first-class worker
+  alongside jcode, after two controlled tests. Root problem: the harness
+  *pushed* jcode into every session (`_jcode_available()` + a trigger-rich
+  `jcode-delegation` skill) but mentioned Gemini only when a report already
+  existed in `outbox/` -- so Gemini was structurally forgotten, not
+  forgotten by accident. Fixed by mechanism, not memory: added
+  `_gemini_available()` (needs BOTH handoff/inbox AND the IDE installed),
+  a `gemini-delegation` SKILL.md, and a routing table in AGENTS.md/CLAUDE.md.
+  Measured payoff: a repo-wide audit cost Gemini ~49.6k tokens of reading vs
+  ~2.5k of ours (~20x leverage). Measured limit: BOTH tests shipped an error
+  invisible in its own self-summary (1 wrong finding marked "Confident: Yes";
+  2 false positives while reporting "unsure: nothing"). Standing rule --
+  its evidence is reliable, its self-assessment is not; verify 100%. Also
+  killed the `status:` contradiction (plan files are read-only for Gemini;
+  the report's existence is the completion signal) and banned re-litigating
+  headless access: the SDK has no OAuth path to the Pro plan and
+  `antigravity-ide chat` only drives the GUI.
+- [decision] 2026-07-26: added `garden.check_doc_counts()` -- hardcoded
+  counts in docs are now drift-checked, not trusted. It had rotted badly
+  (`.gemini/AGENTS.md` claimed "32 skills, 15 agents" for months with every
+  gate green). Counts resolve **per engine**: a line naming `.gemini/` is
+  measured against `.gemini/antigravity/`, since engines legitimately
+  diverge (12 commands vs .kilo/'s 14) -- comparing everything to the
+  source of truth produced 2 false positives in the first draft. Fixed 20
+  real stale counts + a 3.6.0/4.0.0 version lie in the plugin manifests.
 - [decision] 2026-07-25: repaired `verify.sh` (6/31 -> 31/31 PASS). Root
   causes, all silent: (a) it probed `command -v python3`, which on Windows
   resolves to a Microsoft Store *stub* that exits with an install prompt --
@@ -54,29 +79,6 @@
   read password-hashing *prose* as an assignment). Fault-injected a real
   fake secret into both scanners afterward to prove they still fire -- an
   allowlist that disables detection is worse than the false positive.
-- [decision] 2026-07-24: added Context Summary Struct to PreCompact +
-  decisions-archive.md tier. `pre_compact.py` asks Claude to write
-  `.solocode/context-checkpoint.json` (active_feature, unverified_changes,
-  settled_decisions, next_immediate_step); `session_start.py` surfaces it
-  once next session then deletes it (recovery aid, not mid-compaction
-  survival -- a hook can't guarantee that). Bigger context windows should
-  NOT raise MEMORY.md's cap: it's a recurring per-session cost across all 5
-  engines (sized for the weakest, jcode), not a one-time budget. Instead
-  added `.kilo/memory/decisions-archive.md` (uncapped, not auto-loaded) --
-  pruning now MOVES entries there, not deletes. Also `/debug` now requires
-  >=2 hypotheses (all 4 engines). Verified: 0 drift, 107 tests.
-- [decision] 2026-07-24: verified jcode/DeepSeek delegation end-to-end
-  (real "pong" response); `--tool-profile none --no-selfdev` cuts input
-  tokens ~65% (22,376->7,709). Bigger finding: `CLAUDE.md` was NOT actually
-  generated from `AGENTS.md` -- `claude_engine.py`'s template is hand-
-  written, only parameterized by counts. The earlier Gemini-handoff section
-  (added to AGENTS.md) had silently never reached real CLAUDE.md. Fixed:
-  added Gemini + jcode delegation sections into the template + regenerated;
-  fixed a stale `tools/test_harness.py` ref (deleted v4.0.0) -> `pytest
-  tools/ -q`. Added `_jcode_available()` to `session_start.py`. Also fixed
-  CI/Makefile hardcoded test-file allowlist (missed test_garden.py/
-  test_integration.py), test_integration.py's machine-specific >=19-feature
-  assertion, rewrote stale SPEC.md (v3.3.0->v4.1.0), removed suggest.md.
 - [decision] 2026-07-25: upgraded `claude-env.ps1` for FreeModel 4-domain
   multi-tier support: normalize `/v1/messages` for api.freemodel.dev (canonical
   from guide.md), cc.freemodel.dev, api-cc.freemodel.dev, cc-t2.freemodel.dev.

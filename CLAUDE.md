@@ -29,13 +29,13 @@ boundary list.
 
 When asked "Is Solo-Code Harness active?", answer:
 `Solo-Code Harness active: behavior rules, anti-hallucination rules, security rules,
-prose quality rules, 50 skills, 14 agents, guard + lifecycle hooks enabled (Claude Code).
+prose quality rules, 51 skills, 14 agents, guard + lifecycle hooks enabled (Claude Code).
 Use /verify to validate.`
 
 ## Claude Code Assets
 
 - **Subagents (14)** in `.claude/agents/` -- invoke via the Task tool or by name.
-- **Skills (50)** in `.claude/skills/` -- auto-discovered `SKILL.md` capabilities.
+- **Skills (51)** in `.claude/skills/` -- auto-discovered `SKILL.md` capabilities.
 - **Slash commands (14)** in `.claude/commands/` -- `/verify`, `/plan`, `/decide`, `/ship`, and more.
 - **Guard hook** in `.claude/hooks/guard.py` (`PreToolUse`) -- blocks destructive
   commands, secret leaks, and protected-config edits.
@@ -91,6 +91,33 @@ Run `/verify` (or `make check`) before declaring work complete:
 ## Git Commit Convention
 Use Conventional Commits: `type(scope): summary` (feat, fix, docs, test, refactor, chore).
 
+## Choosing a worker engine (routing table)
+
+Two workers are available. Propose one **proactively** when the work fits --
+the user should not have to remember they exist. `session_start.py`
+announces each engine's availability; treat that as a prompt to consider
+delegation, not an instruction to always delegate.
+
+| Work shape | Route to | Why |
+|---|---|---|
+| Read >5 files, then summarize/compare/audit | **Gemini** | ~20x context leverage (measured) |
+| Repo-wide survey -- "where else does X appear?" | **Gemini** | Breadth is its edge |
+| Independent review of a design or diff | **Gemini** | A second model catches different things |
+| UI verification, screenshots, recordings | **Gemini** | The orchestrator cannot do this at all |
+| Small mechanical edit, boilerplate, one test | **jcode** | Headless -- costs the user nothing |
+| Scoped code writing behind an explicit fence | Gemini if broad, jcode if narrow | Both need the fence in writing |
+| Architecture / product / security decisions | **Neither -- do it here** | Judgment is not delegable |
+| Anything needing this conversation's history | **Neither -- do it here** | Both workers are context-blind |
+
+jcode is headless, so delegating costs the user nothing -- just do it.
+Gemini needs a manual relay through the Antigravity IDE, so **propose and
+wait for a yes**.
+
+**Verification is mandatory for both.** Every controlled test of both
+engines produced an error invisible in its own self-summary. Their evidence
+is reliable; their self-assessment is not. Re-run their commands, run the
+real gates, and mutation-test any new check they write.
+
 ## Delegating a task to Gemini/Antigravity (manual handoff)
 
 Antigravity IDE has no headless CLI -- a human must relay tasks to it
@@ -99,6 +126,27 @@ manually. Use the file-based handoff protocol instead of pasting text:
 2. Tell the user the one line to relay to Antigravity.
 3. `session_start.py` auto-detects new `outbox/*-report.md` files at the
    next session start and announces them once.
+
+Writing the brief -- four rules, each from an observed failure:
+1. **Fence the scope, and predict the red gate.** If a correct result will
+   make a check fail, say so ("that failure is the expected outcome") --
+   otherwise Gemini fixes what it was told only to detect.
+2. **Demand evidence, not confidence.** Use `| Claim | Command run |
+   Output |`; add "do not write a claim you did not run a command for".
+   A "Confident? Y/N" column came back 22-for-22 "Yes", one of them wrong.
+3. **Name every writable path, including the plan file** -- it is
+   read-only, `status:` included.
+4. **Give the measurement, never the answer** (`ls .kilo/skill | wc -l`,
+   not "there are 51").
+
+Before delegating a **write**, take a `tools/shared_state.py` lock for the
+files in scope -- Gemini edits the same tree concurrently.
+
+Do not re-investigate headless access: the `google-antigravity` SDK
+authenticates only via `GEMINI_API_KEY` or Vertex+ADC (no OAuth, cannot
+reuse the IDE's Pro login), and `antigravity-ide chat` only drives the GUI
+(exit 0, empty stdout). Full guide:
+`.claude/skills/gemini-delegation/SKILL.md`.
 
 ## Delegating a task to jcode (DeepSeek worker, cost/latency optimization)
 
