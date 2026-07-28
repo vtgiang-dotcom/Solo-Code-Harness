@@ -11,7 +11,7 @@
 
 ## Tech Stack
 - [tech] Python 3.10+ — tools/ and .github/scripts/ are stdlib-only (zero external deps)
-- [tech] Node.js 18+ — .kilo/hooks/ (Kilo Code hooks), .opencode/plugins/ (guard plugins)
+- [tech] Node.js 18+ — .kilo/hooks/ (Kilo Code hooks, 20 scripts)
 - [tech] Bash — init.sh, verify.sh, Makefile (Git Bash on Windows)
 - [tech] Ruff — Python linter (config in .ruff.toml, NOT pyproject.toml)
 - [tech] Gitleaks — secret scanner (.gitleaks.toml with allowlist)
@@ -26,7 +26,7 @@
 ## Verification
 - [verify] `.github/scripts/check_skips.py` — quét mọi test file tìm skip/skipif không lý do. Chỉ SKIP_PLATFORM và KNOWN_GAP được phép.
 - [verify] `.github/scripts/security-allowlist.txt` — mọi call site "nguy hiểm" (subprocess, os.environ) phải có justification trong file này.
-- [verify] `.opencode/tests/repro/test-repro.mjs` — RED tests, non-gating. Chuyển vào test-guard.mjs sau khi fix bug.
+- [verify] `tools/test_claude_guard.py` — 26 guard cases chạy guard.py như subprocess, assert exit code (2 = block, 0 = allow).
 
 ## Gotchas
 - [gotcha] Python PATH on Git Bash: init.sh and Makefile use fallback python3 → python → py

@@ -30,7 +30,7 @@ updated: 2026-06-01
 
 - All PRs must use `.github/pull_request_template.md`.
 - All verification gates in the template checklist must pass before merge.
-- Run `python .github/scripts/check_skips.py .opencode/tests/` — no unconditional skips.
+- Run `python .github/scripts/check_skips.py tools/` — no unconditional skips.
 
 ## Config System
 

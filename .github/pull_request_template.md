@@ -18,7 +18,7 @@
 - [ ] `python .github/scripts/security_scan.py .` passes
 - [ ] `ruff check .` passes
 - [ ] Harness Eval (`python .github/scripts/eval_harness.py .`) passes
-- [ ] Guard Tests (`node .opencode/tests/test-guard.mjs`) pass
+- [ ] Guard Tests (`python -m pytest tools/test_claude_guard.py -q`) pass
 - [ ] Pre-commit hooks run clean
 
 ## Scope

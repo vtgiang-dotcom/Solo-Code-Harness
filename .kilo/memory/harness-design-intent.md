@@ -10,13 +10,12 @@ Solo-Code Harness is a multi-layer quality and safety system for AI coding agent
 AGENTS.md        → Behavior rules, anti-hallucination, prose quality, harness boundaries
 .harness.lock    → Boundary manifest — which files are harness vs project code
 .kilo/instruction/ → Language-specific rules (Python, TS, Git, DB)
-.kilo/skill/     → 44 domain skills (code-review, debugging, testing...)
+.kilo/skill/     → 51 domain skills (code-review, debugging, testing...)
 .kilo/agents/    → 14 specialized agents with handoff chains
 .kilo/hooks/     → 20 lifecycle hooks (bash validation, secret scan, learning...)
 .kilo/hookify/   → MD-config rules engine (user-customizable policies)
 .kilo/prompts/   → Structured workflow templates (code review, feature dev...)
-tools/           → Harness utilities (deploy, generate, garden, harness_config)
-.opencode/tests/ → Guard tests (80 cases, v2.6) + repro suite (4 known bugs)
+tools/           → Harness utilities (deploy, generate, garden, harness_config) + tests (guard, hooks, engine)
 .github/scripts/ → Verification gates (security_scan, checklist, check_skips, eval_harness, security-allowlist)
 .contracts/      → Sub-agent status contracts (DeerFlow pattern)
 kilo.jsonc       → Permission model (bash allow/deny, task allow/deny)
@@ -39,7 +38,6 @@ kilo.jsonc       → Permission model (bash allow/deny, task allow/deny)
 | Deploy/scaffold (deploy.py) | Manual copy-paste errors when replicating harness to new projects |
 | Security allow-list | "Dangerous" calls (subprocess, os.environ) lack auditable justifications — scan false negatives |
 | No-skips policy (check_skips.py) | Test coverage silently degrades via unconditional skip/skipif markers |
-| Bug-repro suite (tests/repro/) | Known bugs forgotten, never tracked or prioritized |
 
 ## Modification Policy
 
@@ -56,7 +54,6 @@ kilo.jsonc       → Permission model (bash allow/deny, task allow/deny)
 | Ruff lint | 0 errors |
 | Check skips | 0 unauthorized skips |
 | Harness eval | 59/59 pass |
-| Guard tests | 80/80 pass (v2.6) |
+| Guard tests | 26/26 pass |
 | Gate guard | 0 false blocks |
 | Hook uptime | 100% (all stdin.resume present) |
-| Repro suite | 4 known bugs tracked |
