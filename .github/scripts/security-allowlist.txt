@@ -13,6 +13,7 @@
 tools/deploy.py:_run_command:git init/scaffold/deploy operations are the intended purpose of the deploy tool
 tools/deploy.py:subprocess.run:scaffold mode runs git init, git add, git commit to bootstrap new projects
 tools/generate_harness.py:subprocess.run:runs ruff format and ruff check via subprocess after file generation
+tools/garden.py:subprocess.run:runs `--help` on this repo's own tools/ and .github/scripts/ files to verify documented CLI flags exist (check_doc_flags); argv is fixed, no shell, no user input
 
 # ── Environment variable access ───────────────────────────────
 tools/harness_config.py:os.environ:config loader reads SOLOCODE_* env vars for config override layer

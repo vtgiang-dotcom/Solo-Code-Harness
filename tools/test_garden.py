@@ -370,3 +370,66 @@ def test_check_doc_paths_skips_archives_and_plans(tmp_path):
     (root / "plans").mkdir()
     (root / "plans" / "old.md").write_text("Touch `tools/gone.py`.", encoding="utf-8")
     assert garden.check_doc_paths(root=root) == []
+
+
+# ── check_doc_flags ──────────────────────────────────────────────────────
+
+
+def _flag_fixture(tmp_path, script_body: str):
+    (tmp_path / "tools").mkdir()
+    (tmp_path / "tools" / "cli.py").write_text(script_body, encoding="utf-8")
+    return tmp_path
+
+
+_ARGPARSE_CLI = (
+    "import argparse\n"
+    "p = argparse.ArgumentParser()\n"
+    "p.add_argument('--real')\n"
+    "p.parse_args()\n"
+)
+
+
+def test_check_doc_flags_detects_unknown_flag(tmp_path):
+    root = _flag_fixture(tmp_path, _ARGPARSE_CLI)
+    (root / "AGENTS.md").write_text(
+        "Run `python tools/cli.py --bogus` nightly.", encoding="utf-8"
+    )
+    issues = garden.check_doc_flags(root=root)
+    assert any("--bogus" in i for i in issues), issues
+
+
+def test_check_doc_flags_accepts_real_flag(tmp_path):
+    root = _flag_fixture(tmp_path, _ARGPARSE_CLI)
+    (root / "AGENTS.md").write_text(
+        "Run `python tools/cli.py --real x`.", encoding="utf-8"
+    )
+    assert garden.check_doc_flags(root=root) == []
+
+
+def test_check_doc_flags_accepts_subcommand_flag(tmp_path):
+    """argparse hides subcommand flags from the top-level --help."""
+    root = _flag_fixture(tmp_path, (
+        "import argparse\n"
+        "p = argparse.ArgumentParser()\n"
+        "sub = p.add_subparsers(dest='cmd')\n"
+        "s = sub.add_parser('sessions')\n"
+        "s.add_argument('--limit', type=int)\n"
+        "p.parse_args()\n"
+    ))
+    (root / "AGENTS.md").write_text(
+        "Run `python tools/cli.py sessions --limit 10`.", encoding="utf-8"
+    )
+    assert garden.check_doc_flags(root=root) == []
+
+
+def test_check_doc_flags_accepts_hand_rolled_argv_flag(tmp_path):
+    """Scripts parsing sys.argv by hand expose no --help; source is checked."""
+    root = _flag_fixture(tmp_path, (
+        "import sys\n"
+        "strict = '--strict' in sys.argv\n"
+        "print('strict:', strict)\n"
+    ))
+    (root / "AGENTS.md").write_text(
+        "Run `python tools/cli.py --strict`.", encoding="utf-8"
+    )
+    assert garden.check_doc_flags(root=root) == []

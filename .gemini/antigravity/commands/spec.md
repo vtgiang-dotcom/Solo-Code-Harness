@@ -22,7 +22,7 @@ Read the specification to understand hard requirements.
 
 ### 3. Validate
 ```bash
-python tools/garden.py --strict
+python tools/garden.py
 python tools/validate_schemas.py
 ```
 

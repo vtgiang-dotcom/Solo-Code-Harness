@@ -19,7 +19,7 @@ ruff check .
 
 ## Gate 3: Garden (Drift Detection)
 ```bash
-python tools/garden.py --strict
+python tools/garden.py
 ```
 
 ## Gate 4: Integration Tests

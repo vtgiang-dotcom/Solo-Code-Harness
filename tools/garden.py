@@ -16,6 +16,7 @@ Usage:
 from __future__ import annotations
 
 import re
+import subprocess  # noqa: S404 — runs `--help` on this repo's own scripts only
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -746,6 +747,100 @@ def check_doc_paths(root: Path = ROOT) -> list[str]:
     return issues
 
 
+def _script_flag_surface(root: Path, script: str) -> str:
+    """Every string in which a valid flag for `script` could appear.
+
+    Combines top-level --help, each subcommand's --help, and the source
+    text itself. Union rather than any single source: argparse omits
+    subcommand flags from the top-level help, and hand-rolled sys.argv
+    parsers produce no help at all.
+    """
+    parts: list[str] = []
+    try:
+        parts.append((root / script).read_text(encoding="utf-8", errors="ignore"))
+    except OSError:
+        return ""
+
+    def _help(*args: str) -> str:
+        try:
+            proc = subprocess.run(  # noqa: S603 — fixed argv, repo-local script
+                [sys.executable, script, *args],
+                capture_output=True, text=True, timeout=60, cwd=root,
+            )
+            return proc.stdout + proc.stderr
+        except (OSError, subprocess.SubprocessError):
+            return ""
+
+    top = _help("--help")
+    parts.append(top)
+    # `{show,features,sessions}` — argparse's subcommand listing
+    for match in re.finditer(r'\{([a-z0-9_,-]+)\}', top):
+        for sub in match.group(1).split(","):
+            parts.append(_help(sub, "--help"))
+    return "\n".join(parts)
+
+
+_DOC_CMD = re.compile(
+    r'python3?\s+((?:tools|\.github/scripts)/[A-Za-z0-9_./-]+\.py)([^\n`]*)'
+)
+_LONG_FLAG = re.compile(r'(--[a-z][a-z0-9-]*)')
+
+
+def check_doc_flags(root: Path = ROOT) -> list[str]:
+    """Verify CLI flags shown in docs actually exist in the script's --help.
+
+    check_doc_paths() proves a cited file exists; it cannot tell whether the
+    *invocation* is real. Three `.gemini/` commands told agents to run
+    `python tools/garden.py --strict` -- garden.py never reads sys.argv at
+    all, so the flag was silently ignored and the docs implied a strict mode
+    that does not exist.
+
+    Only long flags on scripts inside tools/ and .github/scripts/ are
+    checked. Verification is deliberately generous, because a false
+    positive here would push someone to delete a working flag:
+      - subcommand flags are covered by also reading `<script> <sub>
+        --help` (argparse hides them from the top-level help);
+      - the flag is accepted if it appears in the script source at all,
+        which covers tools that parse `sys.argv` by hand and therefore
+        have no argparse help (e.g. security_scan.py's `--strict`).
+    """
+    issues: list[str] = []
+    skip_dirs = {".git", "node_modules", ".venv", ".pytest_cache",
+                 ".ruff_cache", ".solocode", "__pycache__"}
+    help_cache: dict[str, str] = {}
+
+    for md in sorted(root.rglob("*.md")):
+        if any(part in skip_dirs for part in md.parts):
+            continue
+        posix = md.as_posix()
+        if "decisions-archive" in md.name or "/plans/" in posix:
+            continue
+        try:
+            text = md.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+
+        for lineno, line in enumerate(text.splitlines(), 1):
+            if any(m in line.lower() for m in _PATH_NEGATION_MARKERS):
+                continue
+            for script, rest in _DOC_CMD.findall(line):
+                flags = _LONG_FLAG.findall(rest)
+                if not flags or not (root / script).exists():
+                    continue
+                if script not in help_cache:
+                    help_cache[script] = _script_flag_surface(root, script)
+                help_text = help_cache[script]
+                if not help_text:
+                    continue
+                for flag in flags:
+                    if flag not in help_text:
+                        issues.append(
+                            f"{md.relative_to(root).as_posix()}:{lineno} documents "
+                            f"`python {script} {flag}` — no such flag in --help"
+                        )
+    return issues
+
+
 def main() -> int:
     kilo = ROOT / ".kilo"
 
@@ -823,6 +918,17 @@ def main() -> int:
         all_issues.extend(path_issues)
     else:
         print("[OK] Document paths")
+
+    # Document flags — do documented CLI invocations actually accept them?
+    print("\n--- Document Flags ---")
+    flag_issues = check_doc_flags(ROOT)
+    if flag_issues:
+        print("[DRIFT] Docs document flags that do not exist:")
+        for i in flag_issues:
+            print(f"  {i}")
+        all_issues.extend(flag_issues)
+    else:
+        print("[OK] Document flags")
 
     print(f"\nTotal drift issues: {len(all_issues)}")
     if all_issues:
