@@ -26,8 +26,12 @@ metadata:
 - **user** — who the user is, expertise, preferences
 
 ### Location
-- Project memory: `.gemini/antigravity/knowledge/` (one file per fact)
-- Index file: `.gemini/antigravity/knowledge/MEMORY.md` (update this too)
+- Project memory: `.gemini/antigravity/knowledge/artifacts/` (one file per fact)
+- Index: `.gemini/antigravity/knowledge/metadata.json`
+
+Gemini stores knowledge as artifacts + a metadata index — it has no
+`MEMORY.md` mirror like the other engines (see `check_gemini()` in
+`tools/garden.py`). Do not create one; garden does not check for it.
 
 ### Before Saving
 - Check if an existing memory file already covers this → update instead of duplicating

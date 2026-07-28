@@ -51,7 +51,7 @@ Copy to target project:
 
 The `.kilo/` directory is auto-discovered by Kilo. No additional config needed.
 
-### Agents (`.kilo/agent/`)
+### Agents (`.kilo/agents/`)
 | Agent | Mode | Purpose |
 |-------|------|---------|
 | `orchestrator.md` | subagent | Breaks down complex tasks, coordinates parallel sub-agents |
@@ -87,7 +87,7 @@ The `.kilo/` directory is auto-discovered by Kilo. No additional config needed.
 
 ### For a new project
 1. Copy the harness into your project
-2. Customize `.kilo/agent/solo-code-engineer.md` with your project's tech stack, architecture map, and conventions
+2. Customize `.kilo/agents/solo-code-engineer.md` with your project's tech stack, architecture map, and conventions
 3. Update `.kilo/memory/project-conventions.md` with your project's specific rules
 4. Adjust `kilo.json` permissions if your project needs different bash command access
 
@@ -123,6 +123,6 @@ The harness uses three layers of protection:
 
 When editing shared concepts (behavior rules, security rules, project conventions), update ALL four harnesses:
 - `.github/copilot-instructions.md`
-- `.claude/CLAUDE.md`
+- `CLAUDE.md`
 - `.gemini/antigravity/AGENTS.md`
 - `AGENTS.md` (Kilo root)

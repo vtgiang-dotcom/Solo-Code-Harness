@@ -12,7 +12,10 @@ Write a handoff document summarising the current conversation so a fresh agent c
 
 ## Storage location
 
-Write to **`.claude/state/session-handoff.md`** (overwrite). This is the existing convention in this harness — do not save to temporary OS directories.
+Write to **`.solocode/session-handoff.md`** (overwrite). `.solocode/` is
+this harness's local state directory — gitignored, already used by the
+hooks (`shared-state.db`, `context-checkpoint.json`). Do not save to
+temporary OS directories, and do not commit handoffs.
 
 ---
 
@@ -68,6 +71,6 @@ Write to **`.claude/state/session-handoff.md`** (overwrite). This is the existin
 | File | Behaviour |
 |---|---|
 | **`session-handoff.md`** | Overwritten each session — clean start |
-| **`progress.md` (`.claude/state/progress.md`)** | Append-only log across sessions |
+| **`progress.md` (`.solocode/progress.md`)** | Append-only log across sessions |
 
 Do not merge them. Handoff = fresh state; progress = history.

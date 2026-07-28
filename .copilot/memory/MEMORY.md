@@ -86,7 +86,7 @@
   `antigravity-ide chat` only drives the GUI.
 - [decision] 2026-07-26: added `garden.check_doc_counts()` -- hardcoded
   counts in docs are now drift-checked, not trusted. It had rotted badly
-  (`.gemini/AGENTS.md` claimed "32 skills, 15 agents" for months with every
+  (`.gemini/antigravity/AGENTS.md` claimed "32 skills, 15 agents" for months with every
   gate green). Counts resolve **per engine**: a line naming `.gemini/` is
   measured against `.gemini/antigravity/`, since engines legitimately
   diverge (12 commands vs .kilo/'s 14) -- comparing everything to the

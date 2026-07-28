@@ -113,16 +113,24 @@ Use these to diagnose issues with any skill:
 
 ---
 
-## Eval-driven loop (trigger accuracy)
+## Trigger accuracy (manual — no automated checker exists)
 
-After drafting or editing a skill's `description`, validate it doesn't trigger on the wrong prompts:
+A skill's `description` is the only agent-facing hook. If two descriptions
+share trigger keywords, the wrong skill activates. There is **no automated
+trigger eval in this harness** — check it by hand:
 
-1. Add test case to `tools/schemas/skill_triggers.json` (if not already covered)
-2. Run: `python tools/eval.py --check-triggers`
-3. If the skill appears in any FAIL or FP output, refine `description` keywords
-4. Repeat until `python tools/eval.py --check-triggers` shows all PASS
+1. `grep -h '^description:' .kilo/skill/*/SKILL.md | sort` — read them as a
+   set and look for two skills claiming the same keywords.
+2. For any overlap, make each `description` name what makes it *distinct*
+   (the trigger condition), not just its topic.
+3. `python tools/garden.py` — verifies every skill has a valid SKILL.md and
+   that all engines carry the same body.
 
-**Why:** Skill `description` is the only agent-facing hook. If two descriptions share trigger keywords, the wrong skill may activate. The eval harness catches these overlaps.
+A previous version of this section told you to add cases to
+`tools/schemas/skill_triggers.json` and run `python tools/eval.py
+--check-triggers`. Neither has ever existed in this repo (checked with
+`git log --all`), so the loop could not run. If you build such a checker,
+wire it into `garden.py` so it is enforced rather than merely documented.
 
 ---
 
