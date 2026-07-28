@@ -841,6 +841,81 @@ def check_doc_flags(root: Path = ROOT) -> list[str]:
     return issues
 
 
+# A doc line claiming some *named script* will stop you. Vietnamese and
+# English, because the skills are written in both.
+_ENFORCE_VERB = re.compile(
+    r"(will block|blocks the|blocks your|prevents you|rejects|refuses|"
+    r"sẽ chặn|chặn commit|chặn bạn|từ chối|ném ra lỗi|báo lỗi và chặn)",
+    re.IGNORECASE,
+)
+_SCRIPT_IN_BACKTICKS = re.compile(r'`([A-Za-z0-9_./-]+\.(?:py|js|mjs|cjs|sh))`')
+
+# What a script must contain to be *capable* of blocking. A hook that only
+# ever exits 0 is advisory no matter how the prose describes it.
+_CAN_BLOCK = re.compile(
+    r"sys\.exit\([1-9]|process\.exit\([1-9]|exit\([1-9]|"
+    r"return 2\b|\"deny\"|'deny'|permissionDecision",
+)
+
+
+def check_enforcement_claims(root: Path = ROOT) -> list[str]:
+    """Verify that a script described as blocking can actually block.
+
+    check_doc_paths/check_doc_flags prove a citation *resolves*; neither
+    reads what the script does. algorithmic-discipline/SKILL.md told four
+    engines that `quality-gate.js` "sẽ tự động ném ra lỗi và chặn commit"
+    for a missing ALGO-CHECK tag. That file never mentions ALGO-CHECK, and
+    all three of its exits are `process.exit(0)` -- its own header even
+    says "1 = WARNING (non-blocking)". The prose invented an enforcement
+    layer, which is worse than no rule: it invites relying on it.
+
+    Deliberately narrow. Only fires when a line pairs a blocking verb with
+    a backticked script path, so it cannot judge prose in general -- but
+    that pairing is exactly the claim a reader will act on.
+    """
+    issues: list[str] = []
+    skip_dirs = {".git", "node_modules", ".venv", ".pytest_cache",
+                 ".ruff_cache", ".solocode", "__pycache__"}
+    verdict: dict[str, bool] = {}
+
+    for md in sorted(root.rglob("*.md")):
+        if any(part in skip_dirs for part in md.parts):
+            continue
+        posix = md.as_posix()
+        if "decisions-archive" in md.name or "/plans/" in posix:
+            continue
+        try:
+            text = md.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+
+        for lineno, line in enumerate(text.splitlines(), 1):
+            if not _ENFORCE_VERB.search(line):
+                continue
+            if any(m in line.lower() for m in _PATH_NEGATION_MARKERS):
+                continue
+            for script in _SCRIPT_IN_BACKTICKS.findall(line):
+                if script not in verdict:
+                    hits = [p for p in root.rglob(script.split("/")[-1])
+                            if p.is_file()
+                            and not any(d in p.parts for d in skip_dirs)
+                            and p.as_posix().endswith(script)]
+                    verdict[script] = bool(hits) and any(
+                        _CAN_BLOCK.search(
+                            p.read_text(encoding="utf-8", errors="ignore")
+                        )
+                        for p in hits
+                    )
+                    if not hits:  # missing file is check_doc_paths' job
+                        verdict[script] = True
+                if not verdict[script]:
+                    issues.append(
+                        f"{md.relative_to(root).as_posix()}:{lineno} says "
+                        f"`{script}` blocks/rejects, but it only ever exits 0"
+                    )
+    return issues
+
+
 def main() -> int:
     kilo = ROOT / ".kilo"
 
@@ -929,6 +1004,17 @@ def main() -> int:
         all_issues.extend(flag_issues)
     else:
         print("[OK] Document flags")
+
+    # Enforcement claims — can a script called "blocking" actually block?
+    print("\n--- Enforcement Claims ---")
+    enforce_issues = check_enforcement_claims(ROOT)
+    if enforce_issues:
+        print("[DRIFT] Docs claim enforcement that the script cannot perform:")
+        for i in enforce_issues:
+            print(f"  {i}")
+        all_issues.extend(enforce_issues)
+    else:
+        print("[OK] Enforcement claims")
 
     print(f"\nTotal drift issues: {len(all_issues)}")
     if all_issues:

@@ -38,4 +38,4 @@ function findDuplicates(arr) {
 ```
 
 ## Báo lỗi (Violation)
-Nếu bạn viết vòng lặp mà KHÔNG có thẻ `ALGO-CHECK`, hệ thống `quality-gate.js` hook sẽ tự động ném ra lỗi và chặn commit của bạn.
+Không có hook nào kiểm tra thẻ `ALGO-CHECK` — `quality-gate.js` chỉ chạy prettier/biome/ruff/gofmt và luôn `process.exit(0)`, nên nó không thể chặn bất cứ thứ gì. Quy tắc này do agent tự giữ; người review là lớp thực thi duy nhất.

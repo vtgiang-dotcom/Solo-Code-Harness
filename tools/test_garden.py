@@ -433,3 +433,62 @@ def test_check_doc_flags_accepts_hand_rolled_argv_flag(tmp_path):
         "Run `python tools/cli.py --strict`.", encoding="utf-8"
     )
     assert garden.check_doc_flags(root=root) == []
+
+
+# --- check_enforcement_claims ------------------------------------------------
+
+
+def _enforce_fixture(tmp_path, hook_src: str, doc: str):
+    root = tmp_path
+    (root / ".kilo" / "hooks").mkdir(parents=True)
+    (root / ".kilo" / "hooks" / "gate.js").write_text(hook_src, encoding="utf-8")
+    (root / "AGENTS.md").write_text(doc, encoding="utf-8")
+    return root
+
+
+_ADVISORY_HOOK = "console.error('warn');\nprocess.exit(0);\n"
+_BLOCKING_HOOK = "console.error('nope');\nprocess.exit(2);\n"
+
+
+def test_check_enforcement_claims_detects_advisory_hook(tmp_path):
+    """The real bug: a doc promising a block from a hook that only exits 0."""
+    root = _enforce_fixture(
+        tmp_path, _ADVISORY_HOOK, "`gate.js` will block the commit."
+    )
+    issues = garden.check_enforcement_claims(root=root)
+    assert any("gate.js" in i for i in issues), issues
+
+
+def test_check_enforcement_claims_accepts_real_blocker(tmp_path):
+    """A hook that can exit non-zero backs its claim — must stay silent."""
+    root = _enforce_fixture(
+        tmp_path, _BLOCKING_HOOK, "`gate.js` will block the commit."
+    )
+    assert garden.check_enforcement_claims(root=root) == []
+
+
+def test_check_enforcement_claims_detects_vietnamese_claim(tmp_path):
+    """Skills in this harness are written in Vietnamese as often as English."""
+    root = _enforce_fixture(
+        tmp_path, _ADVISORY_HOOK, "Hook `gate.js` sẽ chặn commit của bạn."
+    )
+    issues = garden.check_enforcement_claims(root=root)
+    assert any("gate.js" in i for i in issues), issues
+
+
+def test_check_enforcement_claims_ignores_prose_without_script(tmp_path):
+    """No named script means no checkable claim; stay out of general prose."""
+    root = _enforce_fixture(
+        tmp_path, _ADVISORY_HOOK, "The review process will block bad commits."
+    )
+    assert garden.check_enforcement_claims(root=root) == []
+
+
+def test_check_enforcement_claims_respects_negation_marker(tmp_path):
+    """Docs correcting the record must not be punished for naming the script."""
+    root = _enforce_fixture(
+        tmp_path,
+        _ADVISORY_HOOK,
+        "`gate.js` no longer blocks the commit — it is advisory only.",
+    )
+    assert garden.check_enforcement_claims(root=root) == []
