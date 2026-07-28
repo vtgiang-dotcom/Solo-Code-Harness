@@ -39,7 +39,7 @@ python -m pytest tools/ -q
 
 ### Gate 6: Eval Score
 ```bash
-python tools/eval_harness.py --min-score 60
+python .github/scripts/eval_harness.py .
 ```
 
 ### Gate 7: Debug Artifacts

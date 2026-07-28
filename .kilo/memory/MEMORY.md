@@ -67,6 +67,34 @@
   `/sse` endpoint is dead (404). Also deleted a vendored 18MB
   `linear-master/` SDK checkout that was untracked AND ungitignored --
   one `git add -A` from entering the repo.
+- [decision] 2026-07-28: closed the **"docs assert infrastructure that
+  does not exist"** class with 5 machine gates in `garden.py`, after it
+  produced 6 separate bugs that every gate passed for months.
+  `check_doc_counts()` (2026-07-26, counts resolve per engine),
+  `check_doc_paths()` (cited path must resolve), `check_doc_flags()`
+  (documented flag must exist), `check_enforcement_claims()` (a script
+  called "blocking" must contain a non-zero exit), `check_skill_refs()`
+  (a skill named as a skill must exist). What they caught: `.opencode/*`
+  refs surviving the v4.0.0 engine removal; `.claude/state/` called "the
+  existing convention" though `git log --all` shows it never existed;
+  `tools/eval.py --check-triggers`; `garden.py --strict` on a script with
+  zero argv handling; `quality-gate.js` promising to block a missing
+  ALGO-CHECK tag while all 3 of its exits are `process.exit(0)`; and the
+  router `using-agent-skills` pointing at 5 skills that never existed
+  (104 refs x 4 engines) while real counterparts sat under other names.
+  Design rule learned the hard way: **verify generously, flag narrowly.**
+  Draft 1 of the flag check fired on real subcommand flags (fixed by
+  unioning per-subcommand `--help` + source text, since hand-rolled argv
+  parsers emit no help); draft 1 of the skill check matched bare
+  kebab-case and returned 190 hits, nearly all npm packages and YAML keys
+  -- requiring an explicit marker (`` `x` skill ``, `skills/x/SKILL.md`,
+  or a router arrow on a line containing `?`) dropped it to 0 while still
+  catching all 104. A gate that cries wolf gets disabled, so a false
+  positive costs more than a miss. Every gate was fault-injected before
+  commit. Standing limit, do not re-litigate without new evidence: these
+  check that citations *resolve*, never that prose *descriptions* are
+  accurate -- that needs semantics, i.e. an LLM, i.e. non-determinism, and
+  a gate that fires only sometimes is worse than none.
 - [decision] 2026-07-26: made Gemini/Antigravity a first-class worker
   alongside jcode, after two controlled tests. Root problem: the harness
   *pushed* jcode into every session (`_jcode_available()` + a trigger-rich
@@ -84,27 +112,3 @@
   the report's existence is the completion signal) and banned re-litigating
   headless access: the SDK has no OAuth path to the Pro plan and
   `antigravity-ide chat` only drives the GUI.
-- [decision] 2026-07-26: added `garden.check_doc_counts()` -- hardcoded
-  counts in docs are now drift-checked, not trusted. It had rotted badly
-  (`.gemini/antigravity/AGENTS.md` claimed "32 skills, 15 agents" for months with every
-  gate green). Counts resolve **per engine**: a line naming `.gemini/` is
-  measured against `.gemini/antigravity/`, since engines legitimately
-  diverge (12 commands vs .kilo/'s 14) -- comparing everything to the
-  source of truth produced 2 false positives in the first draft. Fixed 20
-  real stale counts + a 3.6.0/4.0.0 version lie in the plugin manifests.
-- [decision] 2026-07-25: repaired `verify.sh` (6/31 -> 31/31 PASS). Root
-  causes, all silent: (a) it probed `command -v python3`, which on Windows
-  resolves to a Microsoft Store *stub* that exits with an install prompt --
-  so every gated garden/test check "failed" while passing when run directly;
-  now probes by executing `-c "import sys"`. (b) stale paths: `.claude/
-  CLAUDE.md` -> `CLAUDE.md`, flat `.claude/skills/$sk.md` -> `$sk/SKILL.md`,
-  `pytest tools/test_harness.py` (deleted v4.0.0) -> `pytest tools/ -q`,
-  node guard test -> `pytest tools/test_claude_guard.py`. (c) the `socratic`
-  keyword check was NOT stale -- CLAUDE.md genuinely lacked AGENTS.md's
-  Complex Tasks section, so fixed the source template in `claude_engine.py`
-  rather than deleting the check. Security: whitelisted vendored
-  `antigravity-sdk-python-main` in security_scan SKIP_DIRS (fake fixture
-  string) and added a `bcrypt/scrypt/argon2` gitleaks regex allowlist (it
-  read password-hashing *prose* as an assignment). Fault-injected a real
-  fake secret into both scanners afterward to prove they still fire -- an
-  allowlist that disables detection is worse than the false positive.

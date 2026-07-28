@@ -123,6 +123,7 @@ python tools/shared_state.py locks
 | Lint | `ruff check .` | Python code style |
 | Schema | `make validate` | `.kilo/` agent + skill frontmatter validity |
 | Drift | `make garden` | `.kilo` ↔ `.claude` (generated) / `.copilot` / `.gemini` (manual parity) |
+| Document truth | `make garden` | Counts, cited paths, documented CLI flags, enforcement claims and skill references must match reality — see [SPEC.md §7.2.1](SPEC.md) |
 | Harness Tests | `make test` | Generator + shared-state (`tools/test_*.py`) |
 | Integration | `python tools/test_integration.py` | Copilot structure + shared state schema |
 | Security | `make security-scan` | Hardcoded secrets |
@@ -396,6 +397,7 @@ python tools/deploy.py
 | Lint | `ruff check .` | Python code style |
 | Schema | `make validate` | Frontmatter agent + skill trong `.kilo/` |
 | Drift | `make garden` | `.kilo` ↔ `.claude` (sinh tự động) / `.copilot` / `.gemini` (giữ song song thủ công) |
+| Document truth | `make garden` | Số đếm, path trích dẫn, flag CLI, tuyên bố "chặn" và tên skill phải khớp thực tế — xem [SPEC.md §7.2.1](SPEC.md) |
 | Harness Tests | `make test` | Generator + shared-state (`tools/test_*.py`) |
 | Integration | `python tools/test_integration.py` | Cấu trúc Copilot + schema shared state |
 | Security | `make security-scan` | Secret hardcode |

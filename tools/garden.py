@@ -825,7 +825,17 @@ def check_doc_flags(root: Path = ROOT) -> list[str]:
                 continue
             for script, rest in _DOC_CMD.findall(line):
                 flags = _LONG_FLAG.findall(rest)
-                if not flags or not (root / script).exists():
+                if not flags:
+                    continue
+                if not (root / script).exists():
+                    # Missing script in a fenced command block. check_doc_paths()
+                    # only reads backticked paths, so `python tools/eval_harness.py
+                    # --min-score 60` inside a ```bash fence was invisible to both
+                    # checks -- wrong directory AND an invented flag.
+                    issues.append(
+                        f"{md.relative_to(root).as_posix()}:{lineno} runs "
+                        f"`python {script}` — no such script"
+                    )
                     continue
                 if script not in help_cache:
                     help_cache[script] = _script_flag_surface(root, script)

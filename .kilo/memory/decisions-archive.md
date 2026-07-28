@@ -159,3 +159,20 @@ created: 2026-07-24
   generator does. Also made generator writes LF-explicit (`_write_lf`):
   `Path.write_text` emits CRLF on Windows, which git hides here but
   `deploy.py` copies verbatim into non-git target projects. +3 tests (123).
+
+- [decision] 2026-07-25: repaired `verify.sh` (6/31 -> 31/31 PASS). Root
+  causes, all silent: (a) it probed `command -v python3`, which on Windows
+  resolves to a Microsoft Store *stub* that exits with an install prompt --
+  so every gated garden/test check "failed" while passing when run directly;
+  now probes by executing `-c "import sys"`. (b) stale paths: `.claude/
+  CLAUDE.md` -> `CLAUDE.md`, flat `.claude/skills/$sk.md` -> `$sk/SKILL.md`,
+  `pytest tools/test_harness.py` (deleted v4.0.0) -> `pytest tools/ -q`,
+  node guard test -> `pytest tools/test_claude_guard.py`. (c) the `socratic`
+  keyword check was NOT stale -- CLAUDE.md genuinely lacked AGENTS.md's
+  Complex Tasks section, so fixed the source template in `claude_engine.py`
+  rather than deleting the check. Security: whitelisted vendored
+  `antigravity-sdk-python-main` in security_scan SKIP_DIRS (fake fixture
+  string) and added a `bcrypt/scrypt/argon2` gitleaks regex allowlist (it
+  read password-hashing *prose* as an assignment). Fault-injected a real
+  fake secret into both scanners afterward to prove they still fire -- an
+  allowlist that disables detection is worse than the false positive.

@@ -157,8 +157,35 @@ thiểu một key permission (`permissions:` hoặc `permission:`).
 ### 7.2 Skill trigger validation
 
 `python tools/validate_schemas.py` kiểm tra frontmatter mọi agent/skill.
-`python tools/garden.py` kiểm tra parity + content drift. Không dependency
+`python tools/garden.py` kiểm tra parity + content drift, cộng 5 gate
+chống "tài liệu khẳng định thứ không tồn tại" (§7.2.1). Không dependency
 ngoài stdlib.
+
+#### 7.2.1 Document-truth gates
+
+Parity chỉ chứng minh 4 engine nói **giống nhau** — không chứng minh điều
+chúng nói là **đúng**. Năm gate sau đóng khoảng trống đó; mỗi gate sinh ra
+từ một lỗi thật đã sống nhiều tháng với mọi gate xanh:
+
+| Gate | Mệnh đề kiểm tra | Lỗi đã bắt |
+|---|---|---|
+| `check_doc_counts()` | số đếm hardcode khớp thực tế (resolve **theo từng engine**) | `.gemini/` khai "32 skills, 15 agents" |
+| `check_doc_paths()` | path trong backtick phải resolve | `.opencode/*` sót lại sau khi gỡ engine ở v4.0.0; `.claude/state/` bị gọi là "existing convention" dù `git log --all` cho thấy chưa từng tồn tại |
+| `check_doc_flags()` | flag trong lệnh documented phải tồn tại | `garden.py --strict` trên script không hề đọc `sys.argv` |
+| `check_enforcement_claims()` | script được mô tả là "chặn" phải có exit khác 0 | `quality-gate.js` hứa chặn khi thiếu `ALGO-CHECK`, trong khi cả 3 exit đều là `process.exit(0)` |
+| `check_skill_refs()` | tên được nêu **như một skill** phải tồn tại | router `using-agent-skills` trỏ tới 5 skill chưa từng có (104 tham chiếu × 4 engine) |
+
+Nguyên tắc thiết kế: **xác minh rộng rãi, báo lỗi hẹp.** Một gate báo bừa
+sẽ bị tắt, nên false positive đắt hơn bỏ sót. Cụ thể: `check_doc_flags()`
+hợp nhất `--help` cấp cao + `--help` từng subcommand + source text (parser
+`sys.argv` viết tay không sinh help); `check_skill_refs()` chỉ nhận 3 dạng
+có dấu hiệu tường minh — bản nháp bắt kebab-case trần cho ra 190 hit mà
+gần hết là npm package và YAML key.
+
+Giới hạn đã biết, đừng tranh luận lại nếu không có bằng chứng mới: các gate
+này kiểm tra trích dẫn có **resolve**, không kiểm tra **mô tả bằng văn xuôi
+có đúng**. Việc đó cần hiểu ngữ nghĩa → cần LLM → phi tất định, mà một gate
+lúc bắn lúc không thì tệ hơn không có.
 
 ### 7.3 User-invoked vs Model-invoked skill classification
 

@@ -15,7 +15,7 @@ Run all verification gates in order. Stop at the first failure.
 
 ### Gate 1: Security Scan
 ```bash
-python .github/scripts/security_scan.py . --strict
+python .github/scripts/security_scan.py .
 ```
 Expected: exit 0, "No issues found."
 
@@ -29,7 +29,7 @@ Expected: exit 0, no errors.
 ```bash
 python tools/garden.py
 ```
-Expected: "0 errors, 0 warnings"
+Expected: exit 0, "Total drift issues: 0".
 
 ### Gate 4: Integration Tests
 ```bash
@@ -45,9 +45,9 @@ Expected: all tests pass.
 
 ### Gate 6: Eval Score
 ```bash
-python tools/eval_harness.py --min-score 60
+python .github/scripts/eval_harness.py .
 ```
-Expected: score >= 60.
+Expected: exit 0, "All evals passed" (59/59).
 
 ### Gate 7: Debug Artifacts
 Check for leftover debug statements:

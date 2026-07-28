@@ -564,3 +564,19 @@ def test_check_skill_refs_ignores_npm_package(tmp_path):
         tmp_path, "Install `express-rate-limit` and set disable-model-invocation.\n"
     )
     assert garden.check_skill_refs(root=root) == []
+
+
+def test_check_doc_flags_detects_missing_script(tmp_path):
+    """A fenced `python tools/x.py --flag` where x.py is in the wrong dir.
+
+    check_doc_paths() only reads backticked paths, so a command inside a
+    ```bash fence was invisible to both checks -- gate-check.md ran
+    `python tools/eval_harness.py --min-score 60` when the script lives in
+    .github/scripts/ and no such flag ever existed.
+    """
+    root = _flag_fixture(tmp_path, _ARGPARSE_CLI)
+    (root / "AGENTS.md").write_text(
+        "```bash\npython tools/missing.py --real\n```", encoding="utf-8"
+    )
+    issues = garden.check_doc_flags(root=root)
+    assert any("no such script" in i for i in issues), issues

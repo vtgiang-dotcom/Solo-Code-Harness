@@ -9,7 +9,7 @@ Run all verification gates in order. Stop at first failure.
 
 ## Gate 1: Security Scan
 ```bash
-python .github/scripts/security_scan.py . --strict
+python .github/scripts/security_scan.py .
 ```
 
 ## Gate 2: Lint
@@ -34,7 +34,7 @@ python -m pytest tools/ -q
 
 ## Gate 6: Eval Score
 ```bash
-python tools/eval_harness.py --min-score 60
+python .github/scripts/eval_harness.py .
 ```
 
 ## Gate 7: Debug Artifacts
