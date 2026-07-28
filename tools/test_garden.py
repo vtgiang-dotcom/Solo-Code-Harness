@@ -492,3 +492,75 @@ def test_check_enforcement_claims_respects_negation_marker(tmp_path):
         "`gate.js` no longer blocks the commit — it is advisory only.",
     )
     assert garden.check_enforcement_claims(root=root) == []
+
+
+# --- check_skill_refs --------------------------------------------------------
+
+
+def _skillref_fixture(tmp_path, body: str):
+    root = tmp_path
+    for name in ("plan", "testing-patterns"):
+        d = root / ".kilo" / "skill" / name
+        d.mkdir(parents=True)
+        (d / "SKILL.md").write_text(f"# {name}\n", encoding="utf-8")
+    (root / ".kilo" / "agents").mkdir(parents=True)
+    (root / ".kilo" / "agents" / "tdd-guide.md").write_text("x", encoding="utf-8")
+    (root / ".kilo" / "command").mkdir(parents=True)
+    (root / ".kilo" / "skill" / "plan" / "SKILL.md").write_text(
+        body, encoding="utf-8"
+    )
+    return root
+
+
+def test_check_skill_refs_detects_phantom_in_prose(tmp_path):
+    """The real bug: `x` skill where x never existed."""
+    root = _skillref_fixture(tmp_path, "See `test-driven-development` skill.\n")
+    issues = garden.check_skill_refs(root=root)
+    assert any("test-driven-development" in i for i in issues), issues
+
+
+def test_check_skill_refs_detects_phantom_in_router_arrow(tmp_path):
+    root = _skillref_fixture(
+        tmp_path, "    - Writing tests? ----> test-driven-development\n"
+    )
+    issues = garden.check_skill_refs(root=root)
+    assert any("test-driven-development" in i for i in issues), issues
+
+
+def test_check_skill_refs_detects_phantom_in_path_form(tmp_path):
+    root = _skillref_fixture(
+        tmp_path, "Follow `skills/test-driven-development/SKILL.md`.\n"
+    )
+    issues = garden.check_skill_refs(root=root)
+    assert any("test-driven-development" in i for i in issues), issues
+
+
+def test_check_skill_refs_accepts_real_skill(tmp_path):
+    root = _skillref_fixture(tmp_path, "See `testing-patterns` skill.\n")
+    assert garden.check_skill_refs(root=root) == []
+
+
+def test_check_skill_refs_accepts_agent_name(tmp_path):
+    """Skills legitimately reference agents, not just other skills."""
+    root = _skillref_fixture(tmp_path, "Delegate to `tdd-guide` skill.\n")
+    assert garden.check_skill_refs(root=root) == []
+
+
+def test_check_skill_refs_ignores_pipeline_diagram(tmp_path):
+    """`decompose -> research -> build -> verdict` are stages, not skills.
+
+    Requiring a `?` on the line is what separates a routing decision from a
+    flow diagram; without it this produced a false positive on spike/.
+    """
+    root = _skillref_fixture(
+        tmp_path, "```\ndecompose  ----> research  ----> verdict\n```\n"
+    )
+    assert garden.check_skill_refs(root=root) == []
+
+
+def test_check_skill_refs_ignores_npm_package(tmp_path):
+    """A first draft flagged 190 npm packages and YAML keys as skills."""
+    root = _skillref_fixture(
+        tmp_path, "Install `express-rate-limit` and set disable-model-invocation.\n"
+    )
+    assert garden.check_skill_refs(root=root) == []

@@ -916,6 +916,76 @@ def check_enforcement_claims(root: Path = ROOT) -> list[str]:
     return issues
 
 
+# A skill reference is only checkable when the doc marks it AS a skill.
+# Bare kebab-case is not a signal: a first draft of this check produced 190
+# hits, nearly all npm packages (`express-rate-limit`, `chrome-devtools-mcp`),
+# YAML keys (`disable-model-invocation`), branch names and hyphenated prose.
+# These three forms carry an explicit marker, so they cannot be confused.
+_SKILL_REF_FORMS = (
+    # skills/<name>/SKILL.md — an actual path claim
+    re.compile(r'skills?/([a-z][a-z0-9-]{4,})/SKILL\.md'),
+    # router arrow: "├── Reviewing code? ──→ code-review-expert". The `?` is
+    # required -- it marks a routing *decision*. Without it the pattern also
+    # matched pipeline diagrams ("decompose → research → build → verdict"),
+    # whose nodes are stages, not skills.
+    re.compile(r'\?[^\n]*?(?:→|-->)\s*`?([a-z][a-z0-9-]{4,})`?\s*$'),
+    # the word "skill" adjacent: "See `x` skill", "skill `x`"
+    re.compile(r'`([a-z][a-z0-9-]{4,})`\s+skill\b'),
+    re.compile(r'\bskill\s+`([a-z][a-z0-9-]{4,})`'),
+)
+
+
+def check_skill_refs(root: Path = ROOT) -> list[str]:
+    """Verify skill names cited as skills resolve to a real skill.
+
+    The router (`using-agent-skills`) sent readers to five skills that have
+    never existed -- `test-driven-development`, `code-review-and-quality`,
+    `code-simplification`, `git-workflow-and-versioning` and
+    `api-and-interface-design` -- 104 references across four engines. Each
+    had a real counterpart under a different name (`testing-patterns`,
+    `code-review-expert`, `simplify-code`, `git-workflow-master`,
+    `api-patterns`), so the harness looked complete while its own index
+    pointed at nothing.
+
+    Invisible to check_doc_paths(): the names appear as bare words, not
+    paths, and every one reads like a plausible skill. Agents and commands
+    count as valid targets, since skills legitimately reference both.
+
+    Known limit: only the marked forms in _SKILL_REF_FORMS are checked, so
+    a bare mention in a heading ("### With test-driven-development") still
+    slips through. Widening it costs more in false positives than the
+    remaining coverage is worth.
+    """
+    issues: list[str] = []
+    real = {p.parent.name for p in (root / ".kilo" / "skill").glob("*/SKILL.md")}
+    real |= {p.stem for p in (root / ".kilo" / "agents").glob("*.md")}
+    real |= {p.stem for p in (root / ".kilo" / "command").glob("*.md")}
+    if not real:  # not a harness layout; nothing to assert
+        return issues
+
+    skill_dirs = [".kilo/skill", ".claude/skills", ".copilot/skill",
+                  ".gemini/antigravity/skills"]
+    for d in skill_dirs:
+        for md in sorted((root / d).glob("*/SKILL.md")):
+            try:
+                text = md.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            own = md.parent.name
+            for lineno, line in enumerate(text.splitlines(), 1):
+                if any(m in line.lower() for m in _PATH_NEGATION_MARKERS):
+                    continue
+                for pattern in _SKILL_REF_FORMS:
+                    for name in pattern.findall(line):
+                        if name in real or name == own:
+                            continue
+                        issues.append(
+                            f"{md.relative_to(root).as_posix()}:{lineno} routes "
+                            f"to `{name}` — no such skill, agent or command"
+                        )
+    return issues
+
+
 def main() -> int:
     kilo = ROOT / ".kilo"
 
@@ -1015,6 +1085,17 @@ def main() -> int:
         all_issues.extend(enforce_issues)
     else:
         print("[OK] Enforcement claims")
+
+    # Skill references — does the router point at skills that exist?
+    print("\n--- Skill References ---")
+    ref_issues = check_skill_refs(ROOT)
+    if ref_issues:
+        print("[DRIFT] Skill docs reference skills that do not exist:")
+        for i in ref_issues:
+            print(f"  {i}")
+        all_issues.extend(ref_issues)
+    else:
+        print("[OK] Skill references")
 
     print(f"\nTotal drift issues: {len(all_issues)}")
     if all_issues:

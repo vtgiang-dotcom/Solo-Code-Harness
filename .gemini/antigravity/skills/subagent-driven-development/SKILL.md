@@ -249,7 +249,7 @@ This skill EXECUTES plans created by the `plan` skill:
 1. User requirements → plan → implementation plan
 2. Implementation plan → subagent-driven-development → working code
 
-### With test-driven-development
+### With testing-patterns
 
 Implementer subagents should follow TDD:
 1. Write failing test first

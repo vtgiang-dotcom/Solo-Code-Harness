@@ -254,7 +254,7 @@ element.textContent = userInput;
 **subagent-driven-development:** Run this after EACH task as the quality gate.
 The two-stage review (spec compliance + code quality) uses this pipeline.
 
-**test-driven-development:** This pipeline verifies TDD discipline was followed —
+**testing-patterns:** This pipeline verifies TDD discipline was followed —
 tests exist, tests pass, no regressions.
 
 **plan:** Validates implementation matches the plan requirements.

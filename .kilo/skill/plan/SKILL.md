@@ -272,7 +272,7 @@ Every task that produces code should include the full TDD cycle:
 3. Write minimal code
 4. Run to verify pass
 
-See `test-driven-development` skill for details.
+See `testing-patterns` skill for details.
 
 ### Frequent Commits
 
