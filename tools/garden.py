@@ -679,6 +679,73 @@ def check_doc_counts(root: Path = ROOT) -> list[str]:
     return issues
 
 
+_PATH_IN_BACKTICKS = re.compile(
+    r'`([A-Za-z0-9_][A-Za-z0-9_./-]*\.'
+    r'(?:py|md|sh|ps1|js|mjs|cjs|json|jsonc|toml|yaml|yml|txt|sql|lock))`'
+)
+
+# A line carrying one of these is making a point ABOUT a missing/renamed path
+# (e.g. SPEC.md: "at ROOT, not `.claude/CLAUDE.md`"). Flagging those would
+# punish the docs for being precise, so they opt out explicitly.
+_PATH_NEGATION_MARKERS = (
+    "not exist", "doesn't exist", "does not exist", "never existed",
+    "no longer", "removed", "deleted", "outdated", "stale", "deprecated",
+    "instead of", "not `", "khong ton tai", "không tồn tại", "đã lỗi thời",
+    "da loi thoi", "thay vì", "thay vi", "không phải", "khong phai",
+)
+
+# Generated at runtime, so absence is normal rather than drift.
+_RUNTIME_PATH_PREFIXES = (".solocode/", ".kilo/logs/", ".claude/logs/")
+
+
+def check_doc_paths(root: Path = ROOT) -> list[str]:
+    """Verify that repo paths cited in docs actually resolve on disk.
+
+    Motivated by three real cases that survived every gate for months:
+    `.opencode/tests/test-guard.mjs` in the PR checklist, `.claude/state/`
+    called "the existing convention" in handoff/SKILL.md, and a
+    `tools/eval.py --check-triggers` loop in writing-great-skills -- none
+    of which existed. Counts were already checked; paths were not.
+
+    Only *anchored* paths are checked: the first segment must match a real
+    top-level entry (so `src/models/user.py` in a generic example is
+    ignored). Lines that explicitly say a path is missing/renamed opt out
+    via _PATH_NEGATION_MARKERS, and runtime-generated paths are skipped.
+    """
+    issues: list[str] = []
+    skip_dirs = {".git", "node_modules", ".venv", ".pytest_cache",
+                 ".ruff_cache", ".solocode", "__pycache__"}
+    top_level = {p.name for p in root.iterdir() if p.name not in skip_dirs}
+
+    for md in sorted(root.rglob("*.md")):
+        if any(part in skip_dirs for part in md.parts):
+            continue
+        # Archives and plan snapshots describe history; paths may be gone by design.
+        posix = md.as_posix()
+        if "decisions-archive" in md.name or "/plans/" in posix:
+            continue
+        try:
+            text = md.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+
+        for lineno, line in enumerate(text.splitlines(), 1):
+            low = line.lower()
+            if any(marker in low for marker in _PATH_NEGATION_MARKERS):
+                continue
+            for cited in _PATH_IN_BACKTICKS.findall(line):
+                if "/" not in cited or cited.split("/", 1)[0] not in top_level:
+                    continue
+                if cited.startswith(_RUNTIME_PATH_PREFIXES):
+                    continue
+                if not (root / cited).exists():
+                    issues.append(
+                        f"{md.relative_to(root).as_posix()}:{lineno} cites "
+                        f"`{cited}` — no such path"
+                    )
+    return issues
+
+
 def main() -> int:
     kilo = ROOT / ".kilo"
 
@@ -745,6 +812,17 @@ def main() -> int:
         all_issues.extend(doc_issues)
     else:
         print("[OK] Document counts")
+
+    # Document paths — do cited repo paths actually resolve?
+    print("\n--- Document Paths ---")
+    path_issues = check_doc_paths(ROOT)
+    if path_issues:
+        print("[DRIFT] Docs cite paths that do not exist:")
+        for i in path_issues:
+            print(f"  {i}")
+        all_issues.extend(path_issues)
+    else:
+        print("[OK] Document paths")
 
     print(f"\nTotal drift issues: {len(all_issues)}")
     if all_issues:

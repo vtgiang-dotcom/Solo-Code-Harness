@@ -305,3 +305,68 @@ def test_check_doc_counts_unnamed_line_falls_back_to_kilo(tmp_path):
 
     issues = garden.check_doc_counts(root=tmp_path)
     assert any("claimed 2 commands, but ground truth is 1" in i for i in issues), issues
+
+
+# ── check_doc_paths ──────────────────────────────────────────────────────
+
+
+def _doc_paths_fixture(tmp_path):
+    """Minimal repo: one real tool + a docs file citing paths."""
+    (tmp_path / "tools").mkdir()
+    (tmp_path / "tools" / "real.py").write_text("x", encoding="utf-8")
+    return tmp_path
+
+
+def test_check_doc_paths_detects_missing_path(tmp_path):
+    root = _doc_paths_fixture(tmp_path)
+    (root / "AGENTS.md").write_text(
+        "Run `tools/ghost.py` before shipping.", encoding="utf-8"
+    )
+    issues = garden.check_doc_paths(root=root)
+    assert any("tools/ghost.py" in i for i in issues), issues
+    assert any("AGENTS.md:1" in i for i in issues), issues
+
+
+def test_check_doc_paths_clean_when_path_exists(tmp_path):
+    root = _doc_paths_fixture(tmp_path)
+    (root / "AGENTS.md").write_text("Run `tools/real.py`.", encoding="utf-8")
+    assert garden.check_doc_paths(root=root) == []
+
+
+def test_check_doc_paths_ignores_generic_examples(tmp_path):
+    """`src/models/user.py` is illustrative, not a claim about this repo."""
+    root = _doc_paths_fixture(tmp_path)
+    (root / "AGENTS.md").write_text(
+        "For example, edit `src/models/user.py` or `path/to/file.json`.",
+        encoding="utf-8",
+    )
+    assert garden.check_doc_paths(root=root) == []
+
+
+def test_check_doc_paths_respects_negation_marker(tmp_path):
+    """Docs may name a dead path precisely to warn about it."""
+    root = _doc_paths_fixture(tmp_path)
+    (root / "AGENTS.md").write_text(
+        "The rulebook is at ROOT, not `tools/old_location.py`.", encoding="utf-8"
+    )
+    assert garden.check_doc_paths(root=root) == []
+
+
+def test_check_doc_paths_skips_runtime_generated(tmp_path):
+    root = _doc_paths_fixture(tmp_path)
+    (root / ".solocode").mkdir()
+    (root / "AGENTS.md").write_text(
+        "Checkpoints land in `.solocode/context-checkpoint.json`.", encoding="utf-8"
+    )
+    assert garden.check_doc_paths(root=root) == []
+
+
+def test_check_doc_paths_skips_archives_and_plans(tmp_path):
+    """History files describe a past layout; their paths may be gone."""
+    root = _doc_paths_fixture(tmp_path)
+    (root / "decisions-archive.md").write_text(
+        "We removed `tools/gone.py`.", encoding="utf-8"
+    )
+    (root / "plans").mkdir()
+    (root / "plans" / "old.md").write_text("Touch `tools/gone.py`.", encoding="utf-8")
+    assert garden.check_doc_paths(root=root) == []

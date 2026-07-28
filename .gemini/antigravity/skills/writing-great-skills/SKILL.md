@@ -126,11 +126,12 @@ trigger eval in this harness** — check it by hand:
 3. `python tools/garden.py` — verifies every skill has a valid SKILL.md and
    that all engines carry the same body.
 
-A previous version of this section told you to add cases to
-`tools/schemas/skill_triggers.json` and run `python tools/eval.py
---check-triggers`. Neither has ever existed in this repo (checked with
-`git log --all`), so the loop could not run. If you build such a checker,
-wire it into `garden.py` so it is enforced rather than merely documented.
+A previous version of this section told you to add cases to a
+`tools/schemas/skill_triggers.json` that does not exist and run `python
+tools/eval.py --check-triggers`, which does not exist either (confirmed
+with `git log --all` — they were never in this repo), so the loop could
+not run. If you build such a checker, wire it into `garden.py` so it is
+enforced rather than merely documented.
 
 ---
 
