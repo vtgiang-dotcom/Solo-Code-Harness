@@ -216,35 +216,41 @@ Two external LLM providers are configured in `.vscode/settings.json`. Switch mod
 - If cost matters → prefer `deepseek-chat`
 - If analyzing large files / repos → prefer `gemini-2.5-pro` (1M token context)
 
-## Shared State — Cross-Engine Collaboration (MANDATORY)
+## Shared State — Cross-Engine Collaboration (local-only)
 
-This project uses `.solocode/shared-state.db` (SQLite, local-only — NOT committed to git) as the single source of truth for development status across all 5 engines (OpenCode, Claude Code, Kilo, Copilot, Gemini).
+`.solocode/shared-state.db` (SQLite, gitignored — not committed) carries
+state between engines running on the same machine.
 
-### Session Start
-1. Read state via `python tools/shared_state.py show`
-2. Check `active_locks` — avoid editing files locked by another engine
-3. Check `features` — find one `in-progress` (or promote a `not-started` → `in-progress`)
-4. Review recent session log entries for context
-5. Load `shared_memory` conventions/gotchas into current session context
+### What actually runs (measured 2026-07-28)
+| Table | Rows | Written by |
+|---|---:|---|
+| `session_log` | 350 | **Automatic** — Claude Code session/pre-compact hooks |
+| `active_locks` | 0 | Manual, only when delegating parallel writes |
+| `features` | 0 | Nobody — git log + `MEMORY.md` are used instead |
+| `shared_memory_*` | 0 | Nobody — `MEMORY.md` already covers this |
 
-### Session End (MANDATORY — before stopping)
-Run the following Python before ending your session:
+A "MANDATORY" 9-step session protocol used to be documented here with
+**0/9 steps actually performed**. It was removed: a mandatory ritual that
+nothing verifies only teaches agents to trust something that isn't real.
+
+### Session start / end
+Nothing to do by hand — hooks read the last `session_log` rows for context
+and write the session summary back.
+
+### When locks DO matter
+Before delegating a **write** to a worker editing the tree concurrently
+(Gemini/Antigravity), take a lock for the files in scope:
+
 ```python
 from tools.shared_state import SharedState
 
 with SharedState() as state:
-    state.set_feature_status("feat-XXX", "completed", engine="copilot", model="<your-model>", evidence="<what you did>")
-    state.add_session_entry(
-        engine="copilot",
-        model="<your-model>",
-        summary="<one-line summary of what was done>",
-        features_touched=["feat-XXX"],
-        files_changed=["path/to/file1.py", "path/to/file2.py"],
-        verification={"security_scan": True, "integration_tests": True},
-    )
+    if state.acquire_lock("src/auth.py", engine="copilot", model="<your-model>", reason="parallel edit"):
+        # ... perform/delegate the edit ...
+        state.release_lock("src/auth.py", engine="copilot")
 ```
 
-Use `python tools/shared_state.py show` / `features` / `locks` to inspect current state.
+Inspect with `python tools/shared_state.py show` / `sessions` / `locks`.
 
 ## Skills System
 
