@@ -128,3 +128,34 @@ created: 2026-07-24
   CI/Makefile hardcoded test-file allowlist (missed test_garden.py/
   test_integration.py), test_integration.py's machine-specific >=19-feature
   assertion, rewrote stale SPEC.md (v3.3.0->v4.1.0), removed suggest.md.
+- [decision] 2026-07-25: upgraded `claude-env.ps1` for FreeModel 4-domain
+  multi-tier support: normalize `/v1/messages` for api.freemodel.dev (canonical
+  from guide.md), cc.freemodel.dev, api-cc.freemodel.dev, cc-t2.freemodel.dev.
+  Added apiKeyHelper conflict detection: if `~/.claude/settings.json` has
+  `apiKeyHelper` configured, automatically unset `ANTHROPIC_API_KEY` to
+  eliminate the "Both apiKeyHelper and ANTHROPIC_API_KEY set" warning.
+  Updated `.env.template` with 3-tier VIP documentation (Standard/Mid/Top).
+- [decision] 2026-07-25: **removed the jcode two-tier model split** — real
+  usage showed `deepseek-v4-flash` unreliable, its token savings lost to
+  re-prompting and orchestrator rework, and the routing choice itself a
+  recurring source of judgment error. `tools/jcode_delegate.py` is now
+  single-model: `deepseek-v4-pro` on every call with the guardrail preamble
+  (renamed `CODE_TIER_GUARDRAIL` -> `GUARDRAIL`) always prepended; dropped
+  `MODELS`/`classify_tier`; `--tier` kept as an ignored, deprecation-warning
+  no-op so older callers don't break; usage log no longer writes `tier`.
+  Cost optimization now comes only from flag discipline (`--tool-profile
+  none --no-selfdev`, ~65% fewer input tokens), which costs no quality.
+  Synced jcode.ps1 default, README, AGENTS.md, CLAUDE.md + its generator
+  template, and the skill across all 4 engines.
+- [decision] 2026-07-25: fixed the `CLAUDE.md` generator gap found while
+  doing the above. `claude_engine.py`'s `_CLAUDE_MD_TEMPLATE` had silently
+  fallen behind the hand-edited live `CLAUDE.md`, so regenerating would
+  have DELETED real content — exactly what the file's "do not edit by
+  hand" banner is meant to prevent, with nothing verifying it. Ported the
+  live content back into the template (regeneration is now lossless +
+  idempotent) and added `garden.check_claude_md_regenerable()` so the
+  divergence is loud drift instead of a silent landmine; extracted
+  `_claude_md_counts()` so the checker renders the template exactly as the
+  generator does. Also made generator writes LF-explicit (`_write_lf`):
+  `Path.write_text` emits CRLF on Windows, which git hides here but
+  `deploy.py` copies verbatim into non-git target projects. +3 tests (123).

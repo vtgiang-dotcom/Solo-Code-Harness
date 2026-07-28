@@ -38,6 +38,35 @@
 
 
 ## Decisions
+- [decision] 2026-07-28: **rejected Linear (and Notion) for issue tracking**
+  -- keep git log + `MEMORY.md`. The deciding evidence is local, not
+  opinion: after 9 days of real use `shared_state.db` held `session_log`
+  350 rows but `features` **0**, `active_locks` 0, `shared_memory_*` 0.
+  `session_log` fills because hooks write it automatically; `features`
+  stays empty because it needs a human to call `set_feature_status()` --
+  which no executable code ever does. Since a local SQLite table that is
+  free, offline and one Python call away still went unused, a tool that
+  costs OAuth + network + context window will not fare better. General
+  rule extracted: **anything that depends on a human remembering to
+  update it will drift.** Corollary for evaluating any future tracker:
+  ask whether *work* updates it (git: commit/PR/CI) or a *person* does
+  (Linear/Notion) -- git measures progress, trackers only display what
+  someone typed. To reopen this, the trigger is a second **person**, not
+  a second agent: concurrent agents are already handled by `active_locks`
+  (2026-07-26), which trackers cannot do -- they have no file-level
+  locking and second-scale latency. Note `active_locks` only works for
+  agents on ONE machine (DB is gitignored, local-only); distributed
+  humans fall back to branches + PRs. When that day comes, try **GitHub
+  Issues first** (remote already exists, `.mcp.json` already documents
+  enabling GitHub MCP, and `fixes #N` closes issues automatically -- so
+  it lands in the "work updates it" class), and escalate to Linear only
+  for cycles/estimates/roadmaps or non-developer teammates. Already
+  verified so nobody re-probes it: Linear MCP is
+  `https://mcp.linear.app/mcp` (HTTP 401 + `WWW-Authenticate: Bearer
+  realm="OAuth"`, scopes read/write, no API key in config); the older
+  `/sse` endpoint is dead (404). Also deleted a vendored 18MB
+  `linear-master/` SDK checkout that was untracked AND ungitignored --
+  one `git add -A` from entering the repo.
 - [decision] 2026-07-26: made Gemini/Antigravity a first-class worker
   alongside jcode, after two controlled tests. Root problem: the harness
   *pushed* jcode into every session (`_jcode_available()` + a trigger-rich
@@ -79,35 +108,3 @@
   read password-hashing *prose* as an assignment). Fault-injected a real
   fake secret into both scanners afterward to prove they still fire -- an
   allowlist that disables detection is worse than the false positive.
-- [decision] 2026-07-25: upgraded `claude-env.ps1` for FreeModel 4-domain
-  multi-tier support: normalize `/v1/messages` for api.freemodel.dev (canonical
-  from guide.md), cc.freemodel.dev, api-cc.freemodel.dev, cc-t2.freemodel.dev.
-  Added apiKeyHelper conflict detection: if `~/.claude/settings.json` has
-  `apiKeyHelper` configured, automatically unset `ANTHROPIC_API_KEY` to
-  eliminate the "Both apiKeyHelper and ANTHROPIC_API_KEY set" warning.
-  Updated `.env.template` with 3-tier VIP documentation (Standard/Mid/Top).
-- [decision] 2026-07-25: **removed the jcode two-tier model split** — real
-  usage showed `deepseek-v4-flash` unreliable, its token savings lost to
-  re-prompting and orchestrator rework, and the routing choice itself a
-  recurring source of judgment error. `tools/jcode_delegate.py` is now
-  single-model: `deepseek-v4-pro` on every call with the guardrail preamble
-  (renamed `CODE_TIER_GUARDRAIL` -> `GUARDRAIL`) always prepended; dropped
-  `MODELS`/`classify_tier`; `--tier` kept as an ignored, deprecation-warning
-  no-op so older callers don't break; usage log no longer writes `tier`.
-  Cost optimization now comes only from flag discipline (`--tool-profile
-  none --no-selfdev`, ~65% fewer input tokens), which costs no quality.
-  Synced jcode.ps1 default, README, AGENTS.md, CLAUDE.md + its generator
-  template, and the skill across all 4 engines.
-- [decision] 2026-07-25: fixed the `CLAUDE.md` generator gap found while
-  doing the above. `claude_engine.py`'s `_CLAUDE_MD_TEMPLATE` had silently
-  fallen behind the hand-edited live `CLAUDE.md`, so regenerating would
-  have DELETED real content — exactly what the file's "do not edit by
-  hand" banner is meant to prevent, with nothing verifying it. Ported the
-  live content back into the template (regeneration is now lossless +
-  idempotent) and added `garden.check_claude_md_regenerable()` so the
-  divergence is loud drift instead of a silent landmine; extracted
-  `_claude_md_counts()` so the checker renders the template exactly as the
-  generator does. Also made generator writes LF-explicit (`_write_lf`):
-  `Path.write_text` emits CRLF on Windows, which git hides here but
-  `deploy.py` copies verbatim into non-git target projects. +3 tests (123).
-
