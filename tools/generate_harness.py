@@ -84,22 +84,15 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def sync_instruction_mirrors(kilo_root: Path, root: Path) -> int:
-    """Copy .kilo/instruction/*.md to the .copilot/ and .gemini/ mirrors.
+def _sync_mirror_dir(src_dir: Path, mirrors: list[Path], root: Path) -> int:
+    """Copy src_dir/*.md into each mirror, updating only files it already has.
 
-    Only files the mirror ALREADY has are updated. Engines legitimately carry
-    different instruction subsets, so adding new files here would invent
-    parity that garden.check_instructions() never asked for — that check
-    only flags content drift on names present in both.
+    Engines legitimately carry different subsets, and garden only diffs names
+    present in both trees, so creating new files here would invent parity
+    nobody asked for.
     """
-    src_dir = kilo_root / "instruction"
     if not src_dir.is_dir():
         return 0
-
-    mirrors = [
-        root / ".copilot" / "instruction",
-        root / ".gemini" / "antigravity" / "instruction",
-    ]
     synced = 0
     for dst_dir in mirrors:
         if not dst_dir.is_dir():
@@ -108,14 +101,43 @@ def sync_instruction_mirrors(kilo_root: Path, root: Path) -> int:
         for src in sorted(src_dir.glob("*.md")):
             dst = dst_dir / src.name
             if not dst.is_file():
-                continue  # mirror does not carry this instruction — leave it
+                continue  # mirror does not carry this file — leave it
             src_text = src.read_text(encoding="utf-8")
             if dst.read_text(encoding="utf-8") == src_text:
                 continue
             dst.write_text(src_text, encoding="utf-8")
             print(f"  [SYNC] {label}/{src.name}")
             synced += 1
+    return synced
+
+
+def sync_instruction_mirrors(kilo_root: Path, root: Path) -> int:
+    """Copy .kilo/instruction/*.md to the .copilot/ and .gemini/ mirrors."""
+    synced = _sync_mirror_dir(
+        kilo_root / "instruction",
+        [
+            root / ".copilot" / "instruction",
+            root / ".gemini" / "antigravity" / "instruction",
+        ],
+        root,
+    )
     print(f"Instruction mirrors synced: {synced}")
+    return synced
+
+
+def sync_memory_mirrors(kilo_root: Path, root: Path) -> int:
+    """Copy .kilo/memory/*.md to the .copilot/ mirror.
+
+    .claude/memory/ is handled by claude_engine.generate_all(); .copilot/
+    was left to be "manually kept" (see garden.check_memory's docstring),
+    which is the same gap that made garden's remediation advice a no-op for
+    instructions. Memory files are byte-for-byte copies with no per-engine
+    transform, so garden diffs them exactly and this is mechanical.
+    """
+    synced = _sync_mirror_dir(
+        kilo_root / "memory", [root / ".copilot" / "memory"], root
+    )
+    print(f"Memory mirrors synced: {synced}")
     return synced
 
 
@@ -130,6 +152,8 @@ def main() -> int:
     )
     print("\n--- Instruction mirrors (.copilot, .gemini) ---")
     sync_instruction_mirrors(kilo_root, ROOT_DIR)
+    print("\n--- Memory mirrors (.copilot) ---")
+    sync_memory_mirrors(kilo_root, ROOT_DIR)
     return rc
 
 

@@ -1,7 +1,7 @@
 ---
 type: project
 created: 2026-06-01
-updated: 2026-06-01
+updated: 2026-08-03
 ---
 
 # Project Conventions
@@ -51,6 +51,43 @@ The harness uses `tools/harness_config.py` for layered configuration:
 **Why:** Consistent conventions prevent drift and reduce cognitive load.
 
 ---
+
+## Destructive Harness Tooling
+
+Rules earned from `deploy.py` deleting a target project's `package.json`,
+`tsconfig.json`, CI workflows and dev scripts (2026-08-03, see MEMORY.md).
+
+- **A deploy may only delete a path it can prove it wrote.** Never infer
+  ownership from a file's extension, directory or naming pattern — consult an
+  explicit list (`HARNESS_OWNED_ROOT_FILES`, `RETIRED_*`). A target project's
+  root is full of files that look harness-ish and are not ours.
+- `.github/`, `.vscode/` and `tools/` are **shared** with the target project,
+  never wholly harness. Classify any new deployed directory as shared or
+  exclusive; there is no safe default.
+- Any code path that can `unlink()`/`rmtree()` inside a *target* project needs
+  a test that builds a realistic fake project and asserts its files survive.
+  Assert on real damage (`AssertionError`), not on an import error.
+- Before claiming a guard works, run the new test against the pre-fix code and
+  confirm it fails. A guard that passes both ways guards nothing.
+- Prefer an invariant over a case: a test that fails when a future entry is
+  left unclassified beats a test that pins today's list.
+
+## Docs and Generators
+
+- If `garden.py` reports drift in a mirror, the command it prints must
+  actually repair it. Anything described as a "manually-kept mirror" is a
+  missing generator step — instructions and memory both had this gap.
+- A mirror sync updates only files the mirror already has; engines carry
+  different subsets and inventing files manufactures parity nobody asked for.
+- `.kilo/` is the source of truth. Edit there, then run
+  `python tools/generate_harness.py --harness all` — never hand-edit
+  `.claude/`, `.copilot/` or `.gemini/` copies.
+- `MEMORY.md` is capped at 8,000 chars by `memory_gate` (WARN at 4,000) and
+  measured in **characters**, not bytes — CRLF makes the on-disk size larger.
+  The hook reads `.claude/memory/`, so check the size *after* regenerating.
+  When full, MOVE the oldest entry to `decisions-archive.md` (uncapped, not
+  auto-loaded); keep the durable lesson in `MEMORY.md` and leave the full
+  forensics to `git log`.
 
 ## Feature Gate (ENFORCED)
 

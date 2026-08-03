@@ -182,11 +182,14 @@ def check_memory(src: Path, dst: Path, dst_label: str) -> list[str]:
     """Check that all src/memory/ files have a dst/ copy AND identical content.
 
     .kilo/memory/ is the source of truth for the project's own accumulated
-    memory (MEMORY.md, project-conventions.md, harness-design-intent.md);
-    .claude/memory/ and .copilot/memory/ are manually-kept mirrors (no
-    auto-generator regenerates them). File-existence parity alone previously
-    let content silently drift out of sync (one engine's writer updates its
-    own copy but forgets the others) without garden.py ever catching it.
+    memory (MEMORY.md, project-conventions.md, harness-design-intent.md).
+    .claude/memory/ and .copilot/memory/ are generated mirrors -- claude_engine
+    for the former, generate_harness.sync_memory_mirrors() for the latter.
+    File-existence parity alone previously let content silently drift out of
+    sync (one engine's writer updates its own copy but forgets the others)
+    without garden.py ever catching it. Both mirrors were hand-maintained
+    until 2026-08-03, which meant this check reported drift that the fix
+    command it advertises could not actually repair.
     """
     issues = _check_parity_dir(src, dst, dst_label, "memory")
     src_dir = src / "memory"

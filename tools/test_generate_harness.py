@@ -110,3 +110,71 @@ def test_real_repo_mirrors_are_in_sync():
             ROOT / ".kilo", ROOT / rel.parent, label
         )
         assert not issues, f"{label} instruction drift in repo: {issues}"
+
+
+# ─── memory mirrors ─────────────────────────────────────────────────────────
+#
+# Same gap as the instruction mirrors, found while pruning MEMORY.md: garden's
+# check_memory() docstring said .copilot/memory/ is a "manually-kept mirror
+# (no auto-generator regenerates them)", so garden reported memory drift and
+# its own remediation command could not clear it.
+
+MEMORY_MIRROR = Path(".copilot") / "memory"
+
+
+def _fake_memory_tree(tmp_path: Path) -> Path:
+    _write(tmp_path / ".kilo" / "memory" / "MEMORY.md", "SOURCE\n")
+    _write(tmp_path / MEMORY_MIRROR / "MEMORY.md", "SOURCE\n")
+    return tmp_path
+
+
+def test_memory_sync_repairs_drift(tmp_path):
+    root = _fake_memory_tree(tmp_path)
+    _write(root / MEMORY_MIRROR / "MEMORY.md", "DRIFTED\n")
+
+    assert generate_harness.sync_memory_mirrors(root / ".kilo", root) == 1
+    assert (root / MEMORY_MIRROR / "MEMORY.md").read_text(encoding="utf-8") == "SOURCE\n"
+
+
+def test_memory_sync_is_idempotent(tmp_path):
+    root = _fake_memory_tree(tmp_path)
+    assert generate_harness.sync_memory_mirrors(root / ".kilo", root) == 0
+
+
+def test_memory_sync_does_not_invent_files(tmp_path):
+    root = _fake_memory_tree(tmp_path)
+    _write(root / ".kilo" / "memory" / "kilo-only.md", "X\n")
+    generate_harness.sync_memory_mirrors(root / ".kilo", root)
+    assert not (root / MEMORY_MIRROR / "kilo-only.md").exists()
+
+
+def test_garden_memory_remediation_actually_fixes_drift(tmp_path):
+    """garden's advertised fix command must clear the memory drift it reports."""
+    root = _fake_memory_tree(tmp_path)
+    src, dst = root / ".kilo", root / ".copilot"
+    _write(dst / "memory" / "MEMORY.md", "DRIFTED\n")
+
+    assert garden.check_memory(src, dst, ".copilot"), "expected drift before sync"
+    generate_harness.sync_memory_mirrors(src, root)
+    assert not garden.check_memory(src, dst, ".copilot"), (
+        "garden still reports memory drift after running its own remediation"
+    )
+
+
+def test_real_repo_memory_mirrors_are_in_sync():
+    issues = garden.check_memory(ROOT / ".kilo", ROOT / ".copilot", ".copilot")
+    assert not issues, f".copilot memory drift in repo: {issues}"
+
+
+def test_memory_md_is_under_the_hard_cap():
+    """MEMORY.md is injected every session and blocked by memory_gate at 8k.
+
+    Checked for every engine copy, since the hook reads .claude/memory/ while
+    .kilo/ is the source people edit.
+    """
+    for engine in (".kilo", ".claude", ".copilot"):
+        f = ROOT / engine / "memory" / "MEMORY.md"
+        if not f.is_file():
+            continue
+        n = len(f.read_text(encoding="utf-8"))
+        assert n < 8000, f"{engine}/memory/MEMORY.md is {n} chars (hard cap 8000)"

@@ -38,35 +38,39 @@
 
 
 ## Decisions
-- [decision] 2026-07-28: **rejected Linear (and Notion) for issue tracking**
-  -- keep git log + `MEMORY.md`. The deciding evidence is local, not
-  opinion: after 9 days of real use `shared_state.db` held `session_log`
-  350 rows but `features` **0**, `active_locks` 0, `shared_memory_*` 0.
-  `session_log` fills because hooks write it automatically; `features`
-  stays empty because it needs a human to call `set_feature_status()` --
-  which no executable code ever does. Since a local SQLite table that is
-  free, offline and one Python call away still went unused, a tool that
-  costs OAuth + network + context window will not fare better. General
-  rule extracted: **anything that depends on a human remembering to
-  update it will drift.** Corollary for evaluating any future tracker:
-  ask whether *work* updates it (git: commit/PR/CI) or a *person* does
-  (Linear/Notion) -- git measures progress, trackers only display what
-  someone typed. To reopen this, the trigger is a second **person**, not
-  a second agent: concurrent agents are already handled by `active_locks`
-  (2026-07-26), which trackers cannot do -- they have no file-level
-  locking and second-scale latency. Note `active_locks` only works for
-  agents on ONE machine (DB is gitignored, local-only); distributed
-  humans fall back to branches + PRs. When that day comes, try **GitHub
-  Issues first** (remote already exists, `.mcp.json` already documents
-  enabling GitHub MCP, and `fixes #N` closes issues automatically -- so
-  it lands in the "work updates it" class), and escalate to Linear only
-  for cycles/estimates/roadmaps or non-developer teammates. Already
-  verified so nobody re-probes it: Linear MCP is
-  `https://mcp.linear.app/mcp` (HTTP 401 + `WWW-Authenticate: Bearer
-  realm="OAuth"`, scopes read/write, no API key in config); the older
-  `/sse` endpoint is dead (404). Also deleted a vendored 18MB
-  `linear-master/` SDK checkout that was untracked AND ungitignored --
-  one `git add -A` from entering the repo.
+- [decision] 2026-08-03: closed the **"harness infers what it owns instead
+  of consulting a list"** class -- 5 bugs in `deploy.py`, which had 1,275
+  lines and **zero tests**. Root cleanup matched by EXTENSION
+  (`.md/.json/.yml/.ps1`) though its comment claimed names, so deploying
+  deleted a target's `package.json`, `tsconfig.json`, `docker-compose.yml`,
+  its own `README.md`; dir cleanup wiped anything absent from the manifest
+  in `.github`/`.vscode`/`tools`, which are SHARED (CODEOWNERS, dependabot,
+  CI, dev scripts); `.harness.lock` then declared those dirs 100% harness,
+  breaking the boundary BOTH ways -- refuse to touch the project's real CI,
+  or "tidy up" harness files as project code. Surfaced as `Module not
+  found: '@/lib/auth'` (`.mjs` escaped the filter so the build reached
+  compile; `tsconfig.json` did not). `unlink()` leaves no commit or log, so
+  `git status` showed a bare ` D` and the investigating agent could not
+  attribute it. Fix shape every time: replace inference with an explicit
+  list (`HARNESS_OWNED_ROOT_FILES`, `EXCLUSIVE_HARNESS_DIRS` vs
+  `SHARED_DIRS`, `RETIRED_*`) and generate `[shared_files]` from what deploy
+  actually ships -- incl. 14 `.github/agents/*.agent.md` synthesized at
+  deploy time that no source scan finds. Trap: files are retired *by being
+  added to EXCLUDE_FILES*, so `should_copy()` is false for them; checking it
+  first made retired files permanently uncleanable. Standing rule: **a
+  deploy may only delete a path it can prove it wrote.** Guards are
+  invariants: `test_every_deployed_dir_is_classified` fails if a future
+  `DIRS_ALL` entry is unclassified (silent full-wipe default was the root
+  cause); `test_lock_shared_files_match_deployed_files` diffs declared
+  boundary vs shipped set. All verified failing pre-fix. 0 -> 24 tests.
+  Same session, same family as the 2026-07-28 doc gates: `garden.py` advised
+  "Run generate_harness.py --harness all" for drift that script could not
+  fix (it rebuilt only `.claude/`) -- added `sync_instruction_mirrors()`,
+  pinned by `test_garden_remediation_command_actually_fixes_drift` against
+  garden's own checker. And `deploy()` ran LIVE by default with no undo; now
+  needs `--yes` or confirmation when the target is dirty or non-git, and
+  refuses rather than hangs without a TTY. Forensics: git log 5f89c9e,
+  b648327, b9e5500, 6a1bf46.
 - [decision] 2026-07-28: closed the **"docs assert infrastructure that
   does not exist"** class with 5 machine gates in `garden.py`, after it
   produced 6 separate bugs that every gate passed for months.
@@ -95,20 +99,3 @@
   check that citations *resolve*, never that prose *descriptions* are
   accurate -- that needs semantics, i.e. an LLM, i.e. non-determinism, and
   a gate that fires only sometimes is worse than none.
-- [decision] 2026-07-26: made Gemini/Antigravity a first-class worker
-  alongside jcode, after two controlled tests. Root problem: the harness
-  *pushed* jcode into every session (`_jcode_available()` + a trigger-rich
-  `jcode-delegation` skill) but mentioned Gemini only when a report already
-  existed in `outbox/` -- so Gemini was structurally forgotten, not
-  forgotten by accident. Fixed by mechanism, not memory: added
-  `_gemini_available()` (needs BOTH handoff/inbox AND the IDE installed),
-  a `gemini-delegation` SKILL.md, and a routing table in AGENTS.md/CLAUDE.md.
-  Measured payoff: a repo-wide audit cost Gemini ~49.6k tokens of reading vs
-  ~2.5k of ours (~20x leverage). Measured limit: BOTH tests shipped an error
-  invisible in its own self-summary (1 wrong finding marked "Confident: Yes";
-  2 false positives while reporting "unsure: nothing"). Standing rule --
-  its evidence is reliable, its self-assessment is not; verify 100%. Also
-  killed the `status:` contradiction (plan files are read-only for Gemini;
-  the report's existence is the completion signal) and banned re-litigating
-  headless access: the SDK has no OAuth path to the Pro plan and
-  `antigravity-ide chat` only drives the GUI.
