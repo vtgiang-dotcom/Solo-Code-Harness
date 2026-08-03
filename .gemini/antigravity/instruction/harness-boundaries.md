@@ -4,9 +4,9 @@
 
 ## Tại sao cần file này?
 
-Khi triển khai bộ harness vào một dự án mới (`python tools/deploy.py deploy ./target-project`), các thư mục `.kilo/`, `.copilot/`, `.gemini/`, `.claude/`, `.github/`, `.vscode/`, `tools/` được copy vào project đích (dạng runtime-only, không mang theo dev tooling của Solo-Code-CLI). Các file như `AGENTS.md`, `kilo.jsonc`, `jcode.ps1` cũng được copy. (`.opencode/` đã bị gỡ ở v4.0.0 — xem `.harness.lock`.)
+Khi triển khai bộ harness vào một dự án mới (`python tools/deploy.py deploy ./target-project`), các thư mục `.kilo/`, `.copilot/`, `.gemini/`, `.claude/`, `.contracts/` được copy nguyên khối vào project đích (dạng runtime-only, không mang theo dev tooling của Solo-Code-CLI). Riêng `.github/`, `.vscode/`, `tools/` là **thư mục dùng chung** — harness chỉ đặt thêm file vào đó, dự án vẫn giữ file riêng của mình. Các file như `AGENTS.md`, `kilo.jsonc`, `jcode.ps1` cũng được copy. (`.opencode/` đã bị gỡ ở v4.0.0 — xem `.harness.lock`.)
 
-**Agent có thể nhầm lẫn:** thấy các file này trong project đích và cho rằng đây là code hoặc tính năng dở dang của dự án đó.
+**Agent có thể nhầm lẫn theo CẢ HAI chiều:** thấy file harness trong project đích và tưởng là code dở dang của dự án; hoặc thấy CI workflow / script dev của chính dự án nằm trong `.github/`, `tools/` rồi tưởng là harness và không dám đụng. Tra `[shared_files]` trong `.harness.lock` để biết chính xác file nào là harness.
 
 ## Boundary Markers
 

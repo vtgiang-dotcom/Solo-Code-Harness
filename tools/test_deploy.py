@@ -353,3 +353,75 @@ def test_boundary_docs_flag_shared_dirs(tmp_path):
         f"boundary docs mention shared dirs without marking them shared: "
         f"{offenders}"
     )
+
+
+# ─── live-deploy safety guard ───────────────────────────────────────────────
+#
+# deploy() writes ~485 files and removes retired harness files, with no
+# backup. If the target has uncommitted work there is no clean `git checkout`
+# to undo it, so a LIVE deploy there must be confirmed explicitly.
+
+import subprocess  # noqa: E402
+
+
+def _git_repo(tmp_path: Path, *, dirty: bool) -> Path:
+    repo = tmp_path / ("dirty" if dirty else "clean")
+    repo.mkdir(parents=True, exist_ok=True)
+    env = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+    import os
+    env = {**os.environ, **env}
+    subprocess.run(["git", "init", "-q", str(repo)], check=True, env=env)
+    (repo / "package.json").write_text("{}\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True, env=env)
+    subprocess.run(["git", "-C", str(repo), "commit", "-qm", "init"],
+                   check=True, env=env)
+    if dirty:
+        (repo / "package.json").write_text("{modified}\n", encoding="utf-8")
+    return repo
+
+
+def test_clean_repo_needs_no_confirmation(tmp_path):
+    repo = _git_repo(tmp_path, dirty=False)
+    assert deploy._uncommitted_changes(repo) == []
+    assert deploy._confirm_unsafe_deploy(repo, assume_yes=False) is True
+
+
+def test_dirty_repo_is_blocked_without_yes(tmp_path):
+    repo = _git_repo(tmp_path, dirty=True)
+    assert deploy._uncommitted_changes(repo), "expected a dirty tree"
+    # Non-interactive (pytest has no TTY) must refuse rather than hang.
+    assert deploy._confirm_unsafe_deploy(repo, assume_yes=False) is False
+
+
+def test_dirty_repo_proceeds_with_yes(tmp_path):
+    repo = _git_repo(tmp_path, dirty=True)
+    assert deploy._confirm_unsafe_deploy(repo, assume_yes=True) is True
+
+
+def test_non_git_target_is_blocked_without_yes(tmp_path):
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    assert deploy._uncommitted_changes(plain) is None
+    assert deploy._confirm_unsafe_deploy(plain, assume_yes=False) is False
+    assert deploy._confirm_unsafe_deploy(plain, assume_yes=True) is True
+
+
+def test_blocked_deploy_writes_nothing(tmp_path):
+    """An aborted deploy must leave the target untouched."""
+    repo = _git_repo(tmp_path, dirty=True)
+    before = {p.name for p in repo.iterdir()}
+
+    rc = deploy.deploy(str(repo), dry_run=False, assume_yes=False)
+
+    assert rc == 1, "aborted deploy should exit non-zero"
+    assert {p.name for p in repo.iterdir()} == before, "aborted deploy wrote files"
+    assert not (repo / ".harness.lock").exists()
+
+
+def test_dry_run_is_never_blocked(tmp_path):
+    """--dry-run writes nothing, so it must not require confirmation."""
+    repo = _git_repo(tmp_path, dirty=True)
+    rc = deploy.deploy(str(repo), dry_run=True, assume_yes=False)
+    assert rc == 0, "dry-run was blocked by the live-deploy guard"
+    assert not (repo / ".harness.lock").exists()

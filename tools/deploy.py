@@ -1108,7 +1108,74 @@ def _cleanup_stale_files(
     return removed
 
 
-def deploy(target: str, *, engine: str = "all", dry_run: bool = False) -> int:
+def _uncommitted_changes(target: Path) -> list[str] | None:
+    """Return uncommitted paths in target's git repo, or None if not a repo.
+
+    Empty list means a clean tree. Any git failure is reported as None so a
+    missing/broken git never blocks a deploy.
+    """
+    if not (target / ".git").exists():
+        return None
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(target), "status", "--porcelain"],
+            capture_output=True, text=True, timeout=30, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    return [ln for ln in proc.stdout.splitlines() if ln.strip()]
+
+
+def _confirm_unsafe_deploy(target: Path, assume_yes: bool) -> bool:
+    """Guard a LIVE deploy into a target with uncommitted work.
+
+    Deploy writes ~485 files and can delete retired harness files. If the
+    target has uncommitted changes there is no clean `git checkout` to undo
+    it, so require an explicit --yes (or an interactive confirmation).
+    """
+    dirty = _uncommitted_changes(target)
+    if dirty is None:
+        print("  [WARN] Target is not a git repository — no undo if this goes wrong.")
+        if assume_yes:
+            return True
+        return _ask_yes_no("Continue anyway?")
+    if not dirty:
+        return True  # clean tree — `git checkout` can undo everything
+
+    print(f"\n  [WARN] Target has {len(dirty)} uncommitted change(s):")
+    for line in dirty[:10]:
+        print(f"    {line}")
+    if len(dirty) > 10:
+        print(f"    ... and {len(dirty) - 10} more")
+    print("  Deploy writes many files and removes retired harness files.")
+    print("  With a dirty tree you cannot cleanly `git checkout` to undo it.")
+    print("  Commit/stash first, or re-run with --dry-run to preview.")
+    if assume_yes:
+        print("  Proceeding anyway (--yes).")
+        return True
+    return _ask_yes_no("Proceed anyway?")
+
+
+def _ask_yes_no(question: str) -> bool:
+    if not sys.stdin.isatty():
+        print(f"  [ABORT] {question} — not a TTY; re-run with --yes to confirm.")
+        return False
+    try:
+        return input(f"  {question} [y/N] ").strip().lower() in ("y", "yes")
+    except (EOFError, KeyboardInterrupt):
+        print("\n  [ABORT] Cancelled.")
+        return False
+
+
+def deploy(
+    target: str,
+    *,
+    engine: str = "all",
+    dry_run: bool = False,
+    assume_yes: bool = False,
+) -> int:
     """Deploy harness to an existing target directory."""
     target_path = Path(target).resolve()
 
@@ -1118,6 +1185,10 @@ def deploy(target: str, *, engine: str = "all", dry_run: bool = False) -> int:
 
     if not target_path.is_dir():
         print(f"[ERROR] Target is not a directory: {target_path}")
+        return 1
+
+    if not dry_run and not _confirm_unsafe_deploy(target_path, assume_yes):
+        print("[ABORT] Deploy cancelled — nothing was written.")
         return 1
 
     if engine == "kilo":
@@ -1346,6 +1417,12 @@ def main() -> int:
         default="A Solo-Code harness project with AI agent discipline.",
         help="Project description (scaffold mode only)",
     )
+    parser.add_argument(
+        "--yes", "-y",
+        action="store_true",
+        help="Skip the confirmation prompt when deploying into a target with "
+             "uncommitted changes (deploy mode only)",
+    )
 
     args = parser.parse_args()
     positional = args.args
@@ -1395,7 +1472,9 @@ def main() -> int:
             description=args.description,
         )
     else:
-        return deploy(target, engine=args.engine, dry_run=args.dry_run)
+        return deploy(
+            target, engine=args.engine, dry_run=args.dry_run, assume_yes=args.yes
+        )
 
 
 if __name__ == "__main__":
