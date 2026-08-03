@@ -93,6 +93,32 @@ RETIRED_ROOT_FILES = {
 # project and must never be touched by cleanup.
 HARNESS_OWNED_ROOT_FILES = set(ROOT_FILES) | RETIRED_ROOT_FILES | {".harness.lock"}
 
+# Directories that belong to the harness ENTIRELY. Anything inside them that
+# the harness no longer ships is by definition a leftover from an older
+# deploy, so full stale-cleanup is safe here.
+EXCLUSIVE_HARNESS_DIRS = {
+    ".kilo",
+    ".copilot",
+    ".gemini",
+    ".claude",
+    ".claude-plugin",
+    ".contracts",
+}
+
+# Directories the harness SHARES with the target project. A project keeps its
+# own CI workflows, CODEOWNERS, dependabot config, editor settings and dev
+# scripts here. We may only remove files the harness itself deployed, never
+# "everything not in the current manifest".
+SHARED_DIRS = {".github", ".vscode", "tools"}
+
+# Files the harness shipped into SHARED_DIRS in earlier versions and no
+# longer ships. These are the only shared-dir paths cleanup may delete
+# beyond the current manifest. Append here whenever such a file is dropped.
+RETIRED_SHARED_FILES = {
+    "tools/migrate_to_shared_state.py",  # removed with shared-state migration
+    "tools/test_harness.py",             # split into tools/test_*.py
+}
+
 # Directories to copy (relative to ROOT)
 # .opencode/ intentionally omitted — deprecated as of v3.7.0 (100% content
 # mirror of .kilo/, no unique runtime value; see .harness.lock).
@@ -937,9 +963,16 @@ def _cleanup_stale_files(
     dirs: list[str],
     dry_run: bool,
 ) -> int:
-    """Remove files in target harness dirs that are NOT in the source manifest.
+    """Remove files the harness previously deployed but no longer ships.
 
-    Only cleans inside known harness directories (dirs + root files).
+    Two different rules apply, because target directories are not equal:
+
+    * EXCLUSIVE_HARNESS_DIRS (.kilo, .claude, ...) are wholly owned by the
+      harness — anything not in the current manifest is a stale leftover.
+    * SHARED_DIRS (.github, .vscode, tools) are shared with the project. It
+      keeps its own workflows, CODEOWNERS, dependabot config, editor settings
+      and dev scripts there, so only explicitly RETIRED_SHARED_FILES may go.
+
     Returns number of stale files removed (or would-be-removed in dry_run).
     """
     source_manifest = _build_source_manifest(dirs)
@@ -950,9 +983,29 @@ def _cleanup_stale_files(
         dst = target_path / d
         if not dst.is_dir():
             continue
+        shared = d in SHARED_DIRS
         for item in dst.rglob("*"):
             if item.is_file():
                 rel = item.relative_to(target_path).as_posix()
+                # SAFETY INVARIANT (shared dirs): the project owns most of
+                # .github/.vscode/tools. Deleting "everything not in the
+                # manifest" there would wipe its CI workflows and dev
+                # scripts. Only names the harness itself shipped and has
+                # since dropped are eligible.
+                #
+                # Checked BEFORE should_copy(): retired files are typically
+                # retired *by being added to EXCLUDE_FILES*, which makes
+                # should_copy() false — so the skip below would otherwise
+                # make them permanently uncleanable.
+                if shared:
+                    if rel in RETIRED_SHARED_FILES:
+                        if dry_run:
+                            print(f"  [STALE] Would remove: {rel}")
+                        else:
+                            item.unlink()
+                            print(f"  [STALE] Removed: {rel}")
+                        removed += 1
+                    continue
                 # Skip files intentionally excluded from copy (personal
                 # overrides, .pyc, runtime state) — they are never "stale".
                 if not should_copy(item):
