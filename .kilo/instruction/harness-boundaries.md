@@ -23,10 +23,8 @@ Thư mục này là marker dành riêng cho harness, chứa config nội bộ (k
 | Nếu file/thư mục... | Thì nó là... | Hành động |
 |---------------------|-------------|----------|
 | Bắt đầu bằng `.kilo/`, `.copilot/`, `.gemini/`, `.claude/` | **Harness engine** | KHÔNG sửa, KHÔNG phân tích như code dự án |
-| Bắt đầu bằng `.vscode/` | **Harness IDE config** | KHÔNG phải config của dự án |
-| Bắt đầu bằng `.github/scripts/` | **Harness verification** | Script kiểm tra của harness |
-| Bắt đầu bằng `tools/` | **Harness utilities** | `deploy.py`, `garden.py`, `generate_harness.py` |
 | Bắt đầu bằng `.contracts/` | **Harness contracts** | Sub-agent status contracts |
+| Bắt đầu bằng `.github/`, `.vscode/`, `tools/` | **DÙNG CHUNG** — harness *và* dự án | Harness có đặt file ở đây, nhưng dự án CŨNG sở hữu file riêng (CI workflow, `CODEOWNERS`, dependabot, cấu hình editor, script dev). Chỉ các đường dẫn liệt kê trong `[shared_files]` của `.harness.lock` là harness; **mọi file khác ở đây là code dự án** — đọc/sửa bình thường. |
 | Là `AGENTS.md`, `kilo.jsonc`, `.mcp.json`, `.ruff.toml`, `.gitleaks.toml`, `Makefile`, `jcode.ps1`, `verify.sh`, `extensions_config.json`, `.harness.lock`, `.solocode/`, `.pre-commit-config.yaml`, `.github/pull_request_template.md`, `agent.yaml`, `pyproject.toml`, `eslint.config.js` | **Harness config** | File cấu hình agent — không phải config dự án |
 | **Tất cả các file/thư mục khác** | **Project code** | Đây là code của dự án thực — được phép sửa |
 

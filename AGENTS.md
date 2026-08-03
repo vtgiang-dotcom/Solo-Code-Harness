@@ -35,10 +35,8 @@ This project is powered by **Solo-Code Harness** — an AI agent discipline laye
 | If the file path starts with... | Then it is... | Action |
 |----------------------------------|---------------|--------|
 | `.kilo/`, `.copilot/`, `.gemini/`, `.claude/`, `.claude-plugin/` | Harness engine | Rules/skills/hooks for AI behavior — not project logic |
-| `.vscode/` | Harness IDE config | VS Code settings + MCP servers — not project source |
-| `.github/scripts/` | Harness verification | `security_scan.py`, `checklist.py`, `check_skips.py`, `eval_harness.py`, `security-allowlist.txt`, `boundary_audit.py` |
-| `tools/` | Harness utilities | `deploy.py`, `generate_harness.py`, `garden.py`, `shared_state.py` |
 | `.contracts/` | Harness sub-agent contracts | Status contracts for delegated agents |
+| `.github/`, `.vscode/`, `tools/` | **Shared** — harness *and* project | The harness ships files here, but the project also keeps its own CI workflows, `CODEOWNERS`, dependabot config, editor settings and dev scripts. Only the exact paths under `[shared_files]` in `.harness.lock` are harness; **everything else here is project code**. |
 | `AGENTS.md`, `agent.yaml`, `kilo.jsonc`, `.mcp.json`, `.ruff.toml`, `.gitleaks.toml`, `Makefile`, `jcode.ps1`, `claude-env.ps1`, `init.sh`, `verify.sh`, `extensions_config.json`, `.harness.lock`, `.solocode/`, `.pre-commit-config.yaml`, `.github/pull_request_template.md`, `CLAUDE.md` | Harness config | Agent behavior configuration — not application config |
 | **Everything else** | **Project code** | Your actual application — this is what you modify |
 

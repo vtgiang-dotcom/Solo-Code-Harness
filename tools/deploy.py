@@ -180,9 +180,10 @@ EXCLUDE_FILES = {
     # not needed to just RUN the harness in a target project.
     "deploy.py", "garden.py", "generate_harness.py", "claude_engine.py",
     "validate_schemas.py", "migrate_to_shared_state.py", "harness_config.py",
-    "test_claude_engine.py", "test_claude_guard.py", "test_claude_hooks.py",
-    "test_harness.py", "test_integration.py", "test_shared_state.py",
-    "test_jcode_delegate.py",
+    # NOTE: individual tools/test_*.py files are NOT listed here — they are
+    # excluded by rule in should_copy(). Listing them by hand meant every new
+    # test file silently leaked into deployed projects until someone
+    # remembered to add it (test_deploy.py and test_garden.py both did).
     # Solo-Code-CLI's OWN accumulated memory — describes THIS repo's design/
     # conventions, not the target project's. Deploy writes fresh blank
     # templates instead (see _write_blank_memory_templates()).
@@ -240,13 +241,17 @@ This project was scaffolded with **Solo-Code Harness** — an AI agent disciplin
 
 | Contains | Purpose |
 |----------|---------|
-| `.kilo/`, `.copilot/`, `.gemini/`, `.claude/` | AI agent rules, skills, hooks — NOT project logic |
-| `.github/scripts/` | Verification scripts (`security_scan.py`, `checklist.py`, `boundary_audit.py`) |
-| `tools/` | Harness runtime deps (`shared_state.py`, `solocode_config.py`) — dev/test tooling deliberately NOT deployed |
-| `.vscode/` | Harness IDE config — NOT project config |
+| `.kilo/`, `.copilot/`, `.gemini/`, `.claude/`, `.claude-plugin/`, `.contracts/` | Wholly harness — AI agent rules, skills, hooks. No project code lives here. |
 | `AGENTS.md`, `CLAUDE.md`, `kilo.jsonc`, `.harness.lock` | Agent behavior configuration |
 
-> **Read `.harness.lock`** for the authoritative boundary list. Never modify harness files to fix a project bug. Never modify project files to fix a harness issue.
+**`.github/`, `.vscode/` and `tools/` are SHARED.** The harness puts files
+there, but they are also where your project keeps its own CI workflows,
+CODEOWNERS, dependabot config, editor settings and dev scripts. Do **not**
+treat these directories as harness-owned wholesale — only the exact paths
+listed under `[shared_files]` in `.harness.lock` are harness. Everything
+else in them is your project's code.
+
+> **Read `.harness.lock`** for the authoritative boundary list — it names harness files inside shared directories explicitly. Never modify harness files to fix a project bug. Never modify project files to fix a harness issue.
 
 ## Project Memory
 
@@ -271,17 +276,33 @@ source = "solo-code-io/solo-code-cli"
 generated_at = "{timestamp}"
 
 [boundaries]
-# Thư mục harness — KHÔNG chứa code dự án
+# Thư mục harness — TOÀN BỘ nội dung là harness, KHÔNG chứa code dự án
 dirs = [
     ".kilo",
     ".copilot",
     ".gemini",
     ".claude",
     ".claude-plugin",
-    ".github",
     ".contracts",
+]
+
+# Thư mục DÙNG CHUNG — harness đặt file vào đây, nhưng dự án CŨNG sở hữu
+# file riêng ở đây (CI workflow, CODEOWNERS, script dev, cấu hình editor...).
+#
+# AI Model: KHÔNG được coi cả thư mục này là harness. Chỉ những đường dẫn
+# liệt kê trong [shared_files] mới là harness; MỌI file khác trong các thư
+# mục này là CODE DỰ ÁN — đọc, phân tích và sửa như bình thường.
+shared_dirs = [
+    ".github",
     ".vscode",
     "tools",
+]
+
+[shared_files]
+# Đường dẫn chính xác của file harness nằm trong shared_dirs. Danh sách này
+# được sinh ra từ nội dung deploy thực tế, không phải viết tay.
+paths = [
+{shared_files}
 ]
 
 # File gốc harness — KHÔNG phải code dự án
@@ -591,7 +612,34 @@ def _write_blank_memory_templates(target: Path, dirs: list[str], dry_run: bool) 
     return written
 
 
-def _generate_harness_lock(target: Path, dry_run: bool = False) -> None:
+def _shared_harness_paths(dirs: list[str]) -> list[str]:
+    """Exact paths of harness files that land inside SHARED_DIRS.
+
+    Derived from what the deploy actually ships, so the boundary a model
+    reads in .harness.lock cannot drift from the files on disk.
+    """
+    paths: set[str] = set()
+    for d in dirs:
+        if d not in SHARED_DIRS:
+            continue
+        src = ROOT / d
+        if not src.is_dir():
+            continue
+        for item in src.rglob("*"):
+            if item.is_file() and should_copy(item):
+                paths.add(item.relative_to(ROOT).as_posix())
+    # .github/agents/*.agent.md are generated at deploy time from
+    # .copilot/agents/, so they never appear in the source tree.
+    copilot_agents = ROOT / ".copilot" / "agents"
+    if ".github" in dirs and copilot_agents.is_dir():
+        for f in copilot_agents.glob("*.md"):
+            paths.add(f".github/agents/{f.stem}.agent.md")
+    return sorted(paths)
+
+
+def _generate_harness_lock(
+    target: Path, dry_run: bool = False, dirs: list[str] | None = None
+) -> None:
     """Generate .harness.lock with current timestamp and version."""
     if dry_run:
         print("  [DRY] Would generate: .harness.lock")
@@ -610,11 +658,16 @@ def _generate_harness_lock(target: Path, dry_run: bool = False) -> None:
                 version = stripped.split("=", 1)[1].strip().strip('"')
                 break
 
+    shared = _shared_harness_paths(dirs if dirs is not None else DIRS_ALL)
+    shared_block = "\n".join(f'    "{p}",' for p in shared)
+
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    content = HARNESS_LOCK_TEMPLATE.format(version=version, timestamp=timestamp)
+    content = HARNESS_LOCK_TEMPLATE.format(
+        version=version, timestamp=timestamp, shared_files=shared_block
+    )
     lock_path = target / ".harness.lock"
     lock_path.write_text(content, encoding="utf-8")
-    print(f"  [NEW] .harness.lock — generated (v{version})")
+    print(f"  [NEW] .harness.lock — generated (v{version}, {len(shared)} shared paths)")
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -628,6 +681,11 @@ def should_copy(path: Path) -> bool:
         if part in EXCLUDE_DIRS:
             return False
     if path.is_file() and name in EXCLUDE_FILES:
+        return False
+    # Harness test suites test THIS repo's tooling, never the target project.
+    # Excluded by rule, not by an enumerated list that goes stale (see the
+    # note in EXCLUDE_FILES).
+    if path.is_file() and name.startswith("test_") and name.endswith(".py"):
         return False
     if path.is_file() and path.parent.name in ("inbox", "outbox") and (
         name.endswith("-plan.md") or name.endswith("-report.md")
@@ -827,7 +885,7 @@ def scaffold(
 
     # ── Step 2.5: Generate .harness.lock ─────────────────────────
     print("\n--- .harness.lock ---")
-    _generate_harness_lock(target_path, dry_run)
+    _generate_harness_lock(target_path, dry_run, dirs)
     total_new += 1
 
     # ── Step 3: Generate README.md (only if not exists) ──────────
@@ -1150,7 +1208,7 @@ def deploy(target: str, *, engine: str = "all", dry_run: bool = False) -> int:
 
     # ── Generate .harness.lock ──────────────────────────────────
     print("\n--- .harness.lock ---")
-    _generate_harness_lock(target_path, dry_run)
+    _generate_harness_lock(target_path, dry_run, dirs)
     total_new += 1
 
     print()

@@ -230,3 +230,126 @@ def test_retired_shared_files_live_in_shared_dirs(tmp_path):
         assert top in deploy.SHARED_DIRS, (
             f"{rel} is listed as a retired SHARED file but {top}/ is not a shared dir"
         )
+
+
+# ─── boundary declaration (.harness.lock) ───────────────────────────────────
+#
+# The whole point of the harness is that a model can tell control-plane files
+# from the project's own code. .harness.lock is what it reads to do that, so
+# a wrong boundary is a correctness bug, not a docs nit: it either invites a
+# model to "fix" the project's CI as if it were harness config, or makes it
+# treat harness files as project code to be refactored.
+
+def _parse_lock_paths(lock_text: str) -> set[str]:
+    """Extract [shared_files].paths — NOT the shared_dirs list above it."""
+    import re
+    block = lock_text.split("paths = [")[1].split("]")[0]
+    return set(re.findall(r'"([^"]+)"', block))
+
+
+def test_lock_shared_files_match_deployed_files(tmp_path):
+    """Declared harness paths must equal what deploy actually ships there."""
+    deploy._generate_harness_lock(tmp_path, dry_run=False, dirs=deploy.DIRS_ALL)
+    declared = _parse_lock_paths((tmp_path / ".harness.lock").read_text(encoding="utf-8"))
+    expected = set(deploy._shared_harness_paths(deploy.DIRS_ALL))
+    assert declared == expected, (
+        f"lock drifted from reality: missing={expected - declared}, "
+        f"phantom={declared - expected}"
+    )
+    assert declared, "no shared harness paths declared at all"
+
+
+def test_lock_declares_shared_dirs_separately_from_owned_dirs(tmp_path):
+    """Shared dirs must NOT be listed as wholly-harness directories.
+
+    Listing .github/.vscode/tools under `dirs` told models that a project's
+    own CI workflows and dev scripts were harness infrastructure.
+    """
+    deploy._generate_harness_lock(tmp_path, dry_run=False, dirs=deploy.DIRS_ALL)
+    text = (tmp_path / ".harness.lock").read_text(encoding="utf-8")
+    owned_block = text.split("dirs = [")[1].split("]")[0]
+    for d in deploy.SHARED_DIRS:
+        assert f'"{d}"' not in owned_block, (
+            f"{d} is a shared dir but .harness.lock lists it as wholly harness"
+        )
+    shared_block = text.split("shared_dirs = [")[1].split("]")[0]
+    for d in deploy.SHARED_DIRS:
+        assert f'"{d}"' in shared_block, f"{d} missing from lock's shared_dirs"
+
+
+def test_lock_never_claims_a_project_file(tmp_path):
+    """A file the harness does not ship must never appear as harness."""
+    declared = set(deploy._shared_harness_paths(deploy.DIRS_ALL))
+    intruders = {
+        ".github/workflows/deploy-prod.yml",
+        ".github/CODEOWNERS",
+        ".github/dependabot.yml",
+        ".vscode/launch.json",
+        "tools/seed_db.py",
+    }
+    overlap = declared & intruders
+    assert not overlap, f"lock would claim project-owned files as harness: {overlap}"
+
+
+def test_harness_test_files_are_never_deployed(tmp_path):
+    """tools/test_*.py test THIS repo, not the target project.
+
+    These were excluded by a hand-maintained list, so every new test file
+    leaked into deployed projects until someone remembered to add it --
+    test_deploy.py and test_garden.py both did. Now excluded by rule.
+    """
+    test_files = sorted((deploy.ROOT / "tools").glob("test_*.py"))
+    assert test_files, "expected harness test files to exist"
+    for f in test_files:
+        assert not deploy.should_copy(f), f"harness test file would deploy: {f.name}"
+
+
+def test_generated_agent_files_are_declared(tmp_path):
+    """.github/agents/*.agent.md are generated at deploy time.
+
+    They exist in no source dir, so a manifest-derived boundary misses them
+    and a model would read them as project code.
+    """
+    declared = set(deploy._shared_harness_paths(deploy.DIRS_ALL))
+    agents = list((deploy.ROOT / ".copilot" / "agents").glob("*.md"))
+    assert agents, "expected .copilot/agents/*.md to exist"
+    for a in agents:
+        rel = f".github/agents/{a.stem}.agent.md"
+        assert rel in declared, f"generated agent file not declared as harness: {rel}"
+
+
+# ─── boundary docs must not contradict the shared-dir reality ───────────────
+
+BOUNDARY_DOCS = [
+    "AGENTS.md",
+    "CLAUDE.md",
+    ".kilo/instruction/harness-boundaries.md",
+    ".copilot/instruction/harness-boundaries.md",
+    ".gemini/antigravity/instruction/harness-boundaries.md",
+    ".gemini/antigravity/AGENTS.md",
+    ".github/copilot-instructions.md",
+]
+
+
+def test_boundary_docs_flag_shared_dirs(tmp_path):
+    """Every boundary doc that mentions a shared dir must call it shared.
+
+    These docs are what a model reads to decide "is this file mine to
+    change?". Claiming .github/ or tools/ is wholly harness invites it to
+    ignore the project's own CI and dev scripts -- or to "clean up" harness
+    files as if they were project code.
+    """
+    offenders = []
+    for rel in BOUNDARY_DOCS:
+        p = deploy.ROOT / rel
+        if not p.is_file():
+            continue
+        text = p.read_text(encoding="utf-8", errors="replace").lower()
+        if not any(d in text for d in ("`.github/", "`tools/", "`.vscode/")):
+            continue
+        if "shared" not in text and "dùng chung" not in text:
+            offenders.append(rel)
+    assert not offenders, (
+        f"boundary docs mention shared dirs without marking them shared: "
+        f"{offenders}"
+    )
