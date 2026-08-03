@@ -79,6 +79,20 @@ DEV_ONLY_ROOT_FILES = {
     "opencode.json", "opencode.ps1",  # deprecated engine, see .harness.lock
 }
 
+# Root files the harness deployed in EARLIER versions and no longer ships.
+# These are the only names eligible for stale-cleanup at the target root
+# beyond the current ROOT_FILES, because a previous deploy is what put them
+# there. Append here whenever a file is dropped from ROOT_FILES.
+RETIRED_ROOT_FILES = {
+    "opencode.json",   # removed v4.0.0 (Phase 3, OpenCode engine deleted)
+    "opencode.ps1",    # removed v4.0.0
+}
+
+# The complete set of root-level filenames the harness is permitted to
+# delete from a target project. Anything outside this set belongs to the
+# project and must never be touched by cleanup.
+HARNESS_OWNED_ROOT_FILES = set(ROOT_FILES) | RETIRED_ROOT_FILES | {".harness.lock"}
+
 # Directories to copy (relative to ROOT)
 # .opencode/ intentionally omitted — deprecated as of v3.7.0 (100% content
 # mirror of .kilo/, no unique runtime value; see .harness.lock).
@@ -954,29 +968,31 @@ def _cleanup_stale_files(
                         print(f"  [STALE] Removed: {d}/{item.relative_to(dst).as_posix()}")
                     removed += 1
 
-    # Check root-level harness files for staleness
-    root_harness_files = {
-        f for f in ROOT_FILES
-        if (ROOT / f).is_file()
-    }
-    # .harness.lock is always current (regenerated)
-    root_harness_files.add(".harness.lock")
+    # Check root-level harness files for staleness.
+    #
+    # SAFETY INVARIANT: at the target root we may ONLY delete a file whose
+    # name the harness itself has deployed at some point (current ROOT_FILES
+    # or RETIRED_ROOT_FILES). A target project's root is full of files that
+    # look "harness-ish" by extension — package.json, tsconfig.json,
+    # docker-compose.yml, README.md — and they are NOT ours to remove.
+    #
+    # Do NOT reintroduce extension-based matching here. Doing so deleted
+    # package.json/tsconfig.json/README.md from deployed projects and broke
+    # their builds. See test_deploy.py::test_project_root_files_survive_deploy.
     for f_path in target_path.iterdir():
         if not f_path.is_file():
             continue
         name = f_path.name
-        # Only check files whose name matches a known harness file pattern
-        # or files that live at the root and are harness artifacts
-        if name in root_harness_files or name == ".harness.lock":
-            continue  # expected
-        # Check if it's a harness root file that's no longer in source
-        if name.endswith((".md", ".json", ".jsonc", ".toml", ".yaml", ".yml", ".ps1", ".sh", ".js")) and name not in source_manifest and name not in root_harness_files:
-            if dry_run:
-                print(f"  [STALE] Would remove root file: {name}")
-            else:
-                f_path.unlink()
-                print(f"  [STALE] Removed root file: {name}")
-            removed += 1
+        if name not in HARNESS_OWNED_ROOT_FILES:
+            continue  # project-owned — never ours to delete
+        if name in source_manifest:
+            continue  # still shipped by the harness — expected
+        if dry_run:
+            print(f"  [STALE] Would remove root file: {name}")
+        else:
+            f_path.unlink()
+            print(f"  [STALE] Removed root file: {name}")
+        removed += 1
 
     return removed
 
