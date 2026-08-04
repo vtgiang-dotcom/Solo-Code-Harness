@@ -31,6 +31,18 @@ const SECRET_PATTERNS = [
   { name: 'hardcoded_token', pattern: /(?:token|bearer)\s*[:=]\s*["'][A-Za-z0-9._\-+/=]{20,}["']/i },
   { name: 'discord_webhook', pattern: /https:\/\/discord(?:app)?\.com\/api\/webhooks\/\d+\/[A-Za-z0-9_-]+/i },
   { name: 'basic_auth', pattern: /https?:\/\/[^:]+:[^@]+@/ },
+  // Prefixed-token formats. `generic_api_key` only fires on a QUOTED value, so
+  // bare `KEY=sk-ant-...` shell/env forms passed straight through -- this
+  // project's own Anthropic key format included. Length floors sit above
+  // doc-placeholder length so README examples do not trip the gate.
+  // Pinned by tools/test_secret_patterns.py.
+  { name: 'anthropic_key', pattern: /sk-ant-[A-Za-z0-9\-_]{24,}/ },
+  { name: 'openai_project_key', pattern: /sk-proj-[A-Za-z0-9\-_]{20,}/ },
+  { name: 'npm_token', pattern: /npm_[A-Za-z0-9]{36}/ },
+  { name: 'gitlab_pat', pattern: /glpat-[A-Za-z0-9\-_]{20,}/ },
+  { name: 'digitalocean_token', pattern: /dop_v1_[A-Za-z0-9]{64}/ },
+  // Authorization header form: no quotes, no "=", so `hardcoded_token` missed it.
+  { name: 'bearer_header', pattern: /Bearer\s+[A-Za-z0-9._\-+/=]{20,}/ },
 ];
 
 // File extensions that commonly contain secrets

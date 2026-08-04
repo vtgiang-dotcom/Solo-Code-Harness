@@ -81,6 +81,18 @@ SECRET_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("hardcoded_token", re.compile(r"(?:token|bearer)\s*[:=]\s*[\"'][A-Za-z0-9._\-+/=]{20,}[\"']", re.I)),
     ("discord_webhook", re.compile(r"https://discord(?:app)?\.com/api/webhooks/\d+/[A-Za-z0-9_-]+", re.I)),
     ("basic_auth", re.compile(r"https?://[^:]+:[^@]+@")),
+    # Prefixed-token formats. `generic_api_key` only fires on a QUOTED value,
+    # so bare `KEY=sk-ant-...` shell/env forms passed straight through -- this
+    # project's own Anthropic key format included. Length floors sit above
+    # doc-placeholder length so README examples do not trip the gate.
+    # Pinned by tools/test_secret_patterns.py.
+    ("anthropic_key", re.compile(r"sk-ant-[A-Za-z0-9\-_]{24,}")),
+    ("openai_project_key", re.compile(r"sk-proj-[A-Za-z0-9\-_]{20,}")),
+    ("npm_token", re.compile(r"npm_[A-Za-z0-9]{36}")),
+    ("gitlab_pat", re.compile(r"glpat-[A-Za-z0-9\-_]{20,}")),
+    ("digitalocean_token", re.compile(r"dop_v1_[A-Za-z0-9]{64}")),
+    # Authorization header form: no quotes, no "=", so `hardcoded_token` missed it.
+    ("bearer_header", re.compile(r"Bearer\s+[A-Za-z0-9._\-+/=]{20,}")),
 ]
 
 # ─── Protected Config Files (port of PROTECTED_FILES) ───────────────────────

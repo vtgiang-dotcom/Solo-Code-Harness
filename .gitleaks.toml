@@ -18,4 +18,9 @@ paths = [
     '''package-lock\.json''',
     '''\.env''',
     '''tools/eval_harness\.py''',
+    # Synthetic secrets with correct SHAPE but no real credential -- this is
+    # the corpus that pins all three scanners' pattern coverage. Flagging it
+    # would force weakening the very patterns it exists to verify.
+    '''tools/test_secret_patterns\.py''',
+    '''tools/test_claude_guard\.py''',
 ]

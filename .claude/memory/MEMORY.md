@@ -27,6 +27,7 @@
 - [verify] `.github/scripts/check_skips.py` — quét mọi test file tìm skip/skipif không lý do. Chỉ SKIP_PLATFORM và KNOWN_GAP được phép.
 - [verify] `.github/scripts/security-allowlist.txt` — mọi call site "nguy hiểm" (subprocess, os.environ) phải có justification trong file này.
 - [verify] `tools/test_claude_guard.py` — 26 guard cases chạy guard.py như subprocess, assert exit code (2 = block, 0 = allow).
+- [verify] `tools/test_secret_patterns.py` — 1 corpus ghim vào CẢ BA scanner (guard.py, secret-scan.js, security_scan.py). Sửa pattern 1 file mà quên 2 file kia → `test_all_three_scanners_agree` đỏ.
 
 ## Gotchas
 - [gotcha] Python PATH on Git Bash: init.sh and Makefile use fallback python3 → python → py
@@ -35,6 +36,7 @@
 - [gotcha] E501 globally ignored in .ruff.toml [lint]; no per-file E501 needed
 - [gotcha] Dead dir refs: ECC-main, agents-main, hermes-agent-main, etc. are stale — never restore
 - [gotcha] jsonschema not in .venv; schema validation via tools/validate_schemas.py
+- [gotcha] Secret regex: `sk-[a-zA-Z0-9]{20,}` KHÔNG vượt dấu `-` nên trượt `sk-ant-`/`sk-proj-`; `generic_api_key` chỉ khớp giá trị CÓ dấu nháy nên trượt `KEY=value` dạng shell/env. Thêm định dạng token mới phải sửa đủ 3 scanner.
 
 
 ## Decisions

@@ -31,8 +31,22 @@ SECRET_PATTERNS = [
     ),
     (r"AKIA[0-9A-Z]{16}", "AWS Access Key ID"),
     (r"gh[p|o|u|s|r]_[A-Za-z0-9_]{36,255}", "GitHub Token"),
+    (r"github_pat_[A-Za-z0-9_]{22,}", "GitHub fine-grained PAT"),
     (r"AIza[0-9A-Za-z\-_]{35}", "Google API Key"),
     (r"xox[bpras]-[0-9a-zA-Z]{10,}", "Slack Token"),
+    # Prefixed-token formats. The generic `sk-[a-zA-Z0-9]{20,}` above stops at
+    # the first "-", so it never matched sk-ant-/sk-proj- keys -- including
+    # this project's own Anthropic key format. Length floors are set above
+    # doc-placeholder length (e.g. "sk-ant-xxxxxxxxxxxx") to avoid firing on
+    # README examples. Pinned by tools/test_secret_patterns.py.
+    (r"sk-ant-[A-Za-z0-9\-_]{24,}", "Anthropic API key"),
+    (r"sk-proj-[A-Za-z0-9\-_]{20,}", "OpenAI project key"),
+    (r"npm_[A-Za-z0-9]{36}", "npm access token"),
+    (r"glpat-[A-Za-z0-9\-_]{20,}", "GitLab personal access token"),
+    (r"dop_v1_[A-Za-z0-9]{64}", "DigitalOcean token"),
+    # Authorization headers carry no quotes and no "=", so the quoted
+    # secret/token pattern above never saw them.
+    (r"Bearer\s+[A-Za-z0-9._\-+/=]{20,}", "Bearer token in Authorization header"),
 ]
 
 UNSAFE_PATTERNS = [
@@ -107,7 +121,7 @@ SKIP_EXTENSIONS = {
 def should_skip(file_path: Path) -> bool:
     # Skip files that intentionally contain mock secrets for testing
     name = file_path.name.lower()
-    if name in {"eval_harness.py", "secret-scan.test.js", "guard.test.js", "test_claude_guard.py"}:
+    if name in {"eval_harness.py", "secret-scan.test.js", "guard.test.js", "test_claude_guard.py", "test_secret_patterns.py"}:
         return True
     if name in SKIP_NAMES:
         return True

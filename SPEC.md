@@ -105,6 +105,37 @@ Phải tồn tại các thư mục: `.claude/` `.copilot/` `.github/` `.gemini/`
   `.env`/credentials/`.pem`/`.key`, v.v.)
   > Kiểm chứng: `python -m pytest tools/test_claude_guard.py -q`.
 
+### 3.1 Secret detection — 3 bản sao phải đồng thuận [HARD]
+
+Harness có **ba** bộ dò secret độc lập, mỗi bộ là một bản chép tay của cùng
+một danh sách pattern:
+
+| Scanner | Vai trò | Hậu quả khi bỏ lọt |
+|---|---|---|
+| `.claude/hooks/guard.py` | PreToolUse (Claude Code) | Secret được ghi vào file |
+| `.kilo/hooks/pre-tool-use/secret-scan.js` | PreToolUse (Kilo) | Secret được ghi vào file |
+| `.github/scripts/security_scan.py` | CI gate | Secret lọt vào merge |
+
+Không có cơ chế cấu trúc nào bắt chúng phải giống nhau, và chúng **đã** lệch.
+Tệ hơn, cả ba cùng mù với mọi định dạng token có tiền tố (`sk-ant-`,
+`sk-proj-`, `npm_`, `glpat-`, `dop_v1_`) và dạng header `Authorization:
+Bearer` — kể cả định dạng key Anthropic mà chính dự án này dùng. Nguyên nhân:
+`sk-[a-zA-Z0-9]{20,}` không vượt qua dấu `-`, còn `generic_api_key` chỉ khớp
+giá trị **có dấu nháy** nên dạng `KEY=sk-ant-...` trong shell/env đi thẳng qua.
+
+`tools/test_secret_patterns.py` ghim **một corpus** vào **cả ba** scanner:
+`MUST_DETECT` (11 định dạng, gồm cả regression guard cho các mẫu đã hoạt
+động) và `MUST_NOT_DETECT` (7 mẫu văn xuôi/placeholder). Gate quan trọng nhất
+là `test_all_three_scanners_agree` — bắt đúng loại drift "một scanner bắt
+được, hai scanner kia bỏ lọt" (đã bắt thật: `github_pat_` được 2/3 scanner
+nhận ra). Sửa pattern ở một file mà quên hai file kia → test đỏ.
+
+Nguyên tắc giữ nguyên từ §7.2.1: **false positive đắt hơn bỏ sót** — ngưỡng
+độ dài đặt cao hơn độ dài placeholder trong tài liệu (`sk-ant-xxxxxxxxxxxx`)
+để README không kích hoạt gate.
+
+> Kiểm chứng: `python -m pytest tools/test_secret_patterns.py -q` (65 case).
+
 ## 4. Script automation [HARD]
 
 - `security_scan.py`: quét secret, loại trừ `.venv`/`node_modules`/build,
