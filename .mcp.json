@@ -20,17 +20,12 @@
       "command": "npx",
       "args": ["-y", "@playwright/mcp"],
       "description": "Browser automation for E2E testing and web scraping. Free, no API key required. Requires: npx playwright install chromium"
-    },
-    "notebooks": {
-      "disabled": true,
-      "command": "",
-      "args": [],
-      "description": "Antigravity IDE notebooks (disabled — not used)"
     }
   },
   "_comments": {
     "github": "To enable GitHub MCP: add GITHUB_PERSONAL_ACCESS_TOKEN env var and uncomment the github section below",
     "tips": "Keep under 8 MCPs enabled to preserve context window. Disable unused ones.",
-    "install_playwright": "Run 'npx playwright install chromium' once before using playwright MCP"
+    "install_playwright": "Run 'npx playwright install chromium' once before using playwright MCP",
+    "notebooks": "A disabled 'notebooks' entry with an empty command used to live here to suppress an Antigravity pipe error (fa1e289). Claude Code rejected it as an invalid server config ('command cannot be empty') and reported it in `claude doctor` on every run. Removed 2026-08-05 — an entry that is disabled anyway is not worth a permanent validation error."
   }
 }
