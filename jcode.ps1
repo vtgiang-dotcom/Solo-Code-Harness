@@ -3,6 +3,11 @@
 
 $ErrorActionPreference = "Stop"
 
+# deepseek-v4-pro is the only supported worker model. The cheaper
+# deepseek-v4-flash tier was dropped 2026-07-25: unreliable in practice,
+# with the token savings lost to re-prompting and rework.
+$DefaultModel = "deepseek/deepseek-v4-pro"
+
 # ── Banner ──────────────────────────────────────────────────────────
 Write-Host ""
 Write-Host "  ╔══════════════════════════════════════════╗" -ForegroundColor Cyan
@@ -37,12 +42,29 @@ if (Test-Path $envFile) {
     }
 }
 
-# ── Model ───────────────────────────────────────────────────────────
-# deepseek-v4-pro is the only supported worker model. The cheaper
-# deepseek-v4-flash tier was dropped 2026-07-25: unreliable in practice,
-# with the token savings lost to re-prompting and rework.
-$DefaultModel = "deepseek/deepseek-v4-pro"
+# ── Retired-model drift check ───────────────────────────────────────
+# deepseek-v4-flash was retired 2026-07-25 (unreliable; savings lost to
+# re-prompting). The launcher and tools/jcode_delegate.py always pass
+# --model explicitly, so they are safe -- but ~/.jcode/config.toml is a
+# machine-global file this repo does not own, and if it still pins the
+# retired tier then ANY `jcode run` that omits --model silently executes on
+# it. Verified: with the model omitted, jcode reported
+# `model: deepseek/deepseek-v4-flash`.
+#
+# Warn rather than rewrite: config.toml holds unrelated user settings
+# (auth, agents, failover) and silently editing a global file the user owns
+# is worse than telling them precisely what to change.
+$jcodeConfigToml = Join-Path $env:USERPROFILE ".jcode\config.toml"
+if (Test-Path $jcodeConfigToml) {
+    $tomlText = Get-Content $jcodeConfigToml -Raw
+    if ($tomlText -match 'deepseek-v4-flash') {
+        Write-Warning "~/.jcode/config.toml still pins the RETIRED deepseek-v4-flash tier."
+        Write-Warning "  Any 'jcode run' without an explicit --model will use it."
+        Write-Warning "  Fix: set default_model = `"$DefaultModel`" in [provider] and [providers.commandcode]."
+    }
+}
 
+# ── Model ───────────────────────────────────────────────────────────
 # $args[0] used to be taken as the model unconditionally, so
 # `./jcode.ps1 "fix the login bug"` sent --model "fix the login bug" to the
 # gateway and the prompt was consumed as a model name (the request then
