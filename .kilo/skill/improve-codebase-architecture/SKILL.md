@@ -12,7 +12,12 @@ Scan a codebase for **deepening** opportunities — refactors that turn shallow 
 
 ## 1. Explore
 
-1. Read `CONTEXT.md` if it exists (created by skill `domain-modeling`) to learn the project's shared language.
+**Scope before you scan.** Deepening pays off on code that keeps changing, so decide *where* to look first:
+
+- If the user named a module, subsystem, or pain point, take it and skip the inference below.
+- Otherwise run `git log --oneline -n 200 --name-only` and rank paths by change frequency — those hot spots go first. If changes are scattered with no clear hot spot, widen the net.
+
+1. Read `CONTEXT.md` if it exists (created by skill `domain-modeling`) to learn the project's shared language, plus any ADRs in `docs/decisions/` covering the area you are touching.
 2. Use Agent `subagent_type=Explore` to scan the codebase. Record friction signals:
    - **Shallow modules** — interface nearly as complex as the implementation (many public methods for little behaviour)
    - **Module hopping** — must read 3+ files to understand one concept
@@ -49,6 +54,8 @@ Output a ranked list in Markdown. Each candidate follows this format:
 
 Rank candidates by **locality gain** × **leverage gain**. End with a **Top recommendation**.
 
+**ADR conflicts:** if a candidate contradicts an existing ADR in `docs/decisions/`, surface it only when the friction is real enough to justify reopening that decision, and mark it in the candidate (`Contradicts ADR-007 — worth reopening because …`). Do not list every refactor an ADR forbids.
+
 ---
 
 ## 3. Grilling loop
@@ -58,6 +65,7 @@ After presenting candidates, ask: "Which candidate should we explore first?" Do 
 Once the user picks a candidate:
 1. Use skill `interview-me` (upgraded with grilling cadence) to walk through the design tree one decision at a time.
 2. Update `CONTEXT.md` inline (via `domain-modeling`) when new terms crystallise.
+3. If the user rejects a candidate for a **load-bearing** reason, offer to record it: "Want me to record this as an ADR so future architecture reviews do not re-suggest it?" Use skill `documentation-and-adrs`. Only offer when a future explorer would need that reason to avoid re-proposing the same refactor — skip ephemeral ("not worth it right now") and self-evident ones.
 
 ---
 
