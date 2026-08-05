@@ -60,7 +60,9 @@ if (Test-Path $jcodeConfigToml) {
     if ($tomlText -match 'deepseek-v4-flash') {
         Write-Warning "~/.jcode/config.toml still pins the RETIRED deepseek-v4-flash tier."
         Write-Warning "  Any 'jcode run' without an explicit --model will use it."
-        Write-Warning "  Fix: set default_model = `"$DefaultModel`" in [provider] and [providers.commandcode]."
+        Write-Warning "  Fix: set default_model = `"$DefaultModel`" in [provider] and [providers.commandcode],"
+        Write-Warning "       and the [[providers.commandcode.models]] id. One-liner (backs up first):"
+        Write-Warning "       Copy-Item `"`$env:USERPROFILE\.jcode\config.toml`" `"`$env:USERPROFILE\.jcode\config.toml.bak`"; (Get-Content `"`$env:USERPROFILE\.jcode\config.toml`") -replace 'deepseek/deepseek-v4-flash','$DefaultModel' | Set-Content `"`$env:USERPROFILE\.jcode\config.toml`""
     }
 }
 
