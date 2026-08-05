@@ -1,6 +1,7 @@
 ---
 name: shipping-and-launch
 description: Prepares production launches. Use when preparing to deploy to production.
+risk: side-effecting
 disable-model-invocation: true
 ---
 

@@ -151,6 +151,79 @@ def find_secret(text: str) -> str | None:
     return None
 
 
+# ─── Skill risk declaration ─────────────────────────────────────────────────
+#
+# A skill that TELLS the agent to run a side-effecting command (deploy, push,
+# migrate) must declare `risk: side-effecting` in its frontmatter. The point is
+# not the label -- it is that adding such an instruction becomes a deliberate,
+# visible act instead of a line that slips into a skill silently.
+#
+# Only fires on imperative instructions ("Run the migration", "Deploy the ...")
+# so a skill may still freely NAME a command: permission-guard documents
+# `rm -rf` precisely because it blocks it, and must not be forced to declare
+# itself side-effecting for doing so.
+
+SKILL_RISK_VALUES = {"none", "side-effecting"}
+
+_SIDE_EFFECT_INSTRUCTION = re.compile(
+    r"^\s*(?:[-*]|\d+\.)?\s*(?:Run|Execute|Push|Deploy|Apply|Publish|Release)\b"
+    r"[^\n]*?(git\s+push|deploy|migrat|reset\s+--hard|--force)",
+    re.I | re.M,
+)
+
+
+def parse_frontmatter_value(content: str, key: str) -> str | None:
+    """Read one top-level scalar from a `---`-delimited frontmatter block."""
+    if not content.startswith("---"):
+        return None
+    end = content.find("\n---", 3)
+    if end == -1:
+        return None
+    for line in content[3:end].splitlines():
+        m = re.match(rf"^{re.escape(key)}\s*:\s*(.*)$", line.strip())
+        if m:
+            return m.group(1).strip().strip("\"'")
+    return None
+
+
+def check_skill_risk(file_path: str, content: str, *, is_full_content: bool) -> str | None:
+    """Return a denial reason if a SKILL.md's risk declaration is wrong.
+
+    Content-based, not path-based: the check reads what the skill instructs,
+    so it cannot be bypassed by writing the file somewhere else first.
+
+    A partial Edit supplies only the replacement fragment, which carries no
+    frontmatter -- reading `risk:` from it would report "not declared" for
+    every skill, including correctly-declared ones. So for fragments the
+    declaration is read from the file on disk instead.
+    """
+    if os.path.basename(file_path) != "SKILL.md" or not content:
+        return None
+
+    declared_source = content
+    if not is_full_content:
+        try:
+            with open(file_path, encoding="utf-8") as fh:
+                declared_source = fh.read()
+        except OSError:
+            # New file via Edit, or unreadable: no frontmatter to judge
+            # against, so stay silent rather than block on a guess.
+            return None
+
+    declared = parse_frontmatter_value(declared_source, "risk")
+    if declared is not None and declared not in SKILL_RISK_VALUES:
+        return (f"SKILL.md declares unknown risk '{declared}'. "
+                f"Use one of: {', '.join(sorted(SKILL_RISK_VALUES))}.")
+
+    hit = _SIDE_EFFECT_INSTRUCTION.search(content)
+    if hit and declared != "side-effecting":
+        return (f"SKILL.md instructs a side-effecting action "
+                f"({hit.group(0).strip()[:60]!r}) but does not declare "
+                f"'risk: side-effecting' in its frontmatter. Add it, or "
+                f"reword so the skill describes rather than instructs.")
+    return None
+
+
 def deny(reason: str) -> None:
     """Emit a Claude PreToolUse deny decision and exit non-zero."""
     print(json.dumps({
@@ -190,12 +263,20 @@ def main() -> int:
         if basename in PROTECTED_FILES:
             deny(f"'{basename}' is a protected config file. Confirm before editing linter/formatter config.")
         # Scan proposed content for secrets.
-        content = tool_input.get("content", "") or tool_input.get("new_string", "") or ""
-        for edit in tool_input.get("edits", []) or []:
+        full_content = tool_input.get("content", "") or ""
+        content = full_content or tool_input.get("new_string", "") or ""
+        fragments = tool_input.get("edits", []) or []
+        for edit in fragments:
             content += "\n" + (edit.get("new_string", "") or "")
         secret = find_secret(content)
         if secret:
             deny(f"possible secret '{secret}' in file content. Use environment variables instead.")
+        risk_issue = check_skill_risk(
+            file_path, content,
+            is_full_content=bool(full_content) and not fragments,
+        )
+        if risk_issue:
+            deny(risk_issue)
         return 0
 
     return 0

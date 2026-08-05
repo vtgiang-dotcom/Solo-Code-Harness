@@ -111,3 +111,76 @@ def test_unknown_tool_allowed():
 
 def test_empty_command_allowed():
     assert _run_guard({"tool_name": "Bash", "tool_input": {"command": ""}}) == 0
+
+
+# ── Skill risk declaration ───────────────────────────────────────────────
+#
+# A skill that INSTRUCTS a side-effecting action (deploy, push, migrate) must
+# declare `risk: side-effecting`. The value of the field is not the label but
+# the friction: adding such an instruction becomes deliberate rather than a
+# line that slips in unnoticed. Enforced here rather than in a validator so it
+# fires at write time, on content, and cannot be sidestepped by writing the
+# file elsewhere first.
+
+_DECLARED = "---\nname: x\nrisk: side-effecting\ndescription: d\n---\n\n"
+_PLAIN = "---\nname: x\ndescription: d\n---\n\n"
+
+
+def _write_skill(path, content):
+    payload = {"tool_name": "Write",
+               "tool_input": {"file_path": str(path), "content": content}}
+    return _run_guard(payload)
+
+
+def test_skill_instructing_side_effect_without_risk_blocked():
+    assert _write_skill("a/SKILL.md", _PLAIN + "1. Deploy the API with `git push`\n") == 2
+
+
+def test_skill_instructing_side_effect_with_risk_allowed():
+    assert _write_skill("a/SKILL.md", _DECLARED + "1. Deploy the API with `git push`\n") == 0
+
+
+def test_skill_merely_naming_command_allowed():
+    """permission-guard documents `rm -rf` and `git push --force` because it
+    BLOCKS them. Naming a command is not instructing it, and must not force a
+    skill to declare itself side-effecting."""
+    body = "This skill blocks `rm -rf /` and `git push --force` before they run.\n"
+    assert _write_skill("a/SKILL.md", _PLAIN + body) == 0
+
+
+def test_skill_with_unknown_risk_value_blocked():
+    assert _write_skill("a/SKILL.md", "---\nname: x\nrisk: bogus\n---\n\nprose\n") == 2
+
+
+def test_non_skill_file_not_subject_to_risk_check():
+    assert _write_skill("a/README.md", _PLAIN + "1. Deploy with `git push`\n") == 0
+
+
+def test_partial_edit_reads_risk_from_disk_not_fragment(tmp_path):
+    """An Edit sends only the replacement fragment, which carries no
+    frontmatter. Judging the fragment alone would report "not declared" for
+    every skill, including correctly-declared ones."""
+    skill = tmp_path / "SKILL.md"
+    skill.write_text(_DECLARED + "prose\n", encoding="utf-8")
+    payload = {"tool_name": "Edit",
+               "tool_input": {"file_path": str(skill),
+                              "new_string": "1. Deploy with `git push`"}}
+    assert _run_guard(payload) == 0
+
+
+def test_partial_edit_blocked_when_disk_undeclared(tmp_path):
+    skill = tmp_path / "SKILL.md"
+    skill.write_text(_PLAIN + "prose\n", encoding="utf-8")
+    payload = {"tool_name": "Edit",
+               "tool_input": {"file_path": str(skill),
+                              "new_string": "1. Deploy with `git push`"}}
+    assert _run_guard(payload) == 2
+
+
+def test_partial_edit_on_absent_file_allowed():
+    """No frontmatter to judge against -- stay silent rather than block on a
+    guess."""
+    payload = {"tool_name": "Edit",
+               "tool_input": {"file_path": "nope/SKILL.md",
+                              "new_string": "1. Deploy with `git push`"}}
+    assert _run_guard(payload) == 0
