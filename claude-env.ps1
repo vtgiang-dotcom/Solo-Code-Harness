@@ -1,32 +1,26 @@
 $claudeArgs = @($args)
 
-# --bare is OPT-IN, not the default.
+# --bare is OPT-IN. Plain `./claude-env.ps1` runs the FULL harness.
 #
-# History: this launcher used to inject --bare on every run, because some
-# third-party Anthropic-compatible gateways failed auth in full mode.
-# --bare "fixes" that by restricting auth strictly to ANTHROPIC_API_KEY /
-# apiKeyHelper (OAuth and keychain are never read), so a stale keychain or
-# OAuth credential can no longer win over the .env key.
+# Per `claude --help`, --bare skips hooks, CLAUDE.md auto-discovery, LSP,
+# auto-memory and MCP config. That is the entire enforcement layer this repo
+# exists to provide: guard.py, memory_gate, quality_gate, security_post and
+# both session hooks. Defaulting to it means shipping a harness that is
+# installed but not in force.
 #
-# The cost of that workaround was never written down and is severe:
-# per `claude --help`, bare mode SKIPS HOOKS and CLAUDE.md auto-discovery.
-# That silently disabled the entire enforcement layer this repo exists to
-# provide -- guard.py (33 destructive + 21 secret patterns), memory_gate,
-# quality_gate, security_post and the session hooks -- while README.md and
-# CLAUDE.md still advertised them as active.
-#
-# The auth issue is now handled properly below (apiKeyHelper conflict
-# detection, added 2026-07-25), so the workaround is obsolete: full mode
-# authenticates fine against the FreeModel gateway. Default is now full
-# mode so the harness is actually in force. --bare still works if a gateway
-# regresses -- but it warns, because running with hooks off must never be
-# silent.
+# --bare was once the default as a workaround for third-party gateways
+# failing auth in full mode. That is obsolete -- full mode authenticates
+# fine against the FreeModel gateway (verified live, and the apiKeyHelper
+# conflict detection below handles the real cause). --bare stays available
+# for a gateway regression, but it WARNS: hooks-off must never be silent.
 $useBare = $false
 $normalizedArgs = New-Object System.Collections.Generic.List[string]
 foreach ($arg in $claudeArgs) {
-    # Accepted as a no-op so existing callers/docs passing it keep working;
-    # full mode is now the default.
+    # Accepted as a no-op so existing callers and docs keep working.
+    # Deliberately NOT `continue`-d into oblivion: dropping the only arg
+    # used to empty the list and fall through to a hardcoded --bare path.
     if ($arg -eq "--full-mode") {
+        $useBare = $false
         continue
     }
     if ($arg -eq "--bare") {
@@ -104,11 +98,17 @@ if ($useBare) {
     if ($normalizedArgs -notcontains "--bare") {
         [void]$normalizedArgs.Insert(0, "--bare")
     }
+    # --bare skips CLAUDE.md auto-discovery; --add-dir . restores it.
+    # Hooks are NOT recoverable this way -- only full mode runs them.
+    if ($normalizedArgs -notcontains "--add-dir") {
+        [void]$normalizedArgs.Add("--add-dir")
+        [void]$normalizedArgs.Add(".")
+    }
 }
 
-if ($normalizedArgs.Count -gt 0) {
-    & claude @normalizedArgs
-}
-else {
-    & claude
-}
+# Single exec path. There is deliberately no separate no-arg branch: the
+# original bug was a hardcoded `& claude --bare` fallback that fired whenever
+# the arg list ended up empty -- including `--full-mode`, whose whole purpose
+# was to avoid bare. PowerShell splats an empty list as no args, so one line
+# covers both cases and cannot drift from the logic above.
+& claude @normalizedArgs
