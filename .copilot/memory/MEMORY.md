@@ -36,6 +36,7 @@
 - [gotcha] E501 globally ignored in .ruff.toml [lint]; no per-file E501 needed
 - [gotcha] Dead dir refs: ECC-main, agents-main, hermes-agent-main, etc. are stale — never restore
 - [gotcha] jsonschema not in .venv; schema validation via tools/validate_schemas.py
+- [gotcha] `claude --bare` SKIPS ALL HOOKS + CLAUDE.md auto-discovery. claude-env.ps1 injected it by default, so every session ran with guard/memory/quality/security gates OFF while docs claimed they were on. Now opt-in + warns. Hooks also never fire in headless mode (-p or piped stdin), so hook enforcement CANNOT be A/B-tested that way -- verify interactively.
 - [gotcha] Secret regex: `sk-[a-zA-Z0-9]{20,}` KHÔNG vượt dấu `-` nên trượt `sk-ant-`/`sk-proj-`; `generic_api_key` chỉ khớp giá trị CÓ dấu nháy nên trượt `KEY=value` dạng shell/env. Thêm định dạng token mới phải sửa đủ 3 scanner.
 
 
