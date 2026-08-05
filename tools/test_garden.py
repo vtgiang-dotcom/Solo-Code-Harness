@@ -17,6 +17,7 @@ Usage:
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -782,3 +783,67 @@ def test_check_api_key_approval_silent_without_key(tmp_path, monkeypatch, capsys
 
     assert garden.check_api_key_approval() == []
     assert capsys.readouterr().out == ""
+
+
+# ─── _doc_scan_skip_dirs (reference-repo exclusion) ─────────────────────────
+#
+# Reference repos (unpacked upstream projects) used to be excluded by a
+# hardcoded name list. That list named 17 repos -- all since deleted -- while
+# the one repo actually on disk was absent from it, so the doc-scanning checks
+# walked it and reported 169 drift issues that were not the harness's own.
+# These tests pin the replacement signal: zero tracked files == reference repo.
+
+
+def _git(tmp_path: Path, *args: str) -> None:
+    subprocess.run(["git", "-C", str(tmp_path), *args],
+                   capture_output=True, check=True)
+
+
+def _init_repo(tmp_path: Path) -> None:
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "config", "user.email", "t@example.com")
+    _git(tmp_path, "config", "user.name", "t")
+
+
+def test_doc_scan_skips_untracked_reference_repo(tmp_path):
+    _init_repo(tmp_path)
+    _write(tmp_path / "tools" / "real.py", "x = 1\n")
+    _git(tmp_path, "add", "tools/real.py")
+    _git(tmp_path, "commit", "-qm", "init")
+    _write(tmp_path / "vendored-repo" / "SKILL.md", "# unpacked upstream\n")
+
+    skip = garden._doc_scan_skip_dirs(tmp_path)
+
+    assert "vendored-repo" in skip
+
+
+def test_doc_scan_keeps_tracked_dir_holding_untracked_files(tmp_path):
+    """`git ls-files --others --directory` collapses a fully-untracked *nested*
+    directory into a `tools/newsub/` entry; taking its first path segment
+    promotes that to `tools` and excludes the entire harness directory.
+    Adding one new unstaged subdirectory under tools/ or .claude/ -- routine
+    during development -- would have silenced the gate over that whole tree.
+    Only directories with zero tracked files anywhere beneath them may be
+    skipped."""
+    _init_repo(tmp_path)
+    _write(tmp_path / "tools" / "real.py", "x = 1\n")
+    _git(tmp_path, "add", "tools/real.py")
+    _git(tmp_path, "commit", "-qm", "init")
+    # A brand-new, entirely unstaged subdirectory -- git collapses this to
+    # `tools/newsub/`, whose first segment is the tracked dir `tools`.
+    _write(tmp_path / "tools" / "newsub" / "a.py", "x = 1\n")
+
+    skip = garden._doc_scan_skip_dirs(tmp_path)
+
+    assert "tools" not in skip
+
+
+def test_doc_scan_falls_back_to_static_set_outside_git(tmp_path):
+    """Outside a git repo the scan must check everything rather than silently
+    skipping real drift."""
+    _write(tmp_path / "somedir" / "a.md", "# x\n")
+
+    skip = garden._doc_scan_skip_dirs(tmp_path)
+
+    assert skip == garden._SCAN_SKIP_DIRS
+    assert "somedir" not in skip

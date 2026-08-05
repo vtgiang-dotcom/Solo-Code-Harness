@@ -25,6 +25,11 @@ node_modules/
 # Claude Code personal overrides (generated locally, not committed)
 .claude/settings.local.json
 
+# Reference repos — upstream projects unpacked alongside the harness for
+# study. Never committed. Ignoring them also keeps ruff out (it honours
+# .gitignore), which is why they belong here rather than in .ruff.toml.
+/agentic-awesome-skills-main/
+
 # OS
 .DS_Store
 Thumbs.db

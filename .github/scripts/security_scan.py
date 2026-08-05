@@ -11,6 +11,7 @@ Usage:
 """
 
 import re
+import subprocess  # noqa: S404 — runs `git ls-files` on the scanned path only
 import sys
 from pathlib import Path
 
@@ -79,23 +80,6 @@ SKIP_DIRS = {
     ".mypy_cache",
     ".ruff_cache",
     ".pytest_cache",
-    "ECC-main",                    # Reference project — not part of harness
-    "agents-main",                 # Reference project — not part of harness
-    "awesome-deepseek-agent-main", # Reference project — DeepSeek integration guides
-    "claude-code-main",            # Reference project — official Claude Code repo
-    "skills-main",                 # Reference project — official Anthropic skills
-    "claw-code-main",              # Reference project — Claw Code autonomous agent
-    "claude-plugins-official-main",# Reference project — official plugin marketplace
-    "skills-main-2",               # Reference project — Microsoft Azure skills
-    "gemini-skills-main",          # Reference project — Gemini skills
-    "code",                        # Reference project root — all external code
-    "hermes-agent-main",          # Reference project — Hermes agent analysis
-    "deer-flow-main",             # Reference project — DeerFlow 2.0 patterns
-    "opencode-dev",               # OpenCode source — third-party, not harness code
-    "Solo-Code-Harness",          # SoloC-Harness worktree — third-party, not harness code
-    "codebase-memory-mcp-main",   # Reference project — C MCP server for codebase memory
-    "cocoindex-code-main",        # Reference project — Rust-based code indexing tool
-    "antigravity-sdk-python-main", # Reference project — vendored Antigravity SDK
 }
 # Files git-ignored in this repo — skip to avoid flagging local dev secrets
 SKIP_NAMES: set[str] = {".env"}
@@ -118,7 +102,46 @@ SKIP_EXTENSIONS = {
 }
 
 
-def should_skip(file_path: Path) -> bool:
+def untracked_top_level_dirs(root: Path) -> set[str]:
+    """Top-level directories inside `root` containing zero git-tracked files.
+
+    Reference repos (unpacked upstream projects kept alongside the harness for
+    study) contain no tracked files; every harness directory contains many.
+    Using that signal instead of a hardcoded name list means a newly unpacked
+    repo is excluded the moment it lands -- the previous list named 17 repos,
+    all of which had since been deleted, while the one repo actually present
+    was absent from it and pushed the gate to 248 false positives.
+
+    Deliberately NOT `git ls-files --others --directory`: that reports any
+    directory holding untracked files, which collapses to the whole directory
+    and would have excluded `.claude`, `.github`, and `tools` -- silencing the
+    gate over most of the harness.
+
+    Returns an empty set when `root` is not a git repo (this script is also run
+    against arbitrary external paths), so scanning degrades to "check
+    everything" rather than silently skipping real findings.
+    """
+    try:
+        proc = subprocess.run(  # noqa: S603,S607 — fixed argv, no shell
+            ["git", "-C", str(root), "ls-files"],
+            capture_output=True, text=True, timeout=60, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return set()
+    if proc.returncode != 0:
+        return set()
+
+    tracked_top_level = {
+        line.split("/")[0] for line in proc.stdout.splitlines() if "/" in line
+    }
+    return {
+        entry.name
+        for entry in root.iterdir()
+        if entry.is_dir() and entry.name not in tracked_top_level
+    }
+
+
+def should_skip(file_path: Path, extra_skip_dirs: frozenset[str] = frozenset()) -> bool:
     # Skip files that intentionally contain mock secrets for testing
     name = file_path.name.lower()
     if name in {"eval_harness.py", "secret-scan.test.js", "guard.test.js", "test_claude_guard.py", "test_secret_patterns.py"}:
@@ -127,7 +150,7 @@ def should_skip(file_path: Path) -> bool:
         return True
     parts = file_path.parts
     for part in parts:
-        if part in SKIP_DIRS:
+        if part in SKIP_DIRS or part in extra_skip_dirs:
             return True
     return file_path.suffix.lower() in SKIP_EXTENSIONS
 
@@ -163,10 +186,14 @@ def main():
     print(f"Scanning: {project_path}")
     print(f"Mode: {'STRICT' if strict else 'SECRETS ONLY'}\n")
 
+    reference_dirs = frozenset(untracked_top_level_dirs(project_path))
+    if reference_dirs:
+        print(f"Skipping untracked reference dirs: {', '.join(sorted(reference_dirs))}\n")
+
     all_findings = []
     file_count = 0
     for file_path in project_path.rglob("*"):
-        if file_path.is_file() and not should_skip(file_path):
+        if file_path.is_file() and not should_skip(file_path, reference_dirs):
             file_count += 1
             findings = scan_file(file_path, strict)
             all_findings.extend(findings)

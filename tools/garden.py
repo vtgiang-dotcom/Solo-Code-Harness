@@ -28,6 +28,45 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 SKIP_FILE = ROOT / "tools" / "opencode-skip-skills.txt"
 
+_SCAN_SKIP_DIRS = {".git", "node_modules", ".venv", ".pytest_cache",
+                   ".ruff_cache", ".solocode", "__pycache__"}
+
+
+def _doc_scan_skip_dirs(root: Path) -> set[str]:
+    """Directories the doc-scanning checks must not walk into.
+
+    Beyond the usual build/cache noise, this excludes reference repos --
+    unpacked upstream projects kept alongside the harness for study. They are
+    detected as top-level directories with zero git-tracked files (harness
+    directories all contain tracked files), so a newly unpacked repo is
+    excluded the moment it lands rather than when someone remembers to add it
+    to a list. Without this, one unpacked repo reported 169 drift issues, none
+    of which were the harness's own.
+
+    Degrades to the static set when git is unavailable, so a non-repo checkout
+    still scans everything rather than silently skipping real drift.
+    """
+    skip = set(_SCAN_SKIP_DIRS)
+    try:
+        proc = subprocess.run(  # noqa: S603,S607 — fixed argv, no shell
+            ["git", "-C", str(root), "ls-files"],
+            capture_output=True, text=True, timeout=60, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return skip
+    if proc.returncode != 0:
+        return skip
+
+    tracked_top_level = {
+        line.split("/")[0] for line in proc.stdout.splitlines() if "/" in line
+    }
+    skip.update(
+        entry.name
+        for entry in root.iterdir()
+        if entry.is_dir() and entry.name not in tracked_top_level
+    )
+    return skip
+
 
 def _load_skip_skills() -> set[str]:
     """Read opencode-skip-skills.txt — skills intentionally excluded."""
@@ -720,8 +759,7 @@ def check_doc_paths(root: Path = ROOT) -> list[str]:
     via _PATH_NEGATION_MARKERS, and runtime-generated paths are skipped.
     """
     issues: list[str] = []
-    skip_dirs = {".git", "node_modules", ".venv", ".pytest_cache",
-                 ".ruff_cache", ".solocode", "__pycache__"}
+    skip_dirs = _doc_scan_skip_dirs(root)
     top_level = {p.name for p in root.iterdir() if p.name not in skip_dirs}
 
     for md in sorted(root.rglob("*.md")):
@@ -811,8 +849,7 @@ def check_doc_flags(root: Path = ROOT) -> list[str]:
         have no argparse help (e.g. security_scan.py's `--strict`).
     """
     issues: list[str] = []
-    skip_dirs = {".git", "node_modules", ".venv", ".pytest_cache",
-                 ".ruff_cache", ".solocode", "__pycache__"}
+    skip_dirs = _doc_scan_skip_dirs(root)
     help_cache: dict[str, str] = {}
 
     for md in sorted(root.rglob("*.md")):
@@ -890,8 +927,7 @@ def check_enforcement_claims(root: Path = ROOT) -> list[str]:
     that pairing is exactly the claim a reader will act on.
     """
     issues: list[str] = []
-    skip_dirs = {".git", "node_modules", ".venv", ".pytest_cache",
-                 ".ruff_cache", ".solocode", "__pycache__"}
+    skip_dirs = _doc_scan_skip_dirs(root)
     verdict: dict[str, bool] = {}
 
     for md in sorted(root.rglob("*.md")):
