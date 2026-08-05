@@ -120,6 +120,29 @@ def test_check_skill_content_skips_skills_missing_on_either_side(tmp_path):
     assert garden.check_skill_content(src, dst, ".copilot") == []
 
 
+def test_check_skill_content_reports_the_real_destination_dirname(tmp_path):
+    """The reported path must name the directory actually checked.
+
+    The Gemini engine mirrors skills into `skills/` (plural) while Copilot
+    uses `skill/`. The message hardcoded "/skill/", so every Gemini drift
+    pointed at a path that does not exist on disk -- following it led
+    nowhere. Every other test here passed a dst named `dst_skill`, so none
+    of them could catch it.
+    """
+    src = tmp_path / "src"
+    _write(src / "skill" / "wayfinder" / "SKILL.md", "---\n---\nbody A\n")
+
+    plural = tmp_path / "antigravity" / "skills"
+    _write(plural / "wayfinder" / "SKILL.md", "---\n---\nbody B\n")
+    issue = garden.check_skill_content(src, plural, ".gemini/antigravity")[0]
+    assert ".gemini/antigravity/skills/wayfinder/SKILL.md" in issue
+
+    singular = tmp_path / "copilot" / "skill"
+    _write(singular / "wayfinder" / "SKILL.md", "---\n---\nbody B\n")
+    issue = garden.check_skill_content(src, singular, ".copilot")[0]
+    assert ".copilot/skill/wayfinder/SKILL.md" in issue
+
+
 # ─── _split_frontmatter ──────────────────────────────────────────────────────
 
 def test_split_frontmatter_with_delimiters():

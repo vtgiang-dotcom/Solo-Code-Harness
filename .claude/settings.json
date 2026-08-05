@@ -14,7 +14,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/guard.py"
+            "command": "python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/guard.py\""
           }
         ]
       }
@@ -25,11 +25,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/quality_gate.py"
+            "command": "python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/quality_gate.py\""
           },
           {
             "type": "command",
-            "command": "python .claude/hooks/memory_gate.py"
+            "command": "python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/memory_gate.py\""
           }
         ]
       },
@@ -38,7 +38,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/security_post.py"
+            "command": "python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/security_post.py\""
           }
         ]
       }
@@ -48,7 +48,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/pre_compact.py"
+            "command": "python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/pre_compact.py\""
           }
         ]
       }
@@ -58,7 +58,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/session_start.py"
+            "command": "python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/session_start.py\""
           }
         ]
       }
@@ -68,7 +68,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/session_end.py"
+            "command": "python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/session_end.py\""
           }
         ]
       }
