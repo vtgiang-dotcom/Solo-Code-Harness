@@ -72,6 +72,42 @@ def test_safe_commands_allowed(command):
     assert _run_guard({"tool_name": "Bash", "tool_input": {"command": command}}) == 0
 
 
+# ── format_disk: the word "format" is not a disk wipe ─────────────────────
+# The pattern was `\bformat\s`, which blocked `ruff check --output-format json`
+# and even a grep searching for the pattern's own name. A guard that blocks
+# routine tooling teaches people to work around it, so it is anchored now --
+# these tests pin both directions.
+
+REAL_FORMAT_COMMANDS = [
+    "format C:",
+    "format /fs:ntfs D:",
+    "format /q /fs:exfat E:",
+    "echo hi && format C:",
+    "FORMAT c:",
+    "Format-Volume -DriveLetter D",
+]
+
+
+@pytest.mark.parametrize("command", REAL_FORMAT_COMMANDS)
+def test_real_disk_format_still_blocked(command):
+    assert _run_guard({"tool_name": "Bash", "tool_input": {"command": command}}) == 2
+
+
+FORMAT_WORD_COMMANDS = [
+    "ruff check --output-format json .",
+    "ruff check --select S,BLE --output-format concise .",
+    "grep -rn format_disk .claude/hooks/",
+    "gofmt -l . && echo 'format ok'",
+    "python -c \"print('{}'.format(1))\"",
+    "git log --format=%H",
+]
+
+
+@pytest.mark.parametrize("command", FORMAT_WORD_COMMANDS)
+def test_format_word_in_flags_allowed(command):
+    assert _run_guard({"tool_name": "Bash", "tool_input": {"command": command}}) == 0
+
+
 # ── Secret detection in commands ─────────────────────────────────────────
 
 

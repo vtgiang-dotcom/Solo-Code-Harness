@@ -35,7 +35,11 @@ const BLOCK_PATTERNS = [
   { name: 'dev_write', pattern: />\s*\/dev\/sd[a-z]/ },
   { name: 'win_del_force', pattern: /del\s+\/f\s+\/s/ },
   { name: 'win_remove_recursive', pattern: /Remove-Item\s+.*-Recurse.*-Force/ },
-  { name: 'format_disk', pattern: /\bformat\s/ },
+  // Anchored to a real format invocation: `format` in command position with a
+  // drive letter or /fs: switch. A bare /\bformat\s/ also matched
+  // `--output-format json`, so the guard blocked ruff and grep -- and a guard
+  // that blocks routine tooling teaches people to work around it.
+  { name: 'format_disk', pattern: /(?:^|[;&|]\s*)format\s+(?:\/\S+\s+)*[a-zA-Z]:/i },
   { name: 'diskpart', pattern: /\bdiskpart\b/ },
   { name: 'shutdown_system', pattern: /(?:shutdown|reboot|halt)\b/ },
 ];

@@ -43,7 +43,11 @@ BLOCK_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("dev_write", re.compile(r">\s*/dev/sd[a-z]")),
     ("win_del_force", re.compile(r"del\s+/f\s+/s")),
     ("win_remove_recursive", re.compile(r"Remove-Item\s+.*-Recurse.*-Force")),
-    ("format_disk", re.compile(r"\bformat\s")),
+    # Anchored to a real format invocation: `format` in command position with a
+    # drive letter or /fs: switch. A bare \bformat\s also matched
+    # `--output-format json`, so the guard blocked ruff and grep -- and a guard
+    # that blocks routine tooling teaches people to work around it.
+    ("format_disk", re.compile(r"(?:^|[;&|]\s*)format\s+(?:/\S+\s+)*[a-zA-Z]:", re.I)),
     ("diskpart", re.compile(r"\bdiskpart\b")),
     ("shutdown_system", re.compile(r"(?:shutdown|reboot|halt)\b")),
     ("rm_relative_wildcard", re.compile(r"rm\s+-rf?\s+\./")),
