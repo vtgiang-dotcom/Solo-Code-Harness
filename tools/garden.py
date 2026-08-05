@@ -15,6 +15,7 @@ Usage:
 
 from __future__ import annotations
 
+import ast
 import re
 import subprocess  # noqa: S404 — runs `--help` on this repo's own scripts only
 import sys
@@ -948,6 +949,105 @@ _SKILL_REF_FORMS = (
 )
 
 
+def _count_pattern_list(py_file: Path, var_name: str) -> int | None:
+    """Return the literal length of a module-level list `var_name`, or None.
+
+    Parsed via ast rather than regex: these lists contain regexes full of
+    brackets and quotes, so a textual count is unreliable.
+    """
+    try:
+        tree = ast.parse(py_file.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, SyntaxError):
+        return None
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+            continue
+        target = node.target if isinstance(node, ast.AnnAssign) else node.targets[0]
+        if getattr(target, "id", None) != var_name:
+            continue
+        value = node.value
+        if isinstance(value, ast.List):
+            return len(value.elts)
+        # e.g. frozenset({...}) / set([...])
+        if isinstance(value, ast.Call) and value.args:
+            arg = value.args[0]
+            if isinstance(arg, (ast.List, ast.Set)):
+                return len(arg.elts)
+    return None
+
+
+# Prose files that make countable claims about the harness. Shared by
+# check_pattern_counts(); mirrors the list in check_doc_counts().
+_DOC_FILES_TO_SCAN: list[str] = [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "README.md",
+    ".github/copilot-instructions.md",
+    ".gemini/antigravity/AGENTS.md",
+    ".kilo/instruction/harness-checklist.md",
+    ".claude/instruction/harness-checklist.md",
+    ".copilot/instruction/harness-checklist.md",
+]
+
+
+# (doc phrase regex, source file, variable) — the number in the doc must
+# equal the measured length of that list.
+_PATTERN_COUNT_CLAIMS: list[tuple[re.Pattern[str], str, str]] = [
+    (re.compile(r'(\d+)\s+destructive\s+patterns?', re.IGNORECASE),
+     ".claude/hooks/guard.py", "BLOCK_PATTERNS"),
+    (re.compile(r'(\d+)\s+secret\s+patterns?', re.IGNORECASE),
+     ".claude/hooks/guard.py", "SECRET_PATTERNS"),
+]
+
+
+def check_pattern_counts(root: Path = ROOT) -> list[str]:
+    """Verify documented guard-pattern counts match the real pattern lists.
+
+    README.md advertised "33 destructive patterns + 15 secret patterns"
+    while guard.py actually held 21 secret patterns: commit 340ae20 added
+    six prefixed-token formats (sk-ant-, sk-proj-, npm_, glpat-, dop_v1_,
+    Bearer) and never touched the prose. The number understated the
+    harness, but the direction is not the point -- nothing was checking it,
+    so it could drift either way, and an overstated security claim is the
+    dangerous version of this bug.
+
+    check_doc_counts() could not catch it: that scanner only knows
+    skills/agents/commands/instructions, all counted from directory
+    listings. These counts come from list literals inside a Python module,
+    so they need ast, not a glob.
+    """
+    issues: list[str] = []
+    measured: dict[tuple[str, str], int | None] = {}
+
+    for _, rel_src, var in _PATTERN_COUNT_CLAIMS:
+        key = (rel_src, var)
+        if key not in measured:
+            measured[key] = _count_pattern_list(root / rel_src, var)
+
+    for rel_path in _DOC_FILES_TO_SCAN:
+        doc = root / rel_path
+        if not doc.is_file():
+            continue
+        try:
+            content = doc.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+
+        for lineno, line in enumerate(content.splitlines(), 1):
+            for pattern, rel_src, var in _PATTERN_COUNT_CLAIMS:
+                want = measured[(rel_src, var)]
+                if want is None:
+                    continue
+                for match in pattern.finditer(line):
+                    claimed = int(match.group(1))
+                    if claimed != want:
+                        issues.append(
+                            f"{rel_path}:{lineno}: claims {claimed} for "
+                            f"{var}, but {rel_src} defines {want}"
+                        )
+    return issues
+
+
 def check_skill_refs(root: Path = ROOT) -> list[str]:
     """Verify skill names cited as skills resolve to a real skill.
 
@@ -1098,6 +1198,17 @@ def main() -> int:
         all_issues.extend(enforce_issues)
     else:
         print("[OK] Enforcement claims")
+
+    # Pattern counts — do documented guard-pattern totals match the code?
+    print("\n--- Pattern Counts ---")
+    pattern_issues = check_pattern_counts(ROOT)
+    if pattern_issues:
+        print("[DRIFT] Docs claim guard-pattern counts that the code contradicts:")
+        for i in pattern_issues:
+            print(f"  {i}")
+        all_issues.extend(pattern_issues)
+    else:
+        print("[OK] Pattern counts")
 
     # Skill references — does the router point at skills that exist?
     print("\n--- Skill References ---")

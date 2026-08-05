@@ -185,7 +185,7 @@ python tools/generate_harness.py --harness claude
 | Session hooks | `.claude/hooks/session_start.py`, `session_end.py` | `SessionStart`/`SessionEnd` — load git + cross-engine context; log session to shared-state |
 
 The guard hook is a stdlib-only Python port of the Kilo `gate-guard.js`/`secret-scan.js`
-lifecycle hooks (33 destructive patterns + 15 secret patterns + protected config
+lifecycle hooks (33 destructive patterns + 21 secret patterns + protected config
 files). It blocks a tool call by returning a `PreToolUse` deny decision and exit
 code 2. The memory-gate hook can also hard-block (exit code 2) when a memory
 file exceeds 8,000 chars. The remaining PostToolUse/Session hooks are advisory

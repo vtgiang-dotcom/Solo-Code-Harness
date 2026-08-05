@@ -580,3 +580,60 @@ def test_check_doc_flags_detects_missing_script(tmp_path):
     )
     issues = garden.check_doc_flags(root=root)
     assert any("no such script" in i for i in issues), issues
+
+
+# --- check_pattern_counts ----------------------------------------------------
+
+
+_GUARD_SRC = """\
+BLOCK_PATTERNS = [
+    ("a", 1),
+    ("b", 2),
+    ("c", 3),
+]
+
+SECRET_PATTERNS: list[tuple[str, str]] = [
+    ("x", "1"),
+    ("y", "2"),
+]
+"""
+
+
+def _pattern_fixture(tmp_path, doc: str):
+    root = tmp_path
+    (root / ".claude" / "hooks").mkdir(parents=True)
+    (root / ".claude" / "hooks" / "guard.py").write_text(_GUARD_SRC, encoding="utf-8")
+    (root / "README.md").write_text(doc, encoding="utf-8")
+    return root
+
+
+def test_check_pattern_counts_detects_understated_claim(tmp_path):
+    """The real bug: commit 340ae20 added 6 secret patterns, README kept 15."""
+    root = _pattern_fixture(tmp_path, "3 destructive patterns + 1 secret patterns\n")
+    issues = garden.check_pattern_counts(root=root)
+    assert any("SECRET_PATTERNS" in i for i in issues), issues
+
+
+def test_check_pattern_counts_detects_overstated_claim(tmp_path):
+    """The dangerous direction: promising more coverage than exists."""
+    root = _pattern_fixture(tmp_path, "99 destructive patterns\n")
+    issues = garden.check_pattern_counts(root=root)
+    assert any("BLOCK_PATTERNS" in i for i in issues), issues
+
+
+def test_check_pattern_counts_accepts_correct_claim(tmp_path):
+    """Accurate prose must stay silent, or the check gets switched off."""
+    root = _pattern_fixture(tmp_path, "3 destructive patterns + 2 secret patterns\n")
+    assert garden.check_pattern_counts(root=root) == []
+
+
+def test_check_pattern_counts_ignores_missing_source(tmp_path):
+    """No guard.py (e.g. a deployed target) — must not invent drift."""
+    root = tmp_path
+    (root / "README.md").write_text("33 destructive patterns\n", encoding="utf-8")
+    assert garden.check_pattern_counts(root=root) == []
+
+
+def test_check_pattern_counts_matches_live_repo():
+    """Pins the live README against the live guard.py, both directions."""
+    assert garden.check_pattern_counts(root=garden.ROOT) == []
