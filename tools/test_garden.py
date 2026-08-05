@@ -16,6 +16,7 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -711,3 +712,50 @@ def test_check_launcher_defaults_ignores_unrelated_script(tmp_path):
 def test_check_launcher_defaults_matches_live_repo():
     """Pins the live launchers: neither may disable the harness by default."""
     assert garden.check_launcher_defaults(root=garden.ROOT) == []
+
+
+# --- check_api_key_approval --------------------------------------------------
+
+
+def _write_key_config(tmp_path, approved, rejected):
+    """Point HOME at a temp dir holding a synthetic ~/.claude.json."""
+    cfg = tmp_path / ".claude.json"
+    cfg.write_text(
+        json.dumps({"customApiKeyResponses": {"approved": approved, "rejected": rejected}}),
+        encoding="utf-8",
+    )
+    return cfg
+
+
+def test_check_api_key_approval_warns_when_key_rejected(tmp_path, monkeypatch, capsys):
+    key = "k" * 24
+    _write_key_config(tmp_path, [], [key[-20:]])
+    monkeypatch.setenv("ANTHROPIC_API_KEY", key)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+
+    assert garden.check_api_key_approval() == []  # advisory, never fails the run
+    out = capsys.readouterr().out
+    assert "rejected" in out
+    assert "approve_api_key.py" in out
+
+
+def test_check_api_key_approval_silent_when_approved(tmp_path, monkeypatch, capsys):
+    key = "k" * 24
+    _write_key_config(tmp_path, [key[-20:]], [])
+    monkeypatch.setenv("ANTHROPIC_API_KEY", key)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+
+    assert garden.check_api_key_approval() == []
+    assert capsys.readouterr().out == ""
+
+
+def test_check_api_key_approval_silent_without_key(tmp_path, monkeypatch, capsys):
+    _write_key_config(tmp_path, [], ["k" * 20])
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+
+    assert garden.check_api_key_approval() == []
+    assert capsys.readouterr().out == ""

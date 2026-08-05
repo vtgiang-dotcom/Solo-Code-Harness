@@ -16,6 +16,8 @@ Usage:
 from __future__ import annotations
 
 import ast
+import json
+import os
 import re
 import subprocess  # noqa: S404 — runs `--help` on this repo's own scripts only
 import sys
@@ -1111,6 +1113,49 @@ def check_launcher_defaults(root: Path = ROOT) -> list[str]:
     return issues
 
 
+def check_api_key_approval(root: Path = ROOT) -> list[str]:
+    """Warn if the active API key is stored as *rejected* in ~/.claude.json.
+
+    Interactive Claude Code asks "use this custom API key?" and records the
+    answer under `customApiKeyResponses`. A stored "no" makes every
+    interactive session fail with "Not logged in - Please run /login".
+
+    The reason this needs a gate: `-p` (print) mode and `--bare` never read
+    that list, so every headless probe authenticates fine while the only
+    path a human uses is dead. That asymmetry already cost one bad fix --
+    a launcher change shipped with five green gates and still broke startup,
+    because no gate could see interactive-only state.
+
+    Environment-dependent, so it never fails the run: it reports a warning
+    and returns [] to keep CI (where no key or config exists) clean.
+    """
+    key = os.environ.get("ANTHROPIC_API_KEY", "")
+    config = Path(os.path.expanduser("~/.claude.json"))
+    if not key or len(key) < 20 or not config.exists():
+        return []
+
+    try:
+        data = json.loads(config.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return []
+
+    responses = data.get("customApiKeyResponses", {})
+    if not isinstance(responses, dict):
+        return []
+
+    # Claude Code fingerprints a custom key by its last 20 characters.
+    fingerprint = key[-20:]
+    if fingerprint in responses.get("rejected", []):
+        print(
+            "[WARN] The active ANTHROPIC_API_KEY is marked *rejected* in "
+            "~/.claude.json.\n"
+            "  Interactive sessions will fail with 'Not logged in' "
+            "(-p and --bare modes are unaffected, so this hides well).\n"
+            "  Fix: python tools/approve_api_key.py --apply"
+        )
+    return []
+
+
 def check_skill_refs(root: Path = ROOT) -> list[str]:
     """Verify skill names cited as skills resolve to a real skill.
 
@@ -1283,6 +1328,12 @@ def main() -> int:
         all_issues.extend(launcher_issues)
     else:
         print("[OK] Launcher defaults")
+
+    # API key approval — can an interactive session actually authenticate?
+    print("\n--- API Key Approval ---")
+    approval_issues = check_api_key_approval(ROOT)
+    all_issues.extend(approval_issues)
+    print("[OK] API key approval (or not applicable)")
 
     # Skill references — does the router point at skills that exist?
     print("\n--- Skill References ---")
