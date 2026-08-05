@@ -2,8 +2,6 @@
 extend-exclude = [
     ".kilo/node_modules",
     ".venv",
-    "cocoindex-code-main",
-    "codebase-memory-mcp-main",
 ]
 
 # Target Python version
