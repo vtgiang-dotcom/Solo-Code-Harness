@@ -41,7 +41,21 @@ if (Test-Path $envFile) {
 # deepseek-v4-pro is the only supported worker model. The cheaper
 # deepseek-v4-flash tier was dropped 2026-07-25: unreliable in practice,
 # with the token savings lost to re-prompting and rework.
-$model = if ($args[0]) { $args[0] } else { "deepseek/deepseek-v4-pro" }
+$DefaultModel = "deepseek/deepseek-v4-pro"
+
+# $args[0] used to be taken as the model unconditionally, so
+# `./jcode.ps1 "fix the login bug"` sent --model "fix the login bug" to the
+# gateway and the prompt was consumed as a model name (the request then
+# failed on the provider side, or silently ran the wrong model).
+# Only treat argument 0 as a model if it actually looks like one
+# (provider/name) -- otherwise it is the start of the prompt.
+$rest = @($args)
+$model = $DefaultModel
+if ($rest.Count -gt 0 -and $rest[0] -match '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$') {
+    $model = $rest[0]
+    $rest = @($rest | Select-Object -Skip 1)
+}
+
 Write-Host "  Model: $model" -ForegroundColor Yellow
 Write-Host ""
 
@@ -49,9 +63,8 @@ Write-Host ""
 Write-Host "  Launching jcode..." -ForegroundColor Green
 Write-Host ""
 
-if ($args.Length -gt 1) {
-    $remaining = $args[1..($args.Length - 1)]
-    & jcode run --provider-profile commandcode --model $model $remaining
+if ($rest.Count -gt 0) {
+    & jcode run --provider-profile commandcode --model $model @rest
 } else {
     & jcode --provider-profile commandcode --model $model
 }
