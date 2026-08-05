@@ -1048,6 +1048,69 @@ def check_pattern_counts(root: Path = ROOT) -> list[str]:
     return issues
 
 
+# Launcher scripts that start an engine, and the flags that switch that
+# engine into a reduced mode where the harness stops being enforced.
+# `claude --bare` skips hooks AND CLAUDE.md auto-discovery; `--safe-mode`
+# disables hooks, skills, agents, commands and MCP servers wholesale.
+_HARNESS_DISABLING_FLAGS = ("--bare", "--safe-mode", "--dangerously-skip-permissions")
+
+# A launcher may still *support* a reduced mode -- it must not *default* to
+# one. These mark a line as a guarded/one-off use rather than the default
+# path: an opt-in branch, a warning about the mode, or prose about it.
+_LAUNCHER_OPTIN_MARKERS = (
+    "-eq", "-contains", "-match", "if ", "elseif", "write-warning",
+    "write-error", "write-host", "#", "notcontains",
+)
+
+
+def check_launcher_defaults(root: Path = ROOT) -> list[str]:
+    """Fail if a launcher passes a harness-disabling flag unconditionally.
+
+    The gap this closes: claude-env.ps1 injected `--bare` on every launch,
+    including its no-arg path (`& claude --bare`). Per `claude --help`,
+    bare mode skips hooks and CLAUDE.md auto-discovery -- so the documented
+    way to start this harness ran with guard.py, memory_gate, quality_gate,
+    security_post and both session hooks inert, while README.md and
+    CLAUDE.md advertised them as active.
+
+    Every existing gate looked straight past it. check_enforcement_claims()
+    verifies a hook *can* exit non-zero and that settings.json wires it up;
+    it has no notion of the process being started in a mode where hooks are
+    never invoked at all. A harness that exists but is not in force is the
+    failure mode this repo is supposed to prevent.
+
+    Narrow on purpose: only flags a flag literal that is both un-negated and
+    outside any conditional/warning context, i.e. the unconditional default
+    path. Opt-in support for these modes is legitimate and stays silent.
+    """
+    issues: list[str] = []
+
+    for script in sorted(root.glob("*.ps1")) + sorted(root.glob("*.sh")):
+        try:
+            text = script.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+
+        for lineno, raw in enumerate(text.splitlines(), 1):
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            lowered = line.lower()
+            # Only care about lines that actually invoke the engine.
+            if not re.search(r'(?:^|[&|;\s])(?:claude|jcode)\b', lowered):
+                continue
+            if any(m in lowered for m in _LAUNCHER_OPTIN_MARKERS):
+                continue
+            for flag in _HARNESS_DISABLING_FLAGS:
+                if flag in lowered:
+                    issues.append(
+                        f"{script.relative_to(root).as_posix()}:{lineno} "
+                        f"launches with `{flag}` unconditionally — that "
+                        f"disables the harness (hooks/CLAUDE.md) by default"
+                    )
+    return issues
+
+
 def check_skill_refs(root: Path = ROOT) -> list[str]:
     """Verify skill names cited as skills resolve to a real skill.
 
@@ -1209,6 +1272,17 @@ def main() -> int:
         all_issues.extend(pattern_issues)
     else:
         print("[OK] Pattern counts")
+
+    # Launcher defaults — does a launcher start the engine with the harness off?
+    print("\n--- Launcher Defaults ---")
+    launcher_issues = check_launcher_defaults(ROOT)
+    if launcher_issues:
+        print("[DRIFT] Launcher disables the harness by default:")
+        for i in launcher_issues:
+            print(f"  {i}")
+        all_issues.extend(launcher_issues)
+    else:
+        print("[OK] Launcher defaults")
 
     # Skill references — does the router point at skills that exist?
     print("\n--- Skill References ---")

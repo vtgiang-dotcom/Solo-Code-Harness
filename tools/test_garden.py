@@ -637,3 +637,77 @@ def test_check_pattern_counts_ignores_missing_source(tmp_path):
 def test_check_pattern_counts_matches_live_repo():
     """Pins the live README against the live guard.py, both directions."""
     assert garden.check_pattern_counts(root=garden.ROOT) == []
+
+
+# --- check_launcher_defaults -------------------------------------------------
+
+
+# Verbatim shape of the real bug (claude-env.ps1 before 4bc5bdb): the arg
+# loop can clear the flag, but the no-arg path hardcodes it anyway.
+_LAUNCHER_UNCONDITIONAL = """\
+$useBare = $true
+if ($normalizedArgs.Count -gt 0) {
+    & claude @normalizedArgs
+}
+else {
+    & claude --bare
+}
+"""
+
+# The fix: --bare only reaches the process when the user asked for it.
+_LAUNCHER_OPTIN = """\
+$useBare = $false
+foreach ($arg in $claudeArgs) {
+    if ($arg -eq "--bare") { $useBare = $true }
+}
+if ($useBare) {
+    Write-Warning "--bare: hooks are DISABLED for this session."
+}
+& claude @normalizedArgs
+"""
+
+
+def _launcher_fixture(tmp_path, src: str, name: str = "claude-env.ps1"):
+    (tmp_path / name).write_text(src, encoding="utf-8")
+    return tmp_path
+
+
+def test_check_launcher_defaults_detects_unconditional_bare(tmp_path):
+    """The real bug: `& claude --bare` on the no-arg path, hooks off."""
+    root = _launcher_fixture(tmp_path, _LAUNCHER_UNCONDITIONAL)
+    issues = garden.check_launcher_defaults(root=root)
+    assert any("--bare" in i for i in issues), issues
+
+
+def test_check_launcher_defaults_accepts_optin_bare(tmp_path):
+    """Supporting --bare as an opt-in is legitimate — must stay silent."""
+    root = _launcher_fixture(tmp_path, _LAUNCHER_OPTIN)
+    assert garden.check_launcher_defaults(root=root) == []
+
+
+def test_check_launcher_defaults_detects_safe_mode(tmp_path):
+    """--safe-mode disables hooks, skills, agents, commands and MCP."""
+    root = _launcher_fixture(tmp_path, "& claude --safe-mode\n")
+    issues = garden.check_launcher_defaults(root=root)
+    assert any("--safe-mode" in i for i in issues), issues
+
+
+def test_check_launcher_defaults_ignores_comments(tmp_path):
+    """A comment explaining --bare is documentation, not an invocation."""
+    root = _launcher_fixture(
+        tmp_path, "# Default to --bare unless overridden.\n& claude\n"
+    )
+    assert garden.check_launcher_defaults(root=root) == []
+
+
+def test_check_launcher_defaults_ignores_unrelated_script(tmp_path):
+    """A script that never launches an engine is out of scope."""
+    root = _launcher_fixture(
+        tmp_path, "Write-Host '--bare'\n", name="notes.ps1"
+    )
+    assert garden.check_launcher_defaults(root=root) == []
+
+
+def test_check_launcher_defaults_matches_live_repo():
+    """Pins the live launchers: neither may disable the harness by default."""
+    assert garden.check_launcher_defaults(root=garden.ROOT) == []
