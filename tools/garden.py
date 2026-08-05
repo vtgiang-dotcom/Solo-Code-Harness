@@ -1149,6 +1149,22 @@ def check_launcher_defaults(root: Path = ROOT) -> list[str]:
     return issues
 
 
+def _key_from_env_file(env_file: Path) -> str:
+    """Read ANTHROPIC_API_KEY out of a `.env` file, or "" if absent."""
+    try:
+        text = env_file.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        name, _, value = line.partition("=")
+        if name.strip() == "ANTHROPIC_API_KEY":
+            return value.strip().strip('"').strip("'")
+    return ""
+
+
 def check_api_key_approval(root: Path = ROOT) -> list[str]:
     """Warn if the active API key is stored as *rejected* in ~/.claude.json.
 
@@ -1164,8 +1180,17 @@ def check_api_key_approval(root: Path = ROOT) -> list[str]:
 
     Environment-dependent, so it never fails the run: it reports a warning
     and returns [] to keep CI (where no key or config exists) clean.
+
+    Falls back to `.env` when the shell has no key, because the launcher is
+    what loads `.env` -- running the gate from a plain shell in a deployed
+    project would otherwise see nothing and report all-clear on a repo whose
+    interactive sessions are dead.
     """
     key = os.environ.get("ANTHROPIC_API_KEY", "")
+    source = "shell environment"
+    if not key:
+        key = _key_from_env_file(root / ".env")
+        source = ".env"
     config = Path(os.path.expanduser("~/.claude.json"))
     if not key or len(key) < 20 or not config.exists():
         return []
@@ -1183,8 +1208,8 @@ def check_api_key_approval(root: Path = ROOT) -> list[str]:
     fingerprint = key[-20:]
     if fingerprint in responses.get("rejected", []):
         print(
-            "[WARN] The active ANTHROPIC_API_KEY is marked *rejected* in "
-            "~/.claude.json.\n"
+            f"[WARN] The ANTHROPIC_API_KEY from {source} is marked *rejected* "
+            "in ~/.claude.json.\n"
             "  Interactive sessions will fail with 'Not logged in' "
             "(-p and --bare modes are unaffected, so this hides well).\n"
             "  Fix: python tools/approve_api_key.py --apply"

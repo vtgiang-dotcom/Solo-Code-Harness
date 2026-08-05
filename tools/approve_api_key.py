@@ -28,14 +28,46 @@ CONFIG = pathlib.Path(os.path.expanduser("~/.claude.json"))
 FINGERPRINT_LEN = 20
 
 
+def key_from_env_file(env_file: pathlib.Path) -> str:
+    """Read ANTHROPIC_API_KEY out of a `.env` file, or "" if absent."""
+    try:
+        text = env_file.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        name, _, value = line.partition("=")
+        if name.strip() == "ANTHROPIC_API_KEY":
+            return value.strip().strip('"').strip("'")
+    return ""
+
+
+def resolve_key() -> tuple[str, str]:
+    """Return (key, where-it-came-from).
+
+    Falls back to `.env` in the current directory because the failure this
+    script fixes is per-key and shows up in *deployed* projects, where the
+    user is standing in the target repo with no launcher-loaded shell. The
+    shell wins when both are set -- that is the key the session will use.
+    """
+    key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if key:
+        return key, "shell environment"
+    env_file = pathlib.Path.cwd() / ".env"
+    return key_from_env_file(env_file), str(env_file)
+
+
 def main() -> int:
     apply = "--apply" in sys.argv
 
-    key = os.environ.get("ANTHROPIC_API_KEY", "")
+    key, source = resolve_key()
     if not key:
-        print("ERROR: ANTHROPIC_API_KEY is not set in this shell.")
-        print("Run this through the launcher, or load .env first.")
+        print("ERROR: no ANTHROPIC_API_KEY in this shell or in ./.env")
+        print("Run this through the launcher, or fill in .env first.")
         return 1
+    print(f"key from : {source}")
     if len(key) < FINGERPRINT_LEN:
         print(f"ERROR: key is shorter than {FINGERPRINT_LEN} chars.")
         return 1

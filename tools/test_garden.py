@@ -758,7 +758,8 @@ def test_check_api_key_approval_warns_when_key_rejected(tmp_path, monkeypatch, c
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
 
-    assert garden.check_api_key_approval() == []  # advisory, never fails the run
+    # advisory, never fails the run
+    assert garden.check_api_key_approval(root=tmp_path) == []
     out = capsys.readouterr().out
     assert "rejected" in out
     assert "approve_api_key.py" in out
@@ -771,7 +772,7 @@ def test_check_api_key_approval_silent_when_approved(tmp_path, monkeypatch, caps
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
 
-    assert garden.check_api_key_approval() == []
+    assert garden.check_api_key_approval(root=tmp_path) == []
     assert capsys.readouterr().out == ""
 
 
@@ -781,7 +782,49 @@ def test_check_api_key_approval_silent_without_key(tmp_path, monkeypatch, capsys
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
 
-    assert garden.check_api_key_approval() == []
+    assert garden.check_api_key_approval(root=tmp_path) == []
+    assert capsys.readouterr().out == ""
+
+
+def test_check_api_key_approval_reads_env_file_when_shell_has_no_key(
+    tmp_path, monkeypatch, capsys
+):
+    """The launcher is what loads `.env` into the shell. Run the gate from a
+    plain shell in a deployed project and the shell is empty -- so a repo whose
+    interactive sessions are dead would report all-clear. This is the exact
+    shape of the reported failure: a deployed project with a real key in `.env`
+    whose fingerprint was stored as rejected."""
+    key = "k" * 24
+    _write_key_config(tmp_path, [], [key[-20:]])
+    (tmp_path / ".env").write_text(
+        f"# comment\nANTHROPIC_BASE_URL=https://example.invalid\n"
+        f'ANTHROPIC_API_KEY="{key}"\n',
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+
+    assert garden.check_api_key_approval(root=tmp_path) == []
+    out = capsys.readouterr().out
+    assert ".env" in out
+    assert "approve_api_key.py" in out
+
+
+def test_check_api_key_approval_prefers_shell_key_over_env_file(
+    tmp_path, monkeypatch, capsys
+):
+    """The shell key is the one the session will actually use, so it wins.
+    A stale rejected key left in `.env` must not raise a false alarm."""
+    shell_key = "s" * 24
+    stale_key = "k" * 24
+    _write_key_config(tmp_path, [shell_key[-20:]], [stale_key[-20:]])
+    (tmp_path / ".env").write_text(f"ANTHROPIC_API_KEY={stale_key}\n", encoding="utf-8")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", shell_key)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+
+    assert garden.check_api_key_approval(root=tmp_path) == []
     assert capsys.readouterr().out == ""
 
 
