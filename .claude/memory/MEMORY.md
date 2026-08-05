@@ -74,31 +74,29 @@
   needs `--yes` or confirmation when the target is dirty or non-git, and
   refuses rather than hangs without a TTY. Forensics: git log 5f89c9e,
   b648327, b9e5500, 6a1bf46.
-- [decision] 2026-07-28: closed the **"docs assert infrastructure that
-  does not exist"** class with 5 machine gates in `garden.py`, after it
-  produced 6 separate bugs that every gate passed for months.
-  `check_doc_counts()` (2026-07-26, counts resolve per engine),
-  `check_doc_paths()` (cited path must resolve), `check_doc_flags()`
-  (documented flag must exist), `check_enforcement_claims()` (a script
-  called "blocking" must contain a non-zero exit), `check_skill_refs()`
-  (a skill named as a skill must exist). What they caught: `.opencode/*`
-  refs surviving the v4.0.0 engine removal; `.claude/state/` called "the
-  existing convention" though `git log --all` shows it never existed;
-  `tools/eval.py --check-triggers`; `garden.py --strict` on a script with
-  zero argv handling; `quality-gate.js` promising to block a missing
-  ALGO-CHECK tag while all 3 of its exits are `process.exit(0)`; and the
-  router `using-agent-skills` pointing at 5 skills that never existed
-  (104 refs x 4 engines) while real counterparts sat under other names.
-  Design rule learned the hard way: **verify generously, flag narrowly.**
-  Draft 1 of the flag check fired on real subcommand flags (fixed by
-  unioning per-subcommand `--help` + source text, since hand-rolled argv
-  parsers emit no help); draft 1 of the skill check matched bare
-  kebab-case and returned 190 hits, nearly all npm packages and YAML keys
-  -- requiring an explicit marker (`` `x` skill ``, `skills/x/SKILL.md`,
-  or a router arrow on a line containing `?`) dropped it to 0 while still
-  catching all 104. A gate that cries wolf gets disabled, so a false
-  positive costs more than a miss. Every gate was fault-injected before
-  commit. Standing limit, do not re-litigate without new evidence: these
-  check that citations *resolve*, never that prose *descriptions* are
-  accurate -- that needs semantics, i.e. an LLM, i.e. non-determinism, and
-  a gate that fires only sometimes is worse than none.
+- [decision] 2026-08-05: closed the **"harness exists but is not in
+  force"** class. `claude-env.ps1` injected `--bare` on EVERY launch (incl.
+  its no-arg path), and `claude --bare` skips ALL hooks + CLAUDE.md
+  auto-discovery -- so the documented way to start this harness ran with
+  guard/memory/quality/security gates inert while README/CLAUDE.md
+  advertised them active. The `--bare` workaround (3P gateway auth) was
+  obsolete since the 2026-07-25 apiKeyHelper fix; full mode authenticates
+  fine. Now opt-in + warns loudly. Every existing gate passed:
+  `check_enforcement_claims()` proves a hook CAN exit non-zero and is wired
+  in settings.json -- a statement about the hook, not about the process
+  being started in a mode that ever invokes it. New
+  `check_launcher_defaults()` closes it (validated against the real
+  pre-fix file at 340ae20: flags line 87). Also: `jcode.ps1` took `$args[0]`
+  as the model unconditionally, so `./jcode.ps1 "fix the bug"` sent
+  `--model "fix the bug"`; `.mcp.json` shipped `"command": ""` that made
+  `claude doctor` error every run; README understated guard by 6 secret
+  patterns -> `check_pattern_counts()`.
+  **Measurement trap, do not repeat:** hooks do NOT fire in any headless
+  mode (`-p` or piped stdin), in bare OR full mode, and those runs write no
+  `session_log` rows -- so the obvious A/B (run `-p` with/without `--bare`,
+  see if guard blocks) returns "no block" both ways and proves nothing.
+  Verify hook enforcement INTERACTIVELY. Second trap: Windows Python
+  resolves `/tmp/x` to `D:\tmp\x`, so a fixture written from Git Bash does
+  not exist for the check under test -- the first run of
+  `check_launcher_defaults()` reported "clean" because it scanned an empty
+  directory. Use `cygpath -w`.

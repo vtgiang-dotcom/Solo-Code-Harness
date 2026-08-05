@@ -224,3 +224,32 @@ created: 2026-07-24
   read password-hashing *prose* as an assignment). Fault-injected a real
   fake secret into both scanners afterward to prove they still fire -- an
   allowlist that disables detection is worse than the false positive.
+
+- [decision] 2026-07-28: closed the **"docs assert infrastructure that
+  does not exist"** class with 5 machine gates in `garden.py`, after it
+  produced 6 separate bugs that every gate passed for months.
+  `check_doc_counts()` (2026-07-26, counts resolve per engine),
+  `check_doc_paths()` (cited path must resolve), `check_doc_flags()`
+  (documented flag must exist), `check_enforcement_claims()` (a script
+  called "blocking" must contain a non-zero exit), `check_skill_refs()`
+  (a skill named as a skill must exist). What they caught: `.opencode/*`
+  refs surviving the v4.0.0 engine removal; `.claude/state/` called "the
+  existing convention" though `git log --all` shows it never existed;
+  `tools/eval.py --check-triggers`; `garden.py --strict` on a script with
+  zero argv handling; `quality-gate.js` promising to block a missing
+  ALGO-CHECK tag while all 3 of its exits are `process.exit(0)`; and the
+  router `using-agent-skills` pointing at 5 skills that never existed
+  (104 refs x 4 engines) while real counterparts sat under other names.
+  Design rule learned the hard way: **verify generously, flag narrowly.**
+  Draft 1 of the flag check fired on real subcommand flags (fixed by
+  unioning per-subcommand `--help` + source text, since hand-rolled argv
+  parsers emit no help); draft 1 of the skill check matched bare
+  kebab-case and returned 190 hits, nearly all npm packages and YAML keys
+  -- requiring an explicit marker (`` `x` skill ``, `skills/x/SKILL.md`,
+  or a router arrow on a line containing `?`) dropped it to 0 while still
+  catching all 104. A gate that cries wolf gets disabled, so a false
+  positive costs more than a miss. Every gate was fault-injected before
+  commit. Standing limit, do not re-litigate without new evidence: these
+  check that citations *resolve*, never that prose *descriptions* are
+  accurate -- that needs semantics, i.e. an LLM, i.e. non-determinism, and
+  a gate that fires only sometimes is worse than none.
