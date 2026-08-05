@@ -443,12 +443,16 @@ Use /verify to validate.`
 ## Verification Gates
 Run `/verify` (or `make check`) before declaring work complete:
 1. `ruff check .` -- Python lint
-2. `python tools/validate_schemas.py` -- frontmatter schema validation
-3. `python tools/garden.py` -- cross-engine parity / drift detection
-4. `python -m pytest tools/ -q` -- full test suite (auto-discovers all
+2. `python tools/check_lint_budget.py` -- ratchet for the `S` (bandit) and
+   `BLE` rule families, which `.ruff.toml`'s `select` omits, so `ruff check .`
+   cannot see them. Budget in `tools/config/lint-budget.json`; lower it as
+   findings are fixed, never raise it without justification.
+3. `python tools/validate_schemas.py` -- frontmatter schema validation
+4. `python tools/garden.py` -- cross-engine parity / drift detection
+5. `python -m pytest tools/ -q` -- full test suite (auto-discovers all
    `tools/test_*.py`; do not hardcode a subset -- new test files must be
    picked up automatically)
-5. `python .github/scripts/security_scan.py .` -- secret scan
+6. `python .github/scripts/security_scan.py .` -- secret scan
 
 ## Git Commit Convention
 Use Conventional Commits: `type(scope): summary` (feat, fix, docs, test, refactor, chore).

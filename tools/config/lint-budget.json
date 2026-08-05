@@ -1,0 +1,4 @@
+{
+  "maxFindings": 39,
+  "_comment": "S (bandit) + BLE rule families, which .ruff.toml's select omits. Ratchet only: lower this as findings are fixed, never raise it without justification in review. See tools/check_lint_budget.py."
+}

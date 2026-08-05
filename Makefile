@@ -6,7 +6,7 @@
 # Resolve Python: try python3, then python, then py (Windows launcher)
 PY := $(shell command -v python3 2>/dev/null || command -v python 2>/dev/null || echo py)
 
-.PHONY: help generate generate-claude validate garden test test-integration eval check security-scan gitleaks
+.PHONY: help generate generate-claude validate garden lint-budget test test-integration eval check security-scan gitleaks
 
 help:
 	@echo "Solo-Code Harness — Quality Gates"
@@ -17,6 +17,7 @@ help:
 	@echo "  make generate-claude    Same as 'make generate' (alias)"
 	@echo "  make validate           Validate agent/skill frontmatter schemas (.kilo/)"
 	@echo "  make garden             Drift detection (.kilo/ <-> .claude/ generated, .copilot/ parity)"
+	@echo "  make lint-budget        Ratchet for S/BLE rules absent from .ruff.toml"
 	@echo "  make test               Run full test suite (auto-discovers tools/test_*.py)"
 	@echo "  make test-integration   Copilot structure + shared-state schema checks"
 	@echo "  make check              Full CI gate: lint + validate + garden + test + security"
@@ -38,6 +39,9 @@ validate:
 garden:
 	$(PY) tools/garden.py
 
+lint-budget:
+	$(PY) tools/check_lint_budget.py
+
 test:
 	$(PY) -m pytest tools/ -v
 
@@ -47,6 +51,9 @@ test-integration:
 check:
 	@echo "=== Lint (ruff) ==="
 	ruff check . --exclude "Solo-Code-Harness" || exit 1
+	@echo ""
+	@echo "=== Lint Budget (S/BLE families absent from .ruff.toml) ==="
+	$(PY) tools/check_lint_budget.py || exit 1
 	@echo ""
 	@echo "=== Schema Validation ==="
 	$(PY) tools/validate_schemas.py || exit 1
