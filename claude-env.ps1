@@ -90,6 +90,16 @@ if (-not $env:ANTHROPIC_BASE_URL) {
     exit 1
 }
 
+# A key can be present, valid and still unusable: Claude Code records a "no"
+# from its custom-key prompt in ~/.claude.json and then fails interactive
+# sessions with "Not logged in". -p and --bare ignore that list, so nothing
+# else in the harness notices. Warn here, where the key is already loaded --
+# do not block, because the key may be fine for the mode being launched.
+$approver = Join-Path (Get-Location) "tools\approve_api_key.py"
+if ((Test-Path $approver) -and $env:ANTHROPIC_API_KEY) {
+    & python $approver --check
+}
+
 if ($useBare) {
     # Loud on purpose: bare mode disables guard.py and every other hook, so
     # the destructive-command / secret-leak gates are NOT active in this

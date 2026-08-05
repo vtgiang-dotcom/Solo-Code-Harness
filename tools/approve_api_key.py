@@ -13,6 +13,7 @@ treats as duplicates. Python keeps them distinct.
 Usage:
     python tools/approve_api_key.py            # dry run, writes nothing
     python tools/approve_api_key.py --apply    # back up, then write
+    python tools/approve_api_key.py --check    # quiet; exit 3 if rejected
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ import sys
 
 CONFIG = pathlib.Path(os.path.expanduser("~/.claude.json"))
 FINGERPRINT_LEN = 20
+EXIT_REJECTED = 3
 
 
 def key_from_env_file(env_file: pathlib.Path) -> str:
@@ -59,7 +61,51 @@ def resolve_key() -> tuple[str, str]:
     return key_from_env_file(env_file), str(env_file)
 
 
+def is_rejected(key: str, config: pathlib.Path | None = None) -> bool:
+    """True only when this key's fingerprint is in the stored `rejected` list.
+
+    Every uncertain case is False: a missing config, unreadable JSON or a
+    too-short key are not evidence of a rejection, and this answer gates a
+    launcher preflight. Guessing "rejected" there would block startup over
+    nothing.
+
+    `config` resolves at call time, not as a default argument -- a default is
+    bound at import, which silently pinned this to the real ~/.claude.json.
+    """
+    config = config if config is not None else CONFIG
+    if len(key) < FINGERPRINT_LEN:
+        return False
+    try:
+        data = json.loads(config.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    responses = data.get("customApiKeyResponses") or {}
+    rejected = responses.get("rejected") or []
+    return key[-FINGERPRINT_LEN:] in rejected
+
+
+def check() -> int:
+    """Preflight for the launcher: exit EXIT_REJECTED if the key is rejected.
+
+    Deliberately near-silent -- it runs on every launch, so it prints only
+    when there is a real problem the user must act on.
+    """
+    key, _ = resolve_key()
+    if not key or not is_rejected(key):
+        return 0
+    print(
+        "WARNING: this ANTHROPIC_API_KEY is marked *rejected* in ~/.claude.json.\n"
+        "  Interactive Claude Code will fail with 'Not logged in / Please run "
+        "/login'\n"
+        "  (-p and --bare modes ignore the list, so this hides well).\n"
+        "  Fix: python tools/approve_api_key.py --apply"
+    )
+    return EXIT_REJECTED
+
+
 def main() -> int:
+    if "--check" in sys.argv:
+        return check()
     apply = "--apply" in sys.argv
 
     key, source = resolve_key()
