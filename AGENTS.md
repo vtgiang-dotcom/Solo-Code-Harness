@@ -302,10 +302,10 @@ or Vertex+ADC (no OAuth, so it cannot reuse the IDE's Pro login), and
 plan quota is reachable only through the IDE, and the IDE only through a
 human.
 
-### Delegating a task to jcode (DeepSeek worker, cost/latency optimization)
+### Delegating a task to jcode (multi-provider worker routing)
 
 Claude Code / Kilo Code is **always the orchestrator**: jcode is a
-stateless, one-shot DeepSeek worker with no memory of this conversation —
+stateless, one-shot worker with no memory of this conversation —
 it never plans or decides what to do next, it only executes one subtask
 handed to it. `session_start.py` reports `jcode: available` in
 `additionalContext` when the `jcode` binary is on PATH and
@@ -320,12 +320,23 @@ conversational context of this session (architecture judgment, root-cause
 analysis, multi-step back-and-forth) — jcode runs as a one-shot subprocess
 with no access to this conversation's history.
 
-**One model** — every delegated task goes to `deepseek/deepseek-v4-pro`
-with the guardrail preamble prepended. There is no tier to pick:
+**Default + explicit routing** — calls without `--model` always use
+`deepseek/deepseek-v4-pro` through CommandCode. Pick another allowlisted route
+only when the task shape clearly benefits, and always keep the guardrail
+preamble:
 
 | Model | Use for | Risk |
 |-------|---------|------|
 | `deepseek/deepseek-v4-pro` | All delegated subtasks: formatting, boilerplate, a single well-defined test, mechanical refactors, plus real code-reasoning (bug fixes, algorithms, structured refactors) | Measured to ignore scope/style constraints ("phá luật") unless told explicitly right before the task — **never call without the guardrail preamble** |
+| `gpt-5.6-sol` | Complex implementation, difficult debugging, review, independent verification | Stronger worker; still stateless and its result remains an untrusted draft |
+| `gpt-5.6-terra` | Second opinion or fallback when Sol needs independent comparison | Verify independently; do not assume agreement proves correctness |
+
+FreeModel verification on 2026-08-07 showed the real catalog contains
+`gpt-5.6-luna`, `gpt-5.6-sol`, and `gpt-5.6-terra`. Sol and Terra passed both
+Chat Completions and Responses with matching `response.model`; Luna returned
+503 twice and is excluded until verified. Older GPT/Gemini/Kimi/Qwen/GLM
+aliases all routed to Sol and are deliberately excluded to avoid false model
+identity claims.
 
 The earlier cheap `deepseek-v4-flash` tier was removed 2026-07-25: in real
 use it was unreliable, and the tokens it saved were repeatedly lost to
@@ -341,6 +352,8 @@ guardrail preamble on every call (see
 
 ```bash
 python tools/jcode_delegate.py "<self-contained prompt with full context inlined>"
+python tools/jcode_delegate.py "<prompt>" --model gpt-5.6-sol
+python tools/jcode_delegate.py "<prompt>" --model gpt-5.6-terra
 python tools/jcode_delegate.py "<prompt>" --with-tools   # only if jcode needs its own tools
 ```
 

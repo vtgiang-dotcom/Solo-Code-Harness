@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-jcode_delegate.py — Token-optimized, single-model delegation wrapper for
-the jcode (DeepSeek) worker engine.
+jcode_delegate.py — Token-optimized delegation wrapper for jcode workers.
 
 ORCHESTRATION MODEL (important): Claude Code / Kilo Code is ALWAYS the
 orchestrator. This script never runs on its own initiative — it is invoked
@@ -10,8 +9,10 @@ returns a draft the orchestrator must still read and verify. jcode has no
 memory of this conversation between calls; it is a stateless worker, not a
 delegate that can be "trusted and forgotten".
 
-ONE MODEL: deepseek/deepseek-v4-pro, always with the strict guardrail
-preamble (GUARDRAIL) prepended. An earlier version of this wrapper routed
+DEFAULT MODEL: deepseek/deepseek-v4-pro via CommandCode, always with the
+strict guardrail preamble (GUARDRAIL) prepended. Claude Code may explicitly
+select an allowlisted FreeModel worker for a task that benefits from a
+different model. An earlier version of this wrapper routed
 "mechanical" subtasks to the cheaper deepseek-v4-flash tier; in real use
 that tier proved unreliable (2026-07-25) — the token saved was repeatedly
 lost to re-prompting and orchestrator rework, so the cheap tier was
@@ -21,6 +22,7 @@ entirely from the flag discipline below (--tool-profile none --no-selfdev,
 
 Usage:
     python tools/jcode_delegate.py "<self-contained prompt>"
+    python tools/jcode_delegate.py "<prompt>" --model gpt-5.4
     python tools/jcode_delegate.py "<prompt>" --with-tools   # let jcode use its own tools
 
 Every call is logged (model, prompt size, token usage, latency) to
@@ -32,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -43,6 +46,10 @@ ROOT = Path(__file__).resolve().parent.parent
 USAGE_LOG = ROOT / ".solocode" / "jcode-usage.jsonl"
 
 MODEL = "deepseek/deepseek-v4-pro"
+FREE_MODEL_MODELS = {
+    "gpt-5.6-sol",
+    "gpt-5.6-terra",
+}
 
 
 # Injected verbatim before every task. deepseek-v4-pro is the only model
@@ -71,11 +78,14 @@ TASK:
 """
 
 
-def build_command(prompt: str, *, with_tools: bool, json_out: bool) -> list[str]:
+def build_command(
+    prompt: str, *, model: str = MODEL, with_tools: bool, json_out: bool
+) -> list[str]:
+    profile = "commandcode" if model == MODEL else "freemodel-openai"
     cmd = [
         "jcode", "run", GUARDRAIL + prompt,
-        "--provider-profile", "commandcode",
-        "--model", MODEL,
+        "--provider-profile", profile,
+        "--model", model,
         "--quiet",
     ]
     if not with_tools:
@@ -85,6 +95,52 @@ def build_command(prompt: str, *, with_tools: bool, json_out: bool) -> list[str]
     if json_out:
         cmd.append("--json")
     return cmd
+
+
+def _load_env_file(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    if not path.is_file():
+        return values
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key.strip()] = value.strip().strip('"').strip("'")
+    return values
+
+
+def _configure_freemodel(model: str, env: dict[str, str]) -> int:
+    api_key = env.get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    base_url = env.get("OPENAI_BASE_URL") or os.environ.get("OPENAI_BASE_URL")
+    if not api_key or not base_url:
+        print(
+            "FreeModel workers require OPENAI_API_KEY and OPENAI_BASE_URL.",
+            file=sys.stderr,
+        )
+        return 1
+
+    base_url = base_url.rstrip("/")
+    for suffix in ("/v1/chat/completions", "/v1/responses", "/v1"):
+        if base_url.endswith(suffix):
+            base_url = base_url[: -len(suffix)]
+            break
+
+    os.environ["JCODE_PROVIDER_FREEMODEL_OPENAI_API_KEY"] = api_key
+    config_cmd = [
+        "jcode", "provider", "add", "freemodel-openai",
+        "--base-url", f"{base_url}/v1",
+        "--model", model,
+        "--api-key-env", "JCODE_PROVIDER_FREEMODEL_OPENAI_API_KEY",
+        "--env-file", "provider-freemodel-openai.env",
+        "--auth", "bearer",
+        "--overwrite",
+        "--quiet",
+    ]
+    configured = subprocess.run(config_cmd, capture_output=True, text=True)
+    if configured.returncode != 0:
+        print(configured.stderr or configured.stdout, file=sys.stderr)
+    return configured.returncode
 
 
 def _log_usage(
@@ -104,6 +160,11 @@ def _log_usage(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--model", default=MODEL,
+        choices=[MODEL, *sorted(FREE_MODEL_MODELS)],
+        help=f"Worker model (default: {MODEL})",
+    )
     parser.add_argument(
         "prompt", help="Self-contained task prompt (inline all needed context)"
     )
@@ -133,11 +194,19 @@ def main(argv: list[str] | None = None) -> int:
         print("jcode binary not found on PATH -- cannot delegate.", file=sys.stderr)
         return 1
 
+    if args.model != MODEL:
+        configured = _configure_freemodel(args.model, _load_env_file(ROOT / ".env"))
+        if configured != 0:
+            return configured
+
     cmd = build_command(
-        args.prompt, with_tools=args.with_tools, json_out=not args.no_json
+        args.prompt,
+        model=args.model,
+        with_tools=args.with_tools,
+        json_out=not args.no_json,
     )
 
-    print(f"[jcode_delegate] model={MODEL}", file=sys.stderr)
+    print(f"[jcode_delegate] model={args.model}", file=sys.stderr)
 
     start = time.monotonic()
     proc = subprocess.run(cmd, capture_output=True, text=True)
@@ -151,7 +220,7 @@ def main(argv: list[str] | None = None) -> int:
         except json.JSONDecodeError:
             result = None
 
-    _log_usage(MODEL, len(args.prompt), result, elapsed)
+    _log_usage(args.model, len(args.prompt), result, elapsed)
 
     if proc.returncode != 0:
         print(proc.stderr or "jcode exited non-zero with no stderr", file=sys.stderr)

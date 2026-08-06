@@ -229,9 +229,10 @@ alongside a `COMMANDCODE_API_KEY` entry shared with jcode. Your real `.env` is g
 
 ## jcode Setup (DeepSeek Worker Engine)
 
-`jcode.ps1` launches [jcode](https://github.com/1jehuang/jcode) as a cost/latency-optimized
-worker, orchestrated by Claude Code for high-concurrency sub-tasks. It syncs
-`COMMANDCODE_API_KEY` from `.env` into jcode's provider profile on every launch.
+`jcode.ps1` launches [jcode](https://github.com/1jehuang/jcode) as a stateless
+worker orchestrated by Claude Code. CommandCode is restricted to
+`deepseek/deepseek-v4-pro`; GPT workers use the FreeModel OpenAI-compatible
+gateway through Chat Completions.
 
 ```powershell
 # 1. Make sure .env has COMMANDCODE_API_KEY set (see FreeModel setup above)
@@ -239,8 +240,34 @@ worker, orchestrated by Claude Code for high-concurrency sub-tasks. It syncs
 # 2. Launch jcode
 ./jcode.ps1
 
-# 3. Or run a single non-interactive task (used by Claude Code as orchestrator)
-jcode run --provider-profile commandcode --model deepseek/deepseek-v4-pro "your task"
+# 3. DeepSeek remains the default worker
+./jcode.ps1 "your task"
+
+# 4. Stronger workers selected by Claude Code
+./jcode.ps1 gpt-5.6-sol "review this complex implementation"
+./jcode.ps1 gpt-5.6-terra "provide an independent second opinion"
+```
+
+Supported FreeModel choices: `gpt-5.6-sol` and `gpt-5.6-terra`. Set
+`OPENAI_API_KEY` and one
+host-root `OPENAI_BASE_URL` in `.env`: `work.freemodel.dev`,
+`api.freemodel.dev`, or `api-t2-sg.freemodel.dev`. Do not append
+`/v1/chat/completions` or `/v1/responses`; the launcher normalizes the host and
+configures jcode's `freemodel-openai` profile at `/v1`.
+
+Recommended Claude Code worker routing:
+
+| Task | Worker model | Provider path |
+|---|---|---|
+| Routine, small, well-scoped coding | `deepseek/deepseek-v4-pro` | CommandCode (default) |
+| Complex implementation, difficult debugging, review, verification | `gpt-5.6-sol` | FreeModel |
+| Independent second opinion / fallback | `gpt-5.6-terra` | FreeModel |
+
+Examples:
+
+```powershell
+./jcode.ps1 gpt-5.6-sol "analyze and verify this difficult change"
+./jcode.ps1 gpt-5.6-terra "independently challenge this conclusion"
 ```
 
 jcode has no dedicated harness directory — it auto-loads `AGENTS.md` (project

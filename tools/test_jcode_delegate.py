@@ -44,6 +44,19 @@ def test_build_command_always_uses_pro_model():
     assert "--json" in cmd
 
 
+def test_build_command_routes_allowlisted_model_to_freemodel():
+    cmd = jd.build_command(
+        "review X", model="gpt-5.6-sol", with_tools=False, json_out=True
+    )
+    assert "freemodel-openai" in cmd
+    assert "gpt-5.6-sol" in cmd
+    assert "commandcode" not in cmd
+
+
+def test_freemodel_allowlist_contains_routing_models():
+    assert {"gpt-5.6-sol", "gpt-5.6-terra"} == jd.FREE_MODEL_MODELS
+
+
 def test_build_command_always_prepends_guardrail():
     # Even a trivial/mechanical prompt gets the guardrail now -- there is no
     # unguarded path left.
