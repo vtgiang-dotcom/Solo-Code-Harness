@@ -202,23 +202,30 @@ python -m pytest tools/test_claude_guard.py tools/test_claude_hooks.py -q
 ### Launch Claude Code via FreeModel
 
 `claude-env.ps1` loads `.env`, normalizes the gateway URL, and launches Claude Code
-with a single Anthropic-compatible API key (works with [FreeModel](https://freemodel.dev)
-and other gateways).
+with profile-based behavior:
+
+- `gateway` (default): FreeModel / third-party gateways via `--bare`
+- `native`: full mode, prefer `ANTHROPIC_API_KEY` / `apiKeyHelper` if present
+- `kilo`: full mode alias for IDE-integrated Kilo workflows
 
 ```powershell
 # 1. Copy the template and fill your key
 Copy-Item .env.template .env
 #    then edit .env → set ANTHROPIC_API_KEY=<your-key>
 
-# 2. Launch Claude Code with the harness environment
+# 2. Launch Claude Code with the default gateway profile
 ./claude-env.ps1
 
-# Pass-through args work too:
+# 3. Optional profiles
+./claude-env.ps1 --profile native
+./claude-env.ps1 --profile kilo
+
+# Pass-through args still work:
 ./claude-env.ps1 --help
 ```
 
 `.env.template` ships with 3 FreeModel VIP tiers (`cc.freemodel.dev`, `api-cc.freemodel.dev`, `cc-t2.freemodel.dev`)
-alongside a `COMMANDCODE_API_KEY` entry shared with jcode. Your real `.env` is gitignored and never deployed.
+alongside a `COMMANDCODE_API_KEY` entry shared with jcode. Your real `.env` is gitignored and never deployed. The default `gateway` profile restores `CLAUDE.md` discovery with `--add-dir .`, but Claude Code still skips hooks and auto-memory in `--bare` mode.
 
 ## jcode Setup (DeepSeek Worker Engine)
 

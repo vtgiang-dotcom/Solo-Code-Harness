@@ -11,7 +11,7 @@
 
 ## Tech Stack
 - [tech] Python 3.10+ — tools/ and .github/scripts/ are stdlib-only (zero external deps)
-- [tech] Node.js 18+ — .kilo/hooks/ (Kilo Code hooks, 20 scripts)
+- [tech] Node.js 18+ — .kilo/hooks/ (Kilo Code hooks), .opencode/plugins/ (guard plugins)
 - [tech] Bash — init.sh, verify.sh, Makefile (Git Bash on Windows)
 - [tech] Ruff — Python linter (config in .ruff.toml, NOT pyproject.toml)
 - [tech] Gitleaks — secret scanner (.gitleaks.toml with allowlist)
@@ -26,8 +26,7 @@
 ## Verification
 - [verify] `.github/scripts/check_skips.py` — quét mọi test file tìm skip/skipif không lý do. Chỉ SKIP_PLATFORM và KNOWN_GAP được phép.
 - [verify] `.github/scripts/security-allowlist.txt` — mọi call site "nguy hiểm" (subprocess, os.environ) phải có justification trong file này.
-- [verify] `tools/test_claude_guard.py` — 26 guard cases chạy guard.py như subprocess, assert exit code (2 = block, 0 = allow).
-- [verify] `tools/test_secret_patterns.py` — 1 corpus ghim vào CẢ BA scanner (guard.py, secret-scan.js, security_scan.py). Sửa pattern 1 file mà quên 2 file kia → `test_all_three_scanners_agree` đỏ.
+- [verify] `.opencode/tests/repro/test-repro.mjs` — RED tests, non-gating. Chuyển vào test-guard.mjs sau khi fix bug.
 
 ## Gotchas
 - [gotcha] Python PATH on Git Bash: init.sh and Makefile use fallback python3 → python → py
@@ -36,48 +35,87 @@
 - [gotcha] E501 globally ignored in .ruff.toml [lint]; no per-file E501 needed
 - [gotcha] Dead dir refs: ECC-main, agents-main, hermes-agent-main, etc. are stale — never restore
 - [gotcha] jsonschema not in .venv; schema validation via tools/validate_schemas.py
-- [gotcha] `claude --bare` SKIPS ALL HOOKS + CLAUDE.md auto-discovery. claude-env.ps1 injected it by default, so every session ran with guard/memory/quality/security gates OFF while docs claimed they were on. Now opt-in + warns. Hooks also never fire in headless mode (-p or piped stdin), so hook enforcement CANNOT be A/B-tested that way -- verify interactively.
-- [gotcha] Secret regex: `sk-[a-zA-Z0-9]{20,}` KHÔNG vượt dấu `-` nên trượt `sk-ant-`/`sk-proj-`; `generic_api_key` chỉ khớp giá trị CÓ dấu nháy nên trượt `KEY=value` dạng shell/env. Thêm định dạng token mới phải sửa đủ 3 scanner.
 
 
 ## Decisions
-- [decision] 2026-08-03: closed the **"harness infers what it owns instead
-  of consulting a list"** class -- 5 bugs in `deploy.py`, which had 1,275
-  lines and **zero tests**. Root cleanup matched by EXTENSION
-  (`.md/.json/.yml/.ps1`) though its comment claimed names, so deploying
-  deleted a target's `package.json`, `tsconfig.json`, `docker-compose.yml`,
-  its own `README.md`; dir cleanup wiped anything absent from the manifest
-  in `.github`/`.vscode`/`tools`, which are SHARED (CODEOWNERS, dependabot,
-  CI, dev scripts); `.harness.lock` then declared those dirs 100% harness,
-  breaking the boundary BOTH ways -- refuse to touch the project's real CI,
-  or "tidy up" harness files as project code. Surfaced as `Module not
-  found: '@/lib/auth'` (`.mjs` escaped the filter so the build reached
-  compile; `tsconfig.json` did not). `unlink()` leaves no commit or log, so
-  `git status` showed a bare ` D` and the investigating agent could not
-  attribute it. Fix shape every time: replace inference with an explicit
-  list (`HARNESS_OWNED_ROOT_FILES`, `EXCLUSIVE_HARNESS_DIRS` vs
-  `SHARED_DIRS`, `RETIRED_*`) and generate `[shared_files]` from what deploy
-  actually ships -- incl. 14 `.github/agents/*.agent.md` synthesized at
-  deploy time that no source scan finds. Trap: files are retired *by being
-  added to EXCLUDE_FILES*, so `should_copy()` is false for them; checking it
-  first made retired files permanently uncleanable. Standing rule: **a
-  deploy may only delete a path it can prove it wrote.** Guards are
-  invariants: `test_every_deployed_dir_is_classified` fails if a future
-  `DIRS_ALL` entry is unclassified (silent full-wipe default was the root
-  cause); `test_lock_shared_files_match_deployed_files` diffs declared
-  boundary vs shipped set. All verified failing pre-fix. 0 -> 24 tests.
-  Same session, same family as the 2026-07-28 doc gates: `garden.py` advised
-  "Run generate_harness.py --harness all" for drift that script could not
-  fix (it rebuilt only `.claude/`) -- added `sync_instruction_mirrors()`,
-  pinned by `test_garden_remediation_command_actually_fixes_drift` against
-  garden's own checker. And `deploy()` ran LIVE by default with no undo; now
-  needs `--yes` or confirmation when the target is dirty or non-git, and
-  refuses rather than hangs without a TTY. Forensics: git log 5f89c9e,
-  b648327, b9e5500, 6a1bf46.
-- [decision] 2026-08-05: closed the **"harness exists but is not in
-  force"** class. `claude-env.ps1` injected `--bare` on EVERY launch (incl.
-  its no-arg path), and `claude --bare` skips ALL hooks + CLAUDE.md
-  auto-discovery -- so the documented way to start this harness ran with
+- [decision] 2026-07-23: adopted **jcode** (DeepSeek v4 via CommandCode) as the
+  cost/latency-optimized worker engine, orchestrated by Claude Code. Benchmarked
+  ~2-9x faster startup, ~15-63x lower RAM than OpenCode for concurrent workers.
+  No dedicated dir — reads `AGENTS.md` + `.claude/skills/` + `.mcp.json`
+  natively. Launch via `jcode.ps1`.
+- [decision] 2026-07-23: Phase 3 — `.opencode/` physically removed via `git rm`
+  (reversible), vendored `jcode-master/` source removed after installing
+  compiled `jcode.exe` to PATH. Version bumped to v4.0.0 across
+  `.harness.lock`/`agent.yaml`/`garden.py`/`generate_harness.py`/
+  `validate_schemas.py`/docs. `.copilot/memory` synced manually (no
+  auto-generator; parity is check-only via `garden.py`). Verified: 0 drift,
+  full test suite green on a fresh live scaffold.
+- [decision] 2026-07-23: added a `PreCompact` lifecycle hook
+  (`.claude/hooks/pre_compact.py`) for context-compaction continuity — logs an
+  objective checkpoint (git branch/sha/dirty count) to `.solocode/shared-
+  state.db` before every compaction, and reminds Claude via `additionalContext`
+  to append any settled decision to `.kilo/memory/MEMORY.md` first. Added a
+  required-hook check to `garden.py`'s `check_claude()` + 4 new tests. Kilo Code
+  has no equivalent lifecycle event — rule applied manually there instead.
+- [decision] 2026-07-23: added a file-based Claude<->Gemini/Antigravity handoff
+  protocol (`.gemini/antigravity/handoff/{inbox,outbox}/`, git-tracked audit
+  trail, separate from the static `knowledge/` corpus). No headless CLI exists
+  for Antigravity, so a human relay step is unavoidable — reduced to "read
+  file X, write file Y" instead of copy-pasting. `session_start.py` auto-
+  announces new `outbox/*-report.md` files once via a local seen-marker.
+- [decision] 2026-07-24: audited the memory system after a direct user
+  question ("does SQLite belong in project memory too?"). Found two real
+  gaps: (1) `garden.py`'s `check_memory()` only checked filename parity, not
+  content — `.claude/memory/MEMORY.md` had silently drifted 19 lines behind
+  this file (source of truth) with no drift ever reported; (2) Kilo's
+  `memory-manager.js` size gate (WARN 4k/HARD 8k chars) was never ported to
+  Claude Code, so writes to `.claude/memory/` had no size cap at all — this
+  file had already grown past both thresholds (13.4k chars) undetected.
+  Fixed both: `check_memory()` now diffs file content byte-for-byte, not just
+  existence; added `.claude/hooks/memory_gate.py` (Python port of memory-
+  manager.js, exit(2) hard-blocks PostToolUse on Edit/Write/MultiEdit past
+  8k chars) wired into `.claude/settings.json` + required in `garden.py`'s
+  `check_claude()`. Also compacted this Decisions section itself (verbose
+  paragraphs -> concise one-liners; full detail already durable in git commit
+  history) to bring all three memory mirrors back under the WARN threshold.
+  Confirmed: SQLite (`.solocode/shared-state.db`) is correctly scoped to
+  cross-engine coordination state (locks/feature status) only, never
+  project memory/decisions — that split is intentional, not a gap.
+- [decision] 2026-07-24: removed `docs/specs/` (8 files, obsolete OpenCode
+  planning docs + completed plans; history in git log). Fixed real content
+  drift in `.copilot`/`.gemini`: both mirrored from an older `.kilo/` and
+  never re-synced — missing the Fowler Smell Baseline section in
+  `code-review-expert/SKILL.md` + a point in `interview-me/SKILL.md`
+  (identical gap in both). Synced body content, kept each engine's own
+  frontmatter. `garden.py` now diffs real content:
+  `check_skill_content()` (frontmatter-agnostic) + `check_instruction_
+  content()` (byte-for-byte). Added `tools/test_garden.py` (14 tests).
+- [decision] 2026-07-24: added Context Summary Struct to PreCompact +
+  decisions-archive.md tier. `pre_compact.py` asks Claude to write
+  `.solocode/context-checkpoint.json` (active_feature, unverified_changes,
+  settled_decisions, next_immediate_step); `session_start.py` surfaces it
+  once next session then deletes it (recovery aid, not mid-compaction
+  survival -- a hook can't guarantee that). Bigger context windows should
+  NOT raise MEMORY.md's cap: it's a recurring per-session cost across all 5
+  engines (sized for the weakest, jcode), not a one-time budget. Instead
+  added `.kilo/memory/decisions-archive.md` (uncapped, not auto-loaded) --
+  pruning now MOVES entries there, not deletes. Also `/debug` now requires
+  >=2 hypotheses (all 4 engines). Verified: 0 drift, 107 tests.
+- [decision] 2026-07-24: verified jcode/DeepSeek delegation end-to-end
+  (real "pong" response); `--tool-profile none --no-selfdev` cuts input
+  tokens ~65% (22,376->7,709). Bigger finding: `CLAUDE.md` was NOT actually
+  generated from `AGENTS.md` -- `claude_engine.py`'s template is hand-
+  written, only parameterized by counts. The earlier Gemini-handoff section
+  (added to AGENTS.md) had silently never reached real CLAUDE.md. Fixed:
+  added Gemini + jcode delegation sections into the template + regenerated;
+  fixed a stale `tools/test_harness.py` ref (deleted v4.0.0) -> `pytest
+  tools/ -q`. Added `_jcode_available()` to `session_start.py`. Also fixed
+  CI/Makefile hardcoded test-file allowlist (missed test_garden.py/
+  test_integration.py), test_integration.py's machine-specific >=19-feature
+  assertion, rewrote stale SPEC.md (v3.3.0->v4.1.0), removed suggest.md.
+- [decision] 2026-07-25: fixed a false enforcement claim around `claude-env.ps1`
+  defaulting to `--bare`. Per `claude --help`, bare mode skips hooks and
+  CLAUDE.md auto-discovery -- so the documented way to start this harness ran with
   guard/memory/quality/security gates inert while README/CLAUDE.md
   advertised them active. The `--bare` workaround (3P gateway auth) was
   obsolete since the 2026-07-25 apiKeyHelper fix; full mode authenticates
@@ -100,3 +138,12 @@
   not exist for the check under test -- the first run of
   `check_launcher_defaults()` reported "clean" because it scanned an empty
   directory. Use `cygpath -w`.
+- [decision] 2026-08-06: `claude-env.ps1` now supports explicit launcher
+  profiles: `gateway` (default, FreeModel/third-party via `--bare`),
+  `native` (full mode, prefer API key or `apiKeyHelper` if present), and
+  `kilo` (full-mode alias for IDE-integrated Kilo workflows). This keeps the
+  current Claude gateway path stable, avoids touching `jcode.ps1` or
+  `COMMANDCODE_*`/`DEEPSEEK_*`, and makes Kilo-specific IDE integrations opt-in
+  instead of overloading one implicit runtime path. `gateway` still restores
+  `CLAUDE.md` discovery with `--add-dir .`, but hooks/auto-memory remain a
+  documented degraded mode under `--bare`.
