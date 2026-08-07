@@ -38,13 +38,11 @@ MODELS: dict[str, dict[str, str]] = {
         "name": "deepseek-v4-pro[1m]",
         "label": "PRO",
     },
-    "flash": {
-        "name": "deepseek-v4-flash[1m]",
-        "label": "FLASH",
-    },
 }
 
-# DeepSeek pricing per 1M tokens (updated June 2026 — verified current)
+# DeepSeek pricing per 1M tokens (updated June 2026 — verified current).
+# The flash entries stay: deepseek-v4-flash is retired for new sessions, but
+# tools/cost.py prices historical usage.log rows that still name it.
 PRICING: dict[str, dict[str, float]] = {
     "deepseek-v4-pro[1m]":   {"input": 0.435, "cache": 0.003625, "output": 0.87},
     "deepseek-v4-flash[1m]": {"input": 0.14,  "cache": 0.0028,   "output": 0.28},
@@ -52,13 +50,6 @@ PRICING: dict[str, dict[str, float]] = {
     "deepseek-v4-pro":       {"input": 0.435, "cache": 0.003625, "output": 0.87},
     "deepseek-v4-flash":     {"input": 0.14,  "cache": 0.0028,   "output": 0.28},
 }
-
-# Keywords that trigger pro model in auto-detect mode
-COMPLEXITY_KEYWORDS: list[str] = [
-    "refactor", "debug", "bug", "build", "create", "analyze", "audit",
-    "architect", "design", "migrate", "implement", "security", "optimize",
-    "performance", "fix", "error", "crash", "restructure", "review",
-]
 
 # Token consumption estimates (tokens per minute) — for cost estimation
 TOKENS_PER_MINUTE: dict[str, float] = {
@@ -110,28 +101,27 @@ def resolve_model(prompt_text: str = "", model_flag: str = "pro") -> tuple[str, 
     """Resolve the canonical model name.
 
     Returns (model_name, model_label, auto_detected).
+
+    Every flag resolves to pro: deepseek-v4-flash was retired 2026-07-25 for
+    being unreliable, so there is no second tier left to route to. `auto` no
+    longer inspects the prompt (there is nothing to choose between) and
+    `flash` is kept only as an accepted, deprecated alias so already-deployed
+    callers don't break -- the same treatment `jcode_delegate.py` gives its
+    retired `--tier` flag.
     """
     if model_flag not in ("pro", "flash", "auto"):
-        print(f"ERROR: Unknown model '{model_flag}'. Use: pro, flash, auto", file=sys.stderr)
+        print(f"ERROR: Unknown model '{model_flag}'. Use: pro, auto", file=sys.stderr)
         sys.exit(1)
 
-    auto_detected = False
+    if model_flag == "flash":
+        print(
+            "[solocode_config] 'flash' is deprecated and ignored "
+            "(deepseek-v4-flash was retired); using pro.",
+            file=sys.stderr,
+        )
 
-    if model_flag == "auto":
-        if prompt_text and _is_complex(prompt_text):
-            model_flag = "pro"
-            auto_detected = True
-        else:
-            model_flag = "flash"
-
-    model = MODELS[model_flag]
-    return model["name"], model["label"], auto_detected
-
-
-def _is_complex(text: str) -> bool:
-    """Check if prompt text contains complexity keywords."""
-    lower = text.lower()
-    return any(kw in lower for kw in COMPLEXITY_KEYWORDS)
+    model = MODELS["pro"]
+    return model["name"], model["label"], model_flag == "auto"
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -147,10 +137,10 @@ def get_env_vars(api_key: str, model_name: str) -> dict[str, str]:
         "ANTHROPIC_MODEL": model_name,
         "ANTHROPIC_DEFAULT_OPUS_MODEL": "deepseek-v4-pro[1m]",
         "ANTHROPIC_DEFAULT_SONNET_MODEL": "deepseek-v4-pro[1m]",
-        "ANTHROPIC_DEFAULT_HAIKU_MODEL": "deepseek-v4-flash[1m]",
+        "ANTHROPIC_DEFAULT_HAIKU_MODEL": "deepseek-v4-pro[1m]",
         "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
         "CLAUDE_CODE_EFFORT_LEVEL": "xhigh",  # xhigh = recommended for coding/agentic (Opus 4.7+); max may overthink
-        "CLAUDE_CODE_FALLBACK_MODEL": "deepseek-v4-flash[1m]",  # auto-fallback if pro is overloaded
+        "CLAUDE_CODE_FALLBACK_MODEL": "deepseek-v4-pro[1m]",  # auto-fallback if the primary is overloaded
     }
 
 
@@ -234,19 +224,21 @@ def main() -> int:
 
     # --env-json <pro|flash> [--prompt <text>]
     p_json = sub.add_parser("env-json", help="Print env vars as JSON")
-    p_json.add_argument("model", choices=["pro", "flash", "auto"], help="Model tier")
+    p_json.add_argument("model", choices=["pro", "flash", "auto"],
+                        help="Model tier (all resolve to pro; flash is a deprecated alias)")
     p_json.add_argument("--prompt", default="", help="Prompt text for auto-detection")
 
     # --env-bash <pro|flash> [--prompt <text>]
     p_bash = sub.add_parser("env-bash", help="Print env vars as KEY=VALUE")
-    p_bash.add_argument("model", choices=["pro", "flash", "auto"], help="Model tier")
+    p_bash.add_argument("model", choices=["pro", "flash", "auto"],
+                        help="Model tier (all resolve to pro; flash is a deprecated alias)")
     p_bash.add_argument("--prompt", default="", help="Prompt text for auto-detection")
 
     # --resolve-model <prompt_text>
     p_resolve = sub.add_parser("resolve-model", help="Resolve model from prompt text")
     p_resolve.add_argument("prompt", nargs="*", default=[], help="Prompt text to analyze")
     p_resolve.add_argument("--model", default="auto", choices=["pro", "flash", "auto"],
-                           help="Model flag (default: auto)")
+                           help="Model flag (default: auto; all resolve to pro)")
 
     # --log-session
     p_log = sub.add_parser("log-session", help="Append session to usage.log")

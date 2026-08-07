@@ -137,7 +137,11 @@ def _configure_freemodel(model: str, env: dict[str, str]) -> int:
         "--overwrite",
         "--quiet",
     ]
-    configured = subprocess.run(config_cmd, capture_output=True, text=True)
+    # Fixed argv, no shell. `model` is allowlisted by argparse `choices`, and
+    # base_url comes from this repo's own .env -- not from the delegated prompt.
+    configured = subprocess.run(  # noqa: S603
+        config_cmd, capture_output=True, text=True
+    )
     if configured.returncode != 0:
         print(configured.stderr or configured.stdout, file=sys.stderr)
     return configured.returncode

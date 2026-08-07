@@ -4,7 +4,7 @@ description: "Routes small well-specified subtasks to the jcode (DeepSeek) worke
 license: MIT
 ---
 
-# jcode Worker Delegation - Single-Model Routing
+# jcode Worker Delegation - Multi-Provider Routing
 
 ## Overview
 
@@ -36,10 +36,20 @@ If a task is trivial enough to just do directly in 1-2 tool calls, do that
 instead -- delegation has fixed overhead (subprocess spin-up, prompt
 inlining) that isn't worth it for genuinely tiny edits.
 
-## One Model: deepseek-v4-pro
+## Default Model and Explicit Specialist Routes
 
-Every delegated task goes to `deepseek/deepseek-v4-pro` with the guardrail
-preamble prepended. There is no model choice to make and no tier to pick.
+Every delegated task defaults to `deepseek/deepseek-v4-pro` through
+CommandCode with the guardrail preamble prepended. Claude/Kilo may explicitly
+select an allowlisted FreeModel route with `--model` when the task shape
+matches the routing table in AGENTS.md. Never infer a specialist route from a
+vague prompt; default to DeepSeek.
+
+Use `gpt-5.6-sol` for complex implementation, difficult debugging, review,
+and independent verification. Use `gpt-5.6-terra` for a second opinion or
+fallback. FreeModel catalog and API tests on 2026-08-07 confirmed both model
+IDs directly; `gpt-5.6-luna` returned 503 twice and is excluded until verified.
+Do not use older GPT/Gemini/Kimi/Qwen/GLM aliases: they all routed to Sol while
+claiming different requested names.
 
 This replaced an earlier two-tier split that routed "mechanical" work
 (formatting, boilerplate, single tests) to the cheaper
@@ -61,6 +71,7 @@ strict guardrail preamble on every call:
 
 ```bash
 python tools/jcode_delegate.py "<self-contained prompt, full context inlined>"
+python tools/jcode_delegate.py "<prompt>" --model gpt-5.6-sol
 python tools/jcode_delegate.py "<prompt>" --with-tools   # only if jcode needs its own tools
 ```
 

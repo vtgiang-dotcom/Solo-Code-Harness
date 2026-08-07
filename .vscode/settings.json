@@ -17,16 +17,6 @@
       "version": "deepseek-v4-pro"
     },
     {
-      "name": "DeepSeek V4 Flash",
-      "description": "DeepSeek V4 Flash — fast, lightweight, budget-friendly coding",
-      "vendor": "deepseek",
-      "family": "deepseek-v4-flash",
-      "model": "deepseek-v4-flash",
-      "apiKey": "${DEEPSEEK_API_KEY}",
-      "baseUrl": "${DEEPSEEK_BASE_URL}",
-      "version": "deepseek-v4-flash"
-    },
-    {
       "name": "Claude Haiku 4.5 (via CC)",
       "description": "Anthropic Claude Haiku — fast, lightweight coding tasks",
       "vendor": "commandcode",
@@ -125,16 +115,6 @@
       "apiKey": "${COMMANDCODE_API_KEY}",
       "baseUrl": "${COMMANDCODE_BASE_URL}",
       "version": "google/gemini-3.5-flash"
-    },
-    {
-      "name": "DeepSeek V4 Flash (via CC)",
-      "description": "DeepSeek V4 Flash via CommandCode — fast, cost-effective coding",
-      "vendor": "commandcode",
-      "family": "deepseek",
-      "model": "deepseek/deepseek-v4-flash",
-      "apiKey": "${COMMANDCODE_API_KEY}",
-      "baseUrl": "${COMMANDCODE_BASE_URL}",
-      "version": "deepseek/deepseek-v4-flash"
     },
     {
       "name": "DeepSeek V4 Pro (via CC)",
