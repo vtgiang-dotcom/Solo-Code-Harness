@@ -1,5 +1,14 @@
 # Solo-Code jcode Launcher
 # Cost-saving DeepSeek worker engine, synced with .env
+#
+# Usage:
+#   ./jcode.ps1 [<model>] [<prompt> ...]
+#   ./jcode.ps1 -RepairConfig      # opt-in: rewrite the retired tier in ~/.jcode/config.toml
+param(
+    [switch]$RepairConfig,
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$Rest
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -66,18 +75,54 @@ if (Test-Path $envFile) {
 # it. Verified: with the model omitted, jcode reported
 # `model: deepseek/deepseek-v4-flash`.
 #
-# Warn rather than rewrite: config.toml holds unrelated user settings
+# Still never rewrites on its own: config.toml holds unrelated user settings
 # (auth, agents, failover) and silently editing a global file the user owns
-# is worse than telling them precisely what to change.
+# is worse than telling them what to change. -RepairConfig makes the fix
+# one opt-in flag instead of a copy-pasted one-liner -- the user still
+# chooses, but no longer has to hand-assemble the command.
+function Repair-JcodeConfig {
+    param(
+        [string]$Path,
+        [string]$DefaultModel
+    )
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        Write-Warning "No config at $Path -- nothing to repair."
+        return $false
+    }
+
+    $content = Get-Content -LiteralPath $Path -Raw
+    if ($content -notmatch [regex]::Escape('deepseek-v4-flash')) {
+        Write-Host "  config.toml: no retired tier pinned, nothing to fix." -ForegroundColor Green
+        return $false
+    }
+
+    $backupPath = "$Path.bak"
+    Copy-Item -LiteralPath $Path -Destination $backupPath -Force
+
+    $updated = $content -replace [regex]::Escape('deepseek/deepseek-v4-flash'), $DefaultModel
+    # NOT Set-Content -Encoding UTF8: on PowerShell 5.1 that writes a UTF-8
+    # BOM, and config.toml has none. A BOM lands inside the first key name
+    # and can break the user's whole jcode config.
+    [System.IO.File]::WriteAllText($Path, $updated, (New-Object System.Text.UTF8Encoding $false))
+
+    Write-Host "  config.toml: repaired to $DefaultModel (backup: $backupPath)" -ForegroundColor Green
+    return $true
+}
+
 $jcodeConfigToml = Join-Path $env:USERPROFILE ".jcode\config.toml"
+
+if ($RepairConfig) {
+    Repair-JcodeConfig -Path $jcodeConfigToml -DefaultModel $DefaultModel | Out-Null
+    exit 0
+}
+
 if (Test-Path $jcodeConfigToml) {
     $tomlText = Get-Content $jcodeConfigToml -Raw
     if ($tomlText -match 'deepseek-v4-flash') {
         Write-Warning "~/.jcode/config.toml still pins the RETIRED deepseek-v4-flash tier."
         Write-Warning "  Any 'jcode run' without an explicit --model will use it."
-        Write-Warning "  Fix: set default_model = `"$DefaultModel`" in [provider] and [providers.commandcode],"
-        Write-Warning "       and the [[providers.commandcode.models]] id. One-liner (backs up first):"
-        Write-Warning "       Copy-Item `"`$env:USERPROFILE\.jcode\config.toml`" `"`$env:USERPROFILE\.jcode\config.toml.bak`"; (Get-Content `"`$env:USERPROFILE\.jcode\config.toml`") -replace 'deepseek/deepseek-v4-flash','$DefaultModel' | Set-Content `"`$env:USERPROFILE\.jcode\config.toml`""
+        Write-Warning "  Fix (backs up to config.toml.bak first):  ./jcode.ps1 -RepairConfig"
     }
 }
 
@@ -88,7 +133,10 @@ if (Test-Path $jcodeConfigToml) {
 # failed on the provider side, or silently ran the wrong model).
 # Only treat argument 0 as a model if it actually looks like one
 # (provider/name) -- otherwise it is the start of the prompt.
-$rest = @($args)
+#
+# $Rest, not $args: declaring param() stops PowerShell from populating
+# $args, so reading it here would silently drop every argument.
+$rest = @($Rest)
 $model = $DefaultModel
 if ($rest.Count -gt 0 -and (($rest[0] -match '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$') -or ($FreeModelWorkerModels -contains $rest[0]))) {
     $model = $rest[0].Replace("openai/", "")

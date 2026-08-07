@@ -246,6 +246,11 @@ gateway through Chat Completions.
 # 4. Stronger workers selected by Claude Code
 ./jcode.ps1 gpt-5.6-sol "review this complex implementation"
 ./jcode.ps1 gpt-5.6-terra "provide an independent second opinion"
+
+# 5. If the launcher warns that ~/.jcode/config.toml still pins the retired
+#    deepseek-v4-flash tier (any `jcode run` without --model would use it),
+#    this rewrites it to the supported model, backing up to config.toml.bak
+./jcode.ps1 -RepairConfig
 ```
 
 Supported FreeModel choices: `gpt-5.6-sol` and `gpt-5.6-terra`. Set
