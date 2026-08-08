@@ -146,6 +146,17 @@ fine -- re-run with a tighter prompt (narrower file list, explicit style
 example) rather than manually patching every violation; a prompt that
 needs constant hand-fixing has failed the point of delegating.
 
+## Known jcode Quirks (Observed, Not Speculative)
+
+- **HTML/XML-like text gets escaped.** Asked to write a literal
+  `<!-- comment -->` into a Markdown file, jcode wrote `&lt;!-- comment
+  --&gt;` instead -- it silently HTML-entity-encoded the angle brackets.
+  Caught only because `git diff` was checked after the call (2026-08-07,
+  deepseek-v4-pro, --with-tools). If delegated content contains `<`,
+  `>`, or `&` (HTML comments, generic-type syntax, comparison
+  operators, XML), read the actual bytes written back -- do not assume the
+  write succeeded just because jcode's own response claims it did.
+
 ## Deployment
 
 This mechanism (this skill plus tools/jcode_delegate.py plus the AGENTS.md
