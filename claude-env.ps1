@@ -1,21 +1,33 @@
 $claudeArgs = @($args)
 
 # Launcher profiles:
-# - gateway (default): FreeModel/3rd-party gateway auth via --bare.
+# - gateway (default): FreeModel/3rd-party gateway auth. Full mode by default
+#   (hooks, skills, auto-memory, CLAUDE.md auto-discovery all active).
 # - native: native Claude Code mode; prefers API key if present, otherwise lets
 #   Claude Code use its normal auth flow.
 # - kilo: same runtime behavior as native, but keeps a distinct profile name so
 #   IDE integrations can target it explicitly without changing Claude/jcode.
 #
-# Why gateway defaults to --bare:
-# third-party Anthropic-compatible gateways do not support Claude OAuth. In
-# full mode Claude Code prompts for login instead of using ANTHROPIC_API_KEY.
-# In bare mode hooks/CLAUDE.md auto-discovery are skipped, so this launcher
-# restores CLAUDE.md discovery with --add-dir . and warns loudly about the
-# reduced guardrails.
+# Bare mode (--bare), when explicitly requested:
+# skips hooks, skill-dir discovery, LSP, plugin sync, attribution,
+# auto-memory, background prefetches and keychain reads. This launcher
+# restores CLAUDE.md discovery with --add-dir . when bare is on, but hooks
+# (including .claude/hooks/guard.py) stay off -- there is no equivalent flag
+# to bring those back in bare mode.
+#
+# History: this launcher used to force --bare for every gateway-profile run,
+# on the assumption that full mode would prompt for Claude OAuth login
+# instead of honoring ANTHROPIC_API_KEY against a third-party gateway. That
+# assumption was tested and found FALSE on 2026-08-08 (claude 2.1.222,
+# freemodel gateway cc.freemodel.dev): `claude -p` succeeded with no login
+# prompt using only ANTHROPIC_API_KEY + ANTHROPIC_BASE_URL, no --bare needed.
+# Forcing --bare bought nothing but silently disabled every guard/quality/
+# security hook in CLAUDE.md's "Claude Code Assets" list on every single
+# gateway-profile launch. Full mode is now the default for every profile;
+# pass --bare explicitly if a future provider swap needs it again.
 
 $profile = "gateway"
-$useBare = $true
+$useBare = $false
 $normalizedArgs = New-Object System.Collections.Generic.List[string]
 
 for ($i = 0; $i -lt $claudeArgs.Count; $i++) {
@@ -47,22 +59,20 @@ for ($i = 0; $i -lt $claudeArgs.Count; $i++) {
     }
 
     if ($arg -eq "--full-mode") {
+        # No-op now that full mode is the default everywhere; kept so
+        # existing callers/scripts that pass it do not break.
         $useBare = $false
         continue
     }
 
     if ($arg -eq "--bare") {
-        $useBare = $false
+        # Explicit opt-in escape hatch. Not forwarded raw -- the block below
+        # re-adds it (plus --add-dir .) so CLAUDE.md discovery survives bare.
+        $useBare = $true
+        continue
     }
 
     [void]$normalizedArgs.Add($arg)
-}
-
-if ($profile -eq "gateway") {
-    $useBare = $true
-}
-else {
-    $useBare = $false
 }
 
 $envFile = Join-Path (Get-Location) ".env"
@@ -128,7 +138,12 @@ if ((Test-Path $approver) -and $env:ANTHROPIC_API_KEY) {
 }
 
 if ($profile -eq "gateway") {
-    Write-Warning "Profile gateway: running Claude Code with --bare for FreeModel/third-party auth. Hooks, auto-memory, and CLAUDE.md auto-discovery are reduced; this launcher restores CLAUDE.md via --add-dir . only."
+    if ($useBare) {
+        Write-Warning "Profile gateway: running Claude Code with --bare (explicitly requested). Hooks, auto-memory, and CLAUDE.md auto-discovery are reduced; this launcher restores CLAUDE.md via --add-dir . only."
+    }
+    else {
+        Write-Host "Profile gateway: running Claude Code in full mode via ANTHROPIC_API_KEY/ANTHROPIC_BASE_URL (verified 2026-08-08, claude 2.1.222, freemodel gateway: no OAuth prompt). Hooks, skills, and auto-memory are active. Pass --bare if a provider swap ever needs it again."
+    }
 }
 elseif ($profile -eq "native") {
     if ($env:ANTHROPIC_API_KEY -or $hasApiKeyHelper) {
