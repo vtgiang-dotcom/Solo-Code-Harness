@@ -4,8 +4,8 @@
   "description": "Solo-Code-Harness hook system — lifecycle hooks for agent safety and quality",
   "profiles": {
     "minimal": ["pre:gate-guard"],
-    "standard": ["pre:gate-guard", "pre:hookify-bash", "pre:hookify-file", "pre:secret-scan", "pre:config-protection", "post:quality-gate", "post:console-log-check", "post:context-monitor", "post:edit-accumulator", "post:memory-manager", "post:continual-learning", "post:check-output", "post:security-check", "session:start", "session:continual-learning", "session:end", "session:continual-learning-end", "stop:ralph-loop", "stop:verify-gates"],
-    "strict": ["pre:gate-guard", "pre:hookify-bash", "pre:hookify-file", "pre:secret-scan", "pre:config-protection", "pre:governance-capture", "post:quality-gate", "post:console-log-check", "post:context-monitor", "post:edit-accumulator", "post:memory-manager", "post:continual-learning", "post:check-output", "post:security-check", "session:start", "session:continual-learning", "session:end", "session:continual-learning-end", "stop:ralph-loop", "stop:verify-gates"]
+    "standard": ["pre:gate-guard", "pre:hookify-bash", "pre:hookify-file", "pre:secret-scan", "pre:config-protection", "pre:executor-mode", "post:quality-gate", "post:console-log-check", "post:context-monitor", "post:edit-accumulator", "post:memory-manager", "post:continual-learning", "post:check-output", "post:security-check", "session:start", "session:continual-learning", "session:end", "session:continual-learning-end", "stop:ralph-loop", "stop:verify-gates"],
+    "strict": ["pre:gate-guard", "pre:hookify-bash", "pre:hookify-file", "pre:secret-scan", "pre:config-protection", "pre:executor-mode", "pre:governance-capture", "post:quality-gate", "post:console-log-check", "post:context-monitor", "post:edit-accumulator", "post:memory-manager", "post:continual-learning", "post:check-output", "post:security-check", "session:start", "session:continual-learning", "session:end", "session:continual-learning-end", "stop:ralph-loop", "stop:verify-gates"]
   },
   "hooks": {
     "PreToolUse": [
@@ -38,6 +38,12 @@
         "matcher": "Write|Edit|MultiEdit",
         "hook": "node .kilo/hooks/pre-tool-use/config-protection.js",
         "description": "Block modifications to linter/formatter config files"
+      },
+      {
+        "id": "pre:executor-mode",
+        "matcher": "Write|Edit|MultiEdit",
+        "hook": "node .kilo/hooks/pre-tool-use/executor-mode.js",
+        "description": "Default-ON: block direct file writes, force delegation to a worker (.solocode/executor-mode toggle)"
       },
       {
         "id": "pre:governance-capture",
