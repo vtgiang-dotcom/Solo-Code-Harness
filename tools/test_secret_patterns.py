@@ -26,9 +26,11 @@ Usage:
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -83,12 +85,25 @@ def _ci_scan(line: str) -> list[str]:
     ]
 
 
+# These tests assert the guard's SECRET behavior, including negative cases
+# ("this benign line must NOT block"). Executor mode is default-ON and blocks
+# every Edit/Write regardless of content, which would turn each negative case
+# into a false pass/fail unrelated to secret detection. Point the guard at a
+# throwaway root with executor mode off so this file tests one thing only.
+_EXECUTOR_OFF_ROOT = Path(tempfile.mkdtemp(prefix="secretpat-exec-off-"))
+(_EXECUTOR_OFF_ROOT / ".solocode").mkdir(parents=True, exist_ok=True)
+(_EXECUTOR_OFF_ROOT / ".solocode" / "executor-mode").write_text(
+    "off", encoding="utf-8"
+)
+
+
 def _run_guard(payload: dict) -> int:
-    proc = subprocess.run(
+    proc = subprocess.run(  # noqa: S603 — fixed argv, no shell
         [sys.executable, str(GUARD)],
         input=json.dumps(payload),
         capture_output=True,
         text=True,
+        env={**os.environ, "CLAUDE_PROJECT_DIR": str(_EXECUTOR_OFF_ROOT)},
     )
     return proc.returncode
 

@@ -12,8 +12,10 @@ Usage:
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -21,14 +23,35 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 GUARD = ROOT / ".claude" / "hooks" / "guard.py"
 
+# Most tests here predate executor mode and assert the guard's *security*
+# behavior (destructive commands, secrets, protected config, skill risk).
+# Executor mode is default-ON and would block every Edit/Write, masking what
+# those tests actually check. So the default harness points the guard at a
+# throwaway project root where executor mode is explicitly OFF.
+#
+# Deliberately done via CLAUDE_PROJECT_DIR (a real Claude Code variable) and
+# NOT via a "skip executor mode" env flag in guard.py: such a flag would be a
+# bypass the orchestrator could set on itself, which is exactly what the gate
+# exists to prevent.
+_EXECUTOR_OFF_ROOT = Path(tempfile.mkdtemp(prefix="guard-exec-off-"))
+(_EXECUTOR_OFF_ROOT / ".solocode").mkdir(parents=True, exist_ok=True)
+(_EXECUTOR_OFF_ROOT / ".solocode" / "executor-mode").write_text(
+    "off\n", encoding="utf-8"
+)
 
-def _run_guard(payload: dict) -> int:
+
+def _run_guard(payload: dict, *, project_dir: Path | None = None) -> int:
     """Invoke the guard hook, returning its exit code."""
+    env = {
+        **os.environ,
+        "CLAUDE_PROJECT_DIR": str(project_dir or _EXECUTOR_OFF_ROOT),
+    }
     proc = subprocess.run(
         [sys.executable, str(GUARD)],
         input=json.dumps(payload),
         capture_output=True,
         text=True,
+        env=env,
     )
     return proc.returncode
 
@@ -220,3 +243,138 @@ def test_partial_edit_on_absent_file_allowed():
                "tool_input": {"file_path": "nope/SKILL.md",
                               "new_string": "1. Deploy with `git push`"}}
     assert _run_guard(payload) == 0
+
+
+# ── Executor mode (orchestrator must delegate writes) ────────────────────
+#
+# Default-ON by design: an absent state file means the gate is active, so a
+# fresh clone (or a deleted toggle) fails closed rather than open.
+
+
+def _exec_root(tmp_path: Path, state: str | None) -> Path:
+    """Build a project root with executor-mode set to `state` (None = absent)."""
+    (tmp_path / ".solocode").mkdir(parents=True, exist_ok=True)
+    if state is not None:
+        (tmp_path / ".solocode" / "executor-mode").write_text(
+            state, encoding="utf-8"
+        )
+    return tmp_path
+
+
+def test_executor_mode_defaults_on_when_state_file_absent(tmp_path):
+    """No toggle file must mean ENABLED -- fail closed, not open."""
+    payload = {"tool_name": "Edit",
+               "tool_input": {"file_path": "src/app.py", "new_string": "x"}}
+    assert _run_guard(payload, project_dir=_exec_root(tmp_path, None)) == 2
+
+
+@pytest.mark.parametrize("state", ["off", "OFF", " off \n", "0", "disabled",
+                                   "false", "no", "off  # re-enable later"])
+def test_executor_mode_off_values_allow_writes(tmp_path, state):
+    payload = {"tool_name": "Edit",
+               "tool_input": {"file_path": "src/app.py", "new_string": "x"}}
+    assert _run_guard(payload, project_dir=_exec_root(tmp_path, state)) == 0
+
+
+@pytest.mark.parametrize("state", ["on", "", "true", "1", "yes", "garbage"])
+def test_executor_mode_non_off_values_block_writes(tmp_path, state):
+    """Anything that is not an explicit off-value keeps the gate closed."""
+    payload = {"tool_name": "Edit",
+               "tool_input": {"file_path": "src/app.py", "new_string": "x"}}
+    assert _run_guard(payload, project_dir=_exec_root(tmp_path, state)) == 2
+
+
+@pytest.mark.parametrize("tool", ["Edit", "Write", "MultiEdit"])
+def test_executor_mode_blocks_all_write_tools(tmp_path, tool):
+    payload = {"tool_name": tool,
+               "tool_input": {"file_path": "src/app.py", "content": "x"}}
+    assert _run_guard(payload, project_dir=_exec_root(tmp_path, "on")) == 2
+
+
+def test_executor_mode_does_not_gate_bash(tmp_path):
+    """Scope is Edit/Write only (level (a)). Bash stays open on purpose: it is
+    how the orchestrator runs the verification gates it still owns."""
+    payload = {"tool_name": "Bash",
+               "tool_input": {"command": "python -m pytest tools/ -q"}}
+    assert _run_guard(payload, project_dir=_exec_root(tmp_path, "on")) == 0
+
+
+def test_executor_mode_does_not_gate_reads(tmp_path):
+    payload = {"tool_name": "Read", "tool_input": {"file_path": "src/app.py"}}
+    assert _run_guard(payload, project_dir=_exec_root(tmp_path, "on")) == 0
+
+
+@pytest.mark.parametrize("rel", [
+    ".gemini/antigravity/handoff/inbox/my-plan.md",
+    ".solocode/executor-mode",
+])
+def test_executor_mode_exempts_delegation_plumbing(tmp_path, rel):
+    """Writing the handoff brief IS the delegation; the toggle must stay
+    writable or the mode could not be turned off from inside a session."""
+    root = _exec_root(tmp_path, "on")
+    payload = {"tool_name": "Write",
+               "tool_input": {"file_path": rel, "content": "plan"}}
+    assert _run_guard(payload, project_dir=root) == 0
+
+
+def test_executor_mode_exemption_matches_absolute_paths(tmp_path):
+    """Claude Code passes absolute paths; the exemption must survive that."""
+    root = _exec_root(tmp_path, "on")
+    target = root / ".gemini" / "antigravity" / "handoff" / "inbox" / "p.md"
+    payload = {"tool_name": "Write",
+               "tool_input": {"file_path": str(target), "content": "plan"}}
+    assert _run_guard(payload, project_dir=root) == 0
+
+
+def test_executor_mode_exemption_is_not_a_substring_hole(tmp_path):
+    """`inbox/` is exempt; a sibling path that merely *contains* the prefix
+    elsewhere must not inherit the exemption."""
+    root = _exec_root(tmp_path, "on")
+    payload = {"tool_name": "Write",
+               "tool_input": {"file_path": "src/.solocode/executor-mode",
+                              "content": "off"}}
+    assert _run_guard(payload, project_dir=root) == 2
+
+
+def test_protected_config_denial_outranks_executor_mode(tmp_path):
+    """Both would block; the security message must be the one shown."""
+    root = _exec_root(tmp_path, "on")
+    proc = subprocess.run(  # noqa: S603 — fixed argv, no shell
+        [sys.executable, str(GUARD)],
+        input=json.dumps({"tool_name": "Write",
+                          "tool_input": {"file_path": ".ruff.toml",
+                                         "content": "x"}}),
+        capture_output=True, text=True,
+        env={**os.environ, "CLAUDE_PROJECT_DIR": str(root)},
+    )
+    assert proc.returncode == 2
+    assert "protected config file" in proc.stderr
+
+
+def test_secret_denial_outranks_executor_mode(tmp_path):
+    root = _exec_root(tmp_path, "on")
+    proc = subprocess.run(  # noqa: S603 — fixed argv, no shell
+        [sys.executable, str(GUARD)],
+        input=json.dumps({"tool_name": "Write",
+                          "tool_input": {"file_path": "cfg.py",
+                                         "content": 'K = "AKIAIOSFODNN7EXAMPLE"'}}),
+        capture_output=True, text=True,
+        env={**os.environ, "CLAUDE_PROJECT_DIR": str(root)},
+    )
+    assert proc.returncode == 2
+    assert "possible secret" in proc.stderr
+
+
+def test_executor_mode_denial_names_the_delegation_command(tmp_path):
+    """The block is only useful if it tells the operator what to do instead."""
+    root = _exec_root(tmp_path, "on")
+    proc = subprocess.run(  # noqa: S603 — fixed argv, no shell
+        [sys.executable, str(GUARD)],
+        input=json.dumps({"tool_name": "Edit",
+                          "tool_input": {"file_path": "src/app.py",
+                                         "new_string": "x"}}),
+        capture_output=True, text=True,
+        env={**os.environ, "CLAUDE_PROJECT_DIR": str(root)},
+    )
+    assert "jcode_delegate.py" in proc.stderr
+    assert ".solocode/executor-mode" in proc.stderr

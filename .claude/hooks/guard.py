@@ -26,6 +26,7 @@ import json
 import os
 import re
 import sys
+from pathlib import Path
 
 # ─── Destructive Command Patterns (port of BLOCK_PATTERNS) ──────────────────
 BLOCK_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
@@ -241,6 +242,69 @@ def deny(reason: str) -> None:
     sys.exit(2)
 
 
+# ─── Executor Mode (orchestrator/executor split) ────────────────────────────
+# When enabled, the orchestrator (Claude) may not write files directly: code
+# changes must be routed to a worker engine (jcode/DeepSeek, gpt-5.6-sol) via
+# tools/jcode_delegate.py. Claude keeps planning, reviewing and verifying.
+#
+# State lives in .solocode/executor-mode (gitignored, per-machine):
+#   file absent            -> ENABLED  (default-on, by design)
+#   file contains off|0|disabled|false -> disabled
+#   any other content      -> ENABLED
+#
+# SCOPE, STATED HONESTLY: this gates Edit/Write/MultiEdit only. Bash is
+# deliberately NOT gated, so `python -c`, heredocs, `sed -i` and `>` still
+# write files. This is a speed bump plus an audit trail, not a sandbox --
+# chosen over a stricter gate because Bash-write blocking is an unwinnable
+# arms race that also breaks legitimate verification scripts.
+EXECUTOR_MODE_OFF_VALUES: frozenset[str] = frozenset({
+    "off", "0", "disabled", "false", "no",
+})
+
+# Paths the orchestrator must still write for delegation itself to work.
+# Kept deliberately short: every entry is a hole in the gate.
+EXECUTOR_MODE_ALLOWED_PREFIXES: tuple[str, ...] = (
+    # Gemini/Antigravity handoff briefs -- writing the plan IS the delegation.
+    ".gemini/antigravity/handoff/inbox/",
+    # The toggle itself, so the mode can be turned off without hand-editing.
+    ".solocode/executor-mode",
+)
+
+
+def project_root() -> Path:
+    """Repo root: CLAUDE_PROJECT_DIR if set, else this hook's grandparent."""
+    env_root = os.environ.get("CLAUDE_PROJECT_DIR")
+    if env_root:
+        return Path(env_root)
+    return Path(__file__).resolve().parent.parent.parent
+
+
+def executor_mode_enabled(root: Path | None = None) -> bool:
+    """True when the orchestrator must delegate writes. Default: True."""
+    root = root or project_root()
+    state_file = root / ".solocode" / "executor-mode"
+    try:
+        raw = state_file.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return True  # Absent or unreadable -> default-on.
+    return raw.strip().split("#", 1)[0].strip().lower() not in EXECUTOR_MODE_OFF_VALUES
+
+
+def executor_mode_exempt(file_path: str, root: Path | None = None) -> bool:
+    """True if this path is delegation plumbing that stays writable."""
+    if not file_path:
+        return False
+    root = root or project_root()
+    path = Path(file_path)
+    try:
+        rel = (path if path.is_absolute() else root / path).resolve()
+        rel_str = rel.relative_to(root.resolve()).as_posix()
+    except (ValueError, OSError):
+        # Outside the repo (or unresolvable): not delegation plumbing.
+        rel_str = path.as_posix().lstrip("./")
+    return rel_str.startswith(EXECUTOR_MODE_ALLOWED_PREFIXES)
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -281,6 +345,19 @@ def main() -> int:
         )
         if risk_issue:
             deny(risk_issue)
+        # Executor mode last: the security denials above carry more specific,
+        # more urgent messages, so they should win when both would fire.
+        if executor_mode_enabled() and not executor_mode_exempt(file_path):
+            deny(
+                f"executor mode is ON -- the orchestrator does not write files "
+                f"directly. Route this change to a worker:\n"
+                f"  python tools/jcode_delegate.py \"<self-contained task naming "
+                f"{file_path}>\" --with-tools\n"
+                f"Then verify the result yourself (read the file back, run the "
+                f"gates) before accepting it. Note: workers can misreport which "
+                f"path they wrote -- confirm with git status.\n"
+                f"To disable: echo off > .solocode/executor-mode"
+            )
         return 0
 
     return 0
