@@ -228,6 +228,34 @@ soon-to-be-compacted summary.** Do this proactively, not just when reminded:
    manually: whenever a session naturally runs long, checkpoint decisions to
    `MEMORY.md` rather than relying on the engine's own summarization.
 
+### Executor mode (write gate, default ON)
+
+`.solocode/executor-mode` toggles whether the orchestrator (Claude Code or
+Kilo Code) may call `Edit`/`Write`/`MultiEdit` directly. **Default is ON**:
+absent or unreadable state file means the gate is active — fail closed, not
+open, so a fresh clone or a deleted toggle cannot silently disable it. Bash
+is never gated — the orchestrator still runs its own verification gates.
+
+Enforced independently by each engine's own hook so neither can bypass it
+by switching engines:
+
+- Claude Code: `.claude/hooks/guard.py` (`PreToolUse`, matcher
+  `Edit|Write|MultiEdit`).
+- Kilo Code: `.kilo/hooks/pre-tool-use/executor-mode.js` (same matcher,
+  wired into every `hooks.json` profile except `minimal`).
+
+When ON, a write attempt is blocked (exit 2) with the delegation command to
+run instead (`python tools/jcode_delegate.py "<task>" --with-tools`) and a
+reminder to verify the result (`git status`/`git diff`) rather than trust a
+worker's own report of what it wrote. `.gemini/antigravity/handoff/inbox/`
+and `.solocode/executor-mode` itself are exempt — delegating a plan and
+toggling the gate off must both stay possible from inside a gated session.
+
+To disable: `echo off > .solocode/executor-mode`. Accepted off-values:
+`off`, `0`, `disabled`, `false`, `no` (case-insensitive, trailing `#
+comment` ignored). Any other value, including an empty file, keeps the
+gate closed.
+
 ### Choosing a worker engine (routing table)
 
 Two workers are available. Propose one **proactively** when the work fits —

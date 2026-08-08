@@ -400,7 +400,8 @@ Use /verify to validate.`
 - **Skills ({n_skills})** in `.claude/skills/` -- auto-discovered `SKILL.md` capabilities.
 - **Slash commands ({n_commands})** in `.claude/commands/` -- `/verify`, `/plan`, `/decide`, `/ship`, and more.
 - **Guard hook** in `.claude/hooks/guard.py` (`PreToolUse`) -- blocks destructive
-  commands, secret leaks, and protected-config edits.
+  commands, secret leaks, protected-config edits, and (default ON) direct
+  Edit/Write/MultiEdit by the orchestrator itself -- see "Executor Mode" below.
 - **Quality-gate hook** in `.claude/hooks/quality_gate.py` (`PostToolUse` Edit/Write)
   -- advisory format check (ruff/prettier/biome/gofmt) after each edit.
 - **Security-post hook** in `.claude/hooks/security_post.py` (`PostToolUse` Bash)
@@ -408,6 +409,31 @@ Use /verify to validate.`
 - **Session hooks** `session_start.py` / `session_end.py` (`SessionStart`/`SessionEnd`)
   -- load git + cross-engine context at start; log the session to the local
   shared-state DB at end. All hooks are stdlib-only Python and non-blocking except the guard.
+
+## Executor Mode (write gate, default ON)
+
+`.solocode/executor-mode` toggles whether Claude Code may call
+`Edit`/`Write`/`MultiEdit` directly. Absent or unreadable state file means
+the gate is **ON** -- fail closed, not open. Bash is never gated -- you
+still run your own verification gates.
+
+When ON, a write attempt is blocked (exit 2) with the exact delegation
+command to run instead:
+
+```bash
+python tools/jcode_delegate.py "<self-contained task naming the file>" --with-tools
+```
+
+Then verify the result yourself (read the file back, `git status`/`git diff`)
+before accepting it -- workers can misreport which path they wrote.
+`.gemini/antigravity/handoff/inbox/` and `.solocode/executor-mode` itself
+are exempt, so writing a delegation brief and toggling the gate off both
+stay possible from inside a gated session.
+
+To disable: `echo off > .solocode/executor-mode` (accepted off-values:
+`off`, `0`, `disabled`, `false`, `no`, case-insensitive). Kilo Code enforces
+the same default via `.kilo/hooks/pre-tool-use/executor-mode.js`.
+
 
 ## Behavior Rules (MANDATORY)
 
