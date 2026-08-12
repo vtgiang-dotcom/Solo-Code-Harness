@@ -1,34 +1,30 @@
 #!/usr/bin/env python3
 """
-kilo_cli_delegate.py — CLI-based delegation wrapper for Kilo workers.
+opencode_delegate.py — CLI-based delegation wrapper for OpenCode workers.
 
-ORCHESTRATION MODEL: Claude Code / Kilo Code is ALWAYS the orchestrator.
-This script uses `kilo run --attach` to send a single stateless prompt to a
-running Kilo server and parses the JSON events stream. The orchestrator must
-read and verify every result.
+ORCHESTRATION MODEL: Claude Code is ALWAYS the orchestrator.
+This script uses `opencode run` to send a single stateless prompt to OpenCode
+and parses the JSON events stream. The orchestrator must read and verify every result.
 
-CLI APPROACH (Kilo run --attach):
-  kilo run "prompt" --attach http://server --format json --auto --model provider/model
+CLI APPROACH (OpenCode run):
+  opencode run "prompt" --format json --auto --model provider/model
 
-IMPROVEMENTS OVER jcode (subprocess pattern):
-  1. Stable API — JSON events stream with typed schemas vs parsing stdout
-  2. Structured JSON — every event has type, timestamp, sessionID, structured data
-  3. Observable state — events include step_start, text, tool_use, step_finish
-  4. Session tracking — sessionID in every event for debugging
-  5. Proper errors — JSON error events with type/message/ref vs exit-code guessing
-
-IMPROVEMENTS OVER kilo_delegate.py (HTTP API):
-  6. Works immediately — no debugging HTTP payload structure
-  7. Proven stable — kilo run --attach is the official CLI interface
-  8. Same benefits — both use same underlying Kilo server
+IMPROVEMENTS OVER Kilo CLI:
+  1. Free models — opencode/deepseek-v4-flash-free costs $0
+  2. Reasoning tokens — tracks reasoning tokens separately
+  3. Cache tracking — separate cache read/write token counts
+  4. Multi-provider — commandcode, DeepSeek, OpenAI, Anthropic, OpenRouter, ZenMux
+  5. Session export — opencode export <sessionID> for full JSON transcript
+  6. Stats command — opencode stats for usage analytics
 
 Usage:
-    python tools/kilo_cli_delegate.py "<self-contained prompt>"
-    python tools/kilo_cli_delegate.py "<prompt>" --model commandcode/deepseek/deepseek-v4-pro
-    python tools/kilo_cli_delegate.py "<prompt>" --no-guardrail
+    python tools/opencode_delegate.py "<self-contained prompt>"
+    python tools/opencode_delegate.py "<prompt>" --model commandcode/deepseek-v4-pro
+    python tools/opencode_delegate.py "<prompt>" --model opencode/deepseek-v4-flash-free
+    python tools/opencode_delegate.py "<prompt>" --no-guardrail
 
-Requires Kilo server running: kilo serve --port 14096
-Or will auto-find Kilo binary and use --attach to default server.
+Requires OpenCode CLI installed: https://opencode.ai/install
+Auth: opencode providers login <url>
 """
 
 import argparse
@@ -43,10 +39,10 @@ from typing import Any
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
-DEFAULT_SERVER = "http://127.0.0.1:14096"
-DEFAULT_MODEL = "commandcode/deepseek/deepseek-v4-pro"
+DEFAULT_MODEL = "commandcode/deepseek-v4-pro"
+FREE_MODEL = "opencode/deepseek-v4-flash-free"
 
-USAGE_LOG = Path(".solocode/kilo-usage.jsonl")
+USAGE_LOG = Path(".solocode/opencode-usage.jsonl")
 USAGE_LOG.parent.mkdir(parents=True, exist_ok=True)
 
 GUARDRAIL = """\
@@ -70,43 +66,39 @@ STRICT OPERATING CONSTRAINTS (must follow, no exceptions):
 # ── Helper Functions ─────────────────────────────────────────────────────────
 
 def _stderr(msg: str) -> None:
-    """Print to stderr with [kilo_cli_delegate] prefix."""
-    print(f"[kilo_cli_delegate] {msg}", file=sys.stderr)
+    """Print to stderr with [opencode_delegate] prefix."""
+    print(f"[opencode_delegate] {msg}", file=sys.stderr)
 
 
-def find_kilo_binary() -> str | None:
-    """Find Kilo CLI binary. Check PATH first, then common install locations."""
+def find_opencode_binary() -> str | None:
+    """Find OpenCode CLI binary. Check PATH first, then common install locations."""
     # Check PATH
-    kilo_path = shutil.which("kilo")
-    if kilo_path:
-        return kilo_path
+    opencode_path = shutil.which("opencode")
+    if opencode_path:
+        return opencode_path
 
-    # Check Antigravity IDE extensions (Windows)
-    antigravity_base = Path.home() / ".antigravity-ide" / "extensions"
-    if antigravity_base.exists():
-        # Find latest version
-        kilo_exts = list(antigravity_base.glob("kilocode.kilo-code-*/bin/kilo.exe"))
-        if kilo_exts:
-            # Sort by version, take latest
-            latest = sorted(kilo_exts, reverse=True)[0]
-            return str(latest)
+    # Check ~/.opencode/bin (standard install location)
+    home_opencode = Path.home() / ".opencode" / "bin" / "opencode"
+    if home_opencode.exists():
+        return str(home_opencode)
 
-    # Check ~/.local/share/kilo (Linux/Mac)
-    local_kilo = Path.home() / ".local" / "share" / "kilo" / "bin" / "kilo"
-    if local_kilo.exists():
-        return str(local_kilo)
+    # Check Windows user profile
+    if sys.platform == "win32":
+        win_opencode = Path.home() / ".opencode" / "bin" / "opencode.exe"
+        if win_opencode.exists():
+            return str(win_opencode)
 
     return None
 
 
 def parse_json_events(output: str) -> dict[str, Any]:
-    """Parse JSON events stream from kilo run --format json output.
+    """Parse JSON events stream from opencode run --format json output.
 
     Returns dict with:
         - text: concatenated text from all text events
         - events: list of all parsed events
         - session_id: session ID from first event
-        - tokens: token usage from step_finish event
+        - tokens: token usage from step_finish event (includes reasoning + cache)
         - cost: cost from step_finish event
         - error: error message if any error event found
     """
@@ -144,7 +136,8 @@ def parse_json_events(output: str) -> dict[str, Any]:
 
             # Capture errors
             if event.get("type") == "error":
-                result["error"] = event.get("part", {}).get("message", "Unknown error")
+                error_data = event.get("error", {})
+                result["error"] = error_data.get("data", {}).get("message", "Unknown error")
 
         except json.JSONDecodeError:
             # Skip non-JSON lines (banner, warnings)
@@ -153,27 +146,24 @@ def parse_json_events(output: str) -> dict[str, Any]:
     return result
 
 
-def run_kilo_cli(
+def run_opencode_cli(
     prompt: str,
     model: str,
-    server_url: str,
     directory: str,
-    kilo_binary: str,
+    opencode_binary: str,
     timeout_s: int = 120,
 ) -> dict[str, Any]:
-    """Run kilo CLI with --attach to server, return parsed JSON events."""
+    """Run opencode CLI, return parsed JSON events."""
     cmd = [
-        kilo_binary,
+        opencode_binary,
         "run",
         prompt,
         "--model", model,
-        "--attach", server_url,
         "--format", "json",
         "--auto",  # auto-approve non-destructive permissions
-        "--dir", directory,
     ]
 
-    _stderr(f"Running: {' '.join(cmd[:3])} ... --model {model} --attach {server_url}")
+    _stderr(f"Running: opencode run ... --model {model} --format json --auto")
 
     try:
         proc = subprocess.run(
@@ -184,11 +174,12 @@ def run_kilo_cli(
             errors="replace",
             timeout=timeout_s,
             check=False,
+            cwd=directory,
         )
 
         if proc.returncode != 0 and not proc.stdout.strip():
             # No JSON output, likely binary error
-            _stderr(f"kilo CLI failed with exit code {proc.returncode}")
+            _stderr(f"opencode CLI failed with exit code {proc.returncode}")
             if proc.stderr:
                 _stderr(f"stderr: {proc.stderr[:500]}")
             return {
@@ -197,14 +188,14 @@ def run_kilo_cli(
                 "session_id": None,
                 "tokens": None,
                 "cost": None,
-                "error": f"kilo CLI exit code {proc.returncode}",
+                "error": f"opencode CLI exit code {proc.returncode}",
             }
 
         # Parse JSON events from stdout
         return parse_json_events(proc.stdout)
 
     except subprocess.TimeoutExpired:
-        _stderr(f"kilo CLI timed out after {timeout_s}s")
+        _stderr(f"opencode CLI timed out after {timeout_s}s")
         return {
             "text": "",
             "events": [],
@@ -214,7 +205,7 @@ def run_kilo_cli(
             "error": f"Timeout after {timeout_s}s",
         }
     except Exception as exc:
-        _stderr(f"kilo CLI failed: {exc}")
+        _stderr(f"opencode CLI failed: {exc}")
         return {
             "text": "",
             "events": [],
@@ -231,7 +222,7 @@ def log_usage(
     elapsed: float,
     result: dict[str, Any],
 ) -> None:
-    """Log delegation call to .solocode/kilo-usage.jsonl for auditing."""
+    """Log delegation call to .solocode/opencode-usage.jsonl for auditing."""
     entry: dict[str, Any] = {
         "ts": datetime.now(timezone.utc).isoformat(),
         "model": model,
@@ -250,18 +241,13 @@ def log_usage(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Kilo CLI delegation wrapper",
+        description="OpenCode CLI delegation wrapper",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Every call is logged to " + str(USAGE_LOG),
     )
     parser.add_argument(
         "prompt",
         help="Self-contained task prompt (inline all needed context)",
-    )
-    parser.add_argument(
-        "--server",
-        default=DEFAULT_SERVER,
-        help=f"Kilo server URL for --attach (default: {DEFAULT_SERVER})",
     )
     parser.add_argument(
         "--model",
@@ -271,7 +257,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--directory",
         default=".",
-        help="Working directory for kilo CLI (default: current dir)",
+        help="Working directory for opencode CLI (default: current dir)",
     )
     parser.add_argument(
         "--no-guardrail",
@@ -279,13 +265,8 @@ def main(argv: list[str] | None = None) -> int:
         help="Skip prepending the strict guardrail preamble",
     )
     parser.add_argument(
-        "--no-json",
-        action="store_true",
-        help="Disable JSON format request (use default text)",
-    )
-    parser.add_argument(
-        "--kilo-bin",
-        help="Path to kilo binary (auto-detected if not provided)",
+        "--opencode-bin",
+        help="Path to opencode binary (auto-detected if not provided)",
     )
     parser.add_argument(
         "--timeout",
@@ -293,37 +274,44 @@ def main(argv: list[str] | None = None) -> int:
         default=120,
         help="Timeout in seconds (default: 120)",
     )
+    parser.add_argument(
+        "--free",
+        action="store_true",
+        help=f"Use free model ({FREE_MODEL})",
+    )
 
     args = parser.parse_args(argv)
 
-    # ── Find Kilo binary ──
-    kilo_binary = args.kilo_bin or find_kilo_binary()
-    if not kilo_binary:
-        _stderr("Kilo binary not found. Install Kilo CLI or specify --kilo-bin")
+    # ── Find OpenCode binary ──
+    opencode_binary = args.opencode_bin or find_opencode_binary()
+    if not opencode_binary:
+        _stderr("OpenCode binary not found. Install from https://opencode.ai/install")
         return 1
 
-    _stderr(f"Using Kilo binary: {kilo_binary}")
+    _stderr(f"Using OpenCode binary: {opencode_binary}")
+
+    # ── Override model if --free ──
+    model = FREE_MODEL if args.free else args.model
 
     # ── Prepend guardrail unless disabled ──
     prompt = args.prompt
     if not args.no_guardrail:
         prompt = GUARDRAIL + prompt
 
-    _stderr(f"server={args.server}  model={args.model}")
+    _stderr(f"model={model}")
 
-    # ── Run kilo CLI → parse events → log ──
+    # ── Run opencode CLI → parse events → log ──
     start = time.monotonic()
-    result = run_kilo_cli(
+    result = run_opencode_cli(
         prompt=prompt,
-        model=args.model,
-        server_url=args.server,
+        model=model,
         directory=args.directory,
-        kilo_binary=kilo_binary,
+        opencode_binary=opencode_binary,
         timeout_s=args.timeout,
     )
     elapsed = time.monotonic() - start
 
-    log_usage(args.model, len(prompt), elapsed, result)
+    log_usage(model, len(prompt), elapsed, result)
 
     # ── Output ──
     if result.get("error"):
@@ -336,7 +324,14 @@ def main(argv: list[str] | None = None) -> int:
     _stderr(f"session={result.get('session_id')}  elapsed={elapsed:.1f}s")
     if result.get("tokens"):
         tokens = result["tokens"]
-        _stderr(f"tokens: in={tokens.get('input')} out={tokens.get('output')} total={tokens.get('total')}")
+        _stderr(
+            f"tokens: in={tokens.get('input')} out={tokens.get('output')} "
+            f"reasoning={tokens.get('reasoning')} total={tokens.get('total')} "
+            f"cache_read={tokens.get('cache', {}).get('read')} "
+            f"cache_write={tokens.get('cache', {}).get('write')}"
+        )
+    if result.get("cost") is not None:
+        _stderr(f"cost: ${result['cost']:.6f}")
 
     return 0
 

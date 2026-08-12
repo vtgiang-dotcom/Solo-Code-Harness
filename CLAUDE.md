@@ -123,7 +123,7 @@ Use Conventional Commits: `type(scope): summary` (feat, fix, docs, test, refacto
 
 ## Choosing a worker engine (routing table)
 
-Two workers are available. Propose one **proactively** when the work fits --
+Three workers are available. Propose one **proactively** when the work fits --
 the user should not have to remember they exist. `session_start.py`
 announces each engine's availability; treat that as a prompt to consider
 delegation, not an instruction to always delegate.
@@ -134,17 +134,19 @@ delegation, not an instruction to always delegate.
 | Repo-wide survey -- "where else does X appear?" | **Gemini** | Breadth is its edge |
 | Independent review of a design or diff | **Gemini** | A second model catches different things |
 | UI verification, screenshots, recordings | **Gemini** | The orchestrator cannot do this at all |
-| Small mechanical edit, boilerplate, one test | **Kilo CLI** | Headless -- costs the user nothing, 0% parsing failures |
-| Scoped code writing behind an explicit fence | Gemini if broad, Kilo CLI if narrow | Both need the fence in writing |
+| Small mechanical edit, boilerplate, one test | **Kilo CLI** or **OpenCode CLI** | Both headless -- cost the user nothing |
+| Scoped code writing behind an explicit fence | Gemini if broad, Kilo/OpenCode if narrow | All three need the fence in writing |
+| Free model experimentation, cache tracking | **OpenCode CLI** | Has free models + reasoning/cache token breakdown |
 | Architecture / product / security decisions | **Neither -- do it here** | Judgment is not delegable |
-| Anything needing this conversation's history | **Neither -- do it here** | Both workers are context-blind |
+| Anything needing this conversation's history | **Neither -- do it here** | All workers are context-blind |
 
-Kilo CLI is headless, so delegating costs the user nothing -- just do it.
-Gemini needs a manual relay through the Antigravity IDE, so **propose and
-wait for a yes**.
+Kilo CLI and OpenCode CLI are both headless, so delegating costs the user
+nothing -- just do it. OpenCode adds free models (`opencode/*-free`) and
+detailed token breakdown (reasoning + cache read/write). Gemini needs a manual
+relay through the Antigravity IDE, so **propose and wait for a yes**.
 
-**Verification is mandatory for both.** Every controlled test of both
-engines produced an error invisible in its own self-summary. Their evidence
+**Verification is mandatory for all three.** Every controlled test of every
+engine produced an error invisible in its own self-summary. Their evidence
 is reliable; their self-assessment is not. Re-run their commands, run the
 real gates, and mutation-test any new check they write.
 
