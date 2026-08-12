@@ -376,5 +376,5 @@ def test_executor_mode_denial_names_the_delegation_command(tmp_path):
         capture_output=True, text=True,
         env={**os.environ, "CLAUDE_PROJECT_DIR": str(root)},
     )
-    assert "jcode_delegate.py" in proc.stderr
+    assert "kilo_cli_delegate.py" in proc.stderr
     assert ".solocode/executor-mode" in proc.stderr

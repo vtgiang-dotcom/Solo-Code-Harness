@@ -158,7 +158,7 @@ def test_executor_mode_denial_names_the_delegation_command(tmp_path):
         cwd=root,
     )
     assert proc.returncode == 2
-    assert "jcode_delegate.py" in proc.stderr
+    assert "kilo_cli_delegate.py" in proc.stderr
     assert ".solocode/executor-mode" in proc.stderr
 
 

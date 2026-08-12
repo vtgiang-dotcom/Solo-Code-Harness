@@ -49,9 +49,7 @@
   in settings.json -- a statement about the hook, not about the process
   being started in a mode that ever invokes it. New
   `check_launcher_defaults()` closes it (validated against the real
-  pre-fix file at 340ae20: flags line 87). Also: `jcode.ps1` took `$args[0]`
-  as the model unconditionally, so `./jcode.ps1 "fix the bug"` sent
-  `--model "fix the bug"`; `.mcp.json` shipped `"command": ""` that made
+  pre-fix file at 340ae20: flags line 87). Also: `.mcp.json` shipped `"command": ""` that made
   `claude doctor` error every run; README understated guard by 6 secret
   patterns -> `check_pattern_counts()`.
   **Measurement trap, do not repeat:** hooks do NOT fire in any headless
@@ -67,8 +65,7 @@
   profiles: `gateway` (default, FreeModel/third-party via `--bare`),
   `native` (full mode, prefer API key or `apiKeyHelper` if present), and
   `kilo` (full-mode alias for IDE-integrated Kilo workflows). This keeps the
-  current Claude gateway path stable, avoids touching `jcode.ps1` or
-  `COMMANDCODE_*`/`DEEPSEEK_*`, and makes Kilo-specific IDE integrations opt-in
+  current Claude gateway path stable, avoids touching `COMMANDCODE_*`/`DEEPSEEK_*`, and makes Kilo-specific IDE integrations opt-in
   instead of overloading one implicit runtime path. `gateway` still restores
   `CLAUDE.md` discovery with `--add-dir .`, but hooks/auto-memory remain a
   documented degraded mode under `--bare`.

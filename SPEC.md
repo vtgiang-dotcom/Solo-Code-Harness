@@ -17,11 +17,9 @@
 - Engine hỗ trợ thật (đã cài đặt + verify): **Kilo Code** (nguồn gốc),
   **Claude Code** (orchestrator, generate từ Kilo), **GitHub Copilot**
   (mirror thủ công), **Gemini/Antigravity** (mirror thủ công + human-relay
-  handoff protocol, không có CLI headless), **jcode** (worker engine
-  DeepSeek v4 qua CommandCode gateway — không có thư mục riêng, đọc
-  `AGENTS.md` + `.claude/skills/` + `.mcp.json`).
+  handoff protocol, không có CLI headless).
 - **OpenCode đã bị gỡ bỏ vật lý ở v4.0.0** — từng là bản mirror 100% của
-  Kilo, không còn giá trị riêng sau khi Claude Code + jcode phủ hết vai trò.
+  Kilo, không còn giá trị riêng sau khi Claude Code đạt full parity.
   Cursor **không** được hỗ trợ thật (không có `.cursor/`) — nếu tài liệu cũ
   còn nhắc tới, đó là aspirational, không phải hiện trạng.
 
@@ -235,7 +233,7 @@ Lịch sử đầy đủ + lý do từng quyết định: `.kilo/memory/MEMORY.m
 lớn kể từ v3.3.0:
 
 - **v4.0.0**: gỡ vật lý `.opencode/` (không còn giá trị riêng); adopt
-  **jcode** làm worker engine rẻ/nhanh.
+  **Kilo CLI** làm worker engine rẻ/nhanh.
 - Đóng gap parity Gemini (`check_gemini()` trong `garden.py`); thêm
   file-based Claude↔Gemini/Antigravity handoff protocol
   (`.gemini/antigravity/handoff/{inbox,outbox}/`).
@@ -269,7 +267,7 @@ lớn kể từ v3.3.0:
 - Quy ước: nạp `MEMORY.md` đầu phiên (qua rulebook/`session_start.py`),
   lệnh `/remember` để ghi. Format: YAML frontmatter `type`, `created`.
 - **Không nới ngưỡng theo cửa sổ ngữ cảnh model lớn hơn** — chi phí lặp
-  lại mỗi phiên, dùng chung cho engine yếu nhất (jcode); xem lý do đầy đủ
+  lại mỗi phiên, dùng chung cho engine yếu nhất (Kilo CLI); xem lý do đầy đủ
   ở MEMORY.md quyết định 2026-07-24.
   > Kiểm chứng: `python -m pytest tools/test_claude_hooks.py tools/test_garden.py -q`.
 

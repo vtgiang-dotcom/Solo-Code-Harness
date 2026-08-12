@@ -33,7 +33,6 @@ Or will auto-find Kilo binary and use --attach to default server.
 
 import argparse
 import json
-import os
 import shutil
 import subprocess
 import sys

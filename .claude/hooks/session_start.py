@@ -24,11 +24,11 @@ Behavior (all best-effort, never blocks — always exits 0):
     docstring) — surfaced once here then deleted, so a fresh session
     resumes orientation (active feature, unverified changes, next step)
     immediately instead of re-deriving it from git state alone
-  - whether the jcode (DeepSeek) worker engine is available on this
+  - whether the Kilo CLI worker engine is available on this
     machine (binary on PATH + a configured provider profile) -- a signal
     that delegating small, well-specified subtasks to it is *worth
     considering* for cost/latency, not an instruction to always use it
-    (see AGENTS.md "Delegating a task to jcode")
+    (see AGENTS.md "Delegating a task to Kilo CLI")
   - prints a SessionStart hookSpecificOutput JSON with additionalContext
 """
 
@@ -152,22 +152,36 @@ def _pending_checkpoint(cwd: Path) -> dict | None:
     return data
 
 
-def _jcode_available() -> bool:
-    """Best-effort: is the jcode (DeepSeek worker) CLI usable on this
-    machine? Checks the binary is on PATH AND a default provider is
-    configured in ~/.jcode/config.toml -- presence of the binary alone
-    isn't enough (jcode.ps1 must have synced a working provider profile at
-    least once). Silent on any failure -- advisory only, never required.
+def _kilo_available() -> bool:
+    """Best-effort: is Kilo CLI (DeepSeek worker) usable on this machine?
+
+    Checks:
+    1. Binary exists on PATH or in Antigravity IDE extensions
+    2. Kilo server is running and responding on http://127.0.0.1:14096
+
+    Silent on any failure -- advisory only, never required.
     """
-    if shutil.which("jcode") is None:
+    # Check binary availability
+    if shutil.which("kilo") is None:
+        # Check Antigravity IDE extension path (Windows)
+        ide_ext = Path.home() / ".antigravity-ide" / "extensions"
+        if not ide_ext.is_dir():
+            return False
+        kilo_bins = list(ide_ext.glob("kilocode.kilo-code-*/bin/kilo.exe"))
+        if not kilo_bins:
+            return False
+
+    # Check if server is running
+    try:
+        import urllib.request
+        req = urllib.request.Request(
+            "http://127.0.0.1:14096/health",
+            headers={"User-Agent": "session_start/kilo-check"}
+        )
+        with urllib.request.urlopen(req, timeout=1) as resp:
+            return resp.status == 200
+    except Exception:  # noqa: BLE001
         return False
-    config_path = Path.home() / ".jcode" / "config.toml"
-    if not config_path.is_file():
-        return False
-    with suppress(OSError):
-        text = config_path.read_text(encoding="utf-8")
-        return "default_provider" in text
-    return False
 
 
 def _gemini_available(cwd: Path) -> bool:
@@ -176,8 +190,8 @@ def _gemini_available(cwd: Path) -> bool:
     Requires BOTH the handoff protocol in this repo AND the Antigravity IDE
     installed locally -- the inbox alone means nothing if the human has no
     IDE to open, and the IDE alone means this repo was never wired for
-    handoff. Unlike jcode, this delegation is *not* headless: it costs the
-    user a manual relay step, so it is announced as an option, not a default.
+    handoff. This delegation is *not* headless: it costs the user a manual
+    relay step, so it is announced as an option, not a default.
     Silent on any failure -- advisory only, never required.
     """
     if not (cwd / ".gemini" / "antigravity" / "handoff" / "inbox").is_dir():
@@ -202,7 +216,7 @@ def main() -> int:
         sessions = _recent_sessions(cwd)
         new_reports = _new_gemini_reports(cwd)
         checkpoint = _pending_checkpoint(cwd)
-        jcode_ready = _jcode_available()
+        kilo_ready = _kilo_available()
         gemini_ready = _gemini_available(cwd)
     except Exception:  # noqa: BLE001 — never crash session startup
         return 0
@@ -231,11 +245,11 @@ def main() -> int:
             lines.append(f"  - settled_decisions: {checkpoint['settled_decisions']}")
         if checkpoint.get("next_immediate_step"):
             lines.append(f"  - next_immediate_step: {checkpoint['next_immediate_step']}")
-    if jcode_ready:
+    if kilo_ready:
         lines.append(
-            "jcode (DeepSeek worker) available — consider delegating small, "
+            "Kilo CLI (DeepSeek worker) available — consider delegating small, "
             "well-specified subtasks to it for cost/latency (see AGENTS.md "
-            "'Delegating a task to jcode')."
+            "'Delegating a task to Kilo CLI')."
         )
     if gemini_ready:
         lines.append(

@@ -244,8 +244,8 @@ def deny(reason: str) -> None:
 
 # ─── Executor Mode (orchestrator/executor split) ────────────────────────────
 # When enabled, the orchestrator (Claude) may not write files directly: code
-# changes must be routed to a worker engine (jcode/DeepSeek, gpt-5.6-sol) via
-# tools/jcode_delegate.py. Claude keeps planning, reviewing and verifying.
+# changes must be routed to a worker engine (Kilo CLI/DeepSeek, gpt-5.6-sol) via
+# tools/kilo_cli_delegate.py. Claude keeps planning, reviewing and verifying.
 #
 # State lives in .solocode/executor-mode (gitignored, per-machine):
 #   file absent            -> ENABLED  (default-on, by design)
@@ -351,7 +351,7 @@ def main() -> int:
             deny(
                 f"executor mode is ON -- the orchestrator does not write files "
                 f"directly. Route this change to a worker:\n"
-                f"  python tools/jcode_delegate.py \"<self-contained task naming "
+                f"  python tools/kilo_cli_delegate.py \"<self-contained task naming "
                 f"{file_path}>\" --with-tools\n"
                 f"Then verify the result yourself (read the file back, run the "
                 f"gates) before accepting it. Note: workers can misreport which "

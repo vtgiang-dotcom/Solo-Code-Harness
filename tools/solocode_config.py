@@ -106,8 +106,7 @@ def resolve_model(prompt_text: str = "", model_flag: str = "pro") -> tuple[str, 
     being unreliable, so there is no second tier left to route to. `auto` no
     longer inspects the prompt (there is nothing to choose between) and
     `flash` is kept only as an accepted, deprecated alias so already-deployed
-    callers don't break -- the same treatment `jcode_delegate.py` gives its
-    retired `--tier` flag.
+    callers don't break.
     """
     if model_flag not in ("pro", "flash", "auto"):
         print(f"ERROR: Unknown model '{model_flag}'. Use: pro, auto", file=sys.stderr)

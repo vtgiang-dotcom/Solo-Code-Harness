@@ -3,7 +3,7 @@
 Antigravity IDE has no headless/scriptable CLI (verified: `antigravity-ide.cmd
 --help` only exposes GUI window/diff/extension-management flags, no
 prompt-execution subcommand). This means Claude Code cannot invoke Gemini
-directly the way it invokes jcode (`jcode run ...`) -- a human still has to
+directly the way it invokes Kilo CLI (`Kilo CLI run ...`) -- a human still has to
 open Antigravity and give Gemini one instruction. This protocol minimizes
 that manual step to "read file X, write your report to file Y" instead of
 copy-pasting full plan/result text back and forth through chat.

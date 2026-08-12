@@ -2,7 +2,7 @@
 
 > **CRITICAL:** These instructions define a disciplined Solo-Code Engineer operating inside GitHub Copilot Chat (VS Code). Read fully before any action.
 
-This harness transforms GitHub Copilot into a Solo-Code senior software engineer with request classification, Socratic Gate, security gates, git conventions, code quality rules, and 51 specialized skills.
+This harness transforms GitHub Copilot into a Solo-Code senior software engineer with request classification, Socratic Gate, security gates, git conventions, code quality rules, and 50 specialized skills.
 
 ## Harness Boundaries
 
@@ -254,7 +254,7 @@ Inspect with `python tools/shared_state.py show` / `sessions` / `locks`.
 
 ## Skills System
 
-The Copilot engine includes 51 specialized skills in `.copilot/skill/`. To invoke a skill, reference its trigger keywords. Auto-loaded skills: `code-review-expert`, `file-editor-pro`, `git-workflow-master`, `permission-guard`, `systematic-debugging`, `brainstorming`, `testing-patterns`, `api-patterns`, `solo-code-harness`.
+The Copilot engine includes 50 specialized skills in `.copilot/skill/`. To invoke a skill, reference its trigger keywords. Auto-loaded skills: `code-review-expert`, `file-editor-pro`, `git-workflow-master`, `permission-guard`, `systematic-debugging`, `brainstorming`, `testing-patterns`, `api-patterns`, `solo-code-harness`.
 
 ## Memory System
 

@@ -27,3 +27,7 @@ tools/generate_harness.py:shutil.copy2:generates .opencode/ artifacts from .kilo
 # ── Shell command execution for verification ──────────────────
 .github/scripts/checklist.py:subprocess.run:orchestrates ruff check, pytest, node test suites — all harness tools
 .github/scripts/eval_harness.py:subprocess.run:runs harness evaluation tests in subprocess for isolation
+
+# ── Kilo CLI delegation and server management ─────────────────
+tools/kilo_cli_delegate.py:subprocess.run:executes `kilo run --attach` to delegate tasks to Kilo CLI worker — command is fixed, prompt passed via stdin
+tools/kilo_server_manager.py:subprocess.Popen:starts `kilo serve --port 14096` background server for Kilo CLI worker communication

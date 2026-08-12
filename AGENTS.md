@@ -24,7 +24,7 @@ permissions:
 
 > **CRITICAL:** Read this file fully before taking any action. These rules are NON-NEGOTIABLE.
 
-This file serves **Kilo** (reads `.kilo/` for hooks/skills/memory — source of truth), **Claude Code** (reads `.claude/` + `CLAUDE.md`, generated from `.kilo/`), **jcode** (reads this file + `.claude/skills/` directly, no dedicated dir), and **GitHub Copilot** (reads `.copilot/` for agents/skills/commands, `.github/copilot-instructions.md` for rulebook). Sections referencing `.kilo/` paths are Kilo-specific; other engines ignore them and use their own generated/mirrored equivalents. (`.opencode/` was deprecated in v3.7.0 and physically removed in v4.0.0 — see `.harness.lock`.)
+This file serves **Kilo** (reads `.kilo/` for hooks/skills/memory — source of truth), **Claude Code** (reads `.claude/` + `CLAUDE.md`, generated from `.kilo/`), and **GitHub Copilot** (reads `.copilot/` for agents/skills/commands, `.github/copilot-instructions.md` for rulebook). Sections referencing `.kilo/` paths are Kilo-specific; other engines ignore them and use their own generated/mirrored equivalents. (`.opencode/` was deprecated in v3.7.0 and physically removed in v4.0.0 — see `.harness.lock`.)
 
 ## Harness Boundaries (READ FIRST)
 
@@ -37,7 +37,7 @@ This project is powered by **Solo-Code Harness** — an AI agent discipline laye
 | `.kilo/`, `.copilot/`, `.gemini/`, `.claude/`, `.claude-plugin/` | Harness engine | Rules/skills/hooks for AI behavior — not project logic |
 | `.contracts/` | Harness sub-agent contracts | Status contracts for delegated agents |
 | `.github/`, `.vscode/`, `tools/` | **Shared** — harness *and* project | The harness ships files here, but the project also keeps its own CI workflows, `CODEOWNERS`, dependabot config, editor settings and dev scripts. Only the exact paths under `[shared_files]` in `.harness.lock` are harness; **everything else here is project code**. |
-| `AGENTS.md`, `agent.yaml`, `kilo.jsonc`, `.mcp.json`, `.ruff.toml`, `.gitleaks.toml`, `Makefile`, `jcode.ps1`, `claude-env.ps1`, `init.sh`, `verify.sh`, `extensions_config.json`, `.harness.lock`, `.solocode/`, `.pre-commit-config.yaml`, `.github/pull_request_template.md`, `CLAUDE.md` | Harness config | Agent behavior configuration — not application config |
+| `AGENTS.md`, `agent.yaml`, `kilo.jsonc`, `.mcp.json`, `.ruff.toml`, `.gitleaks.toml`, `Makefile`, `claude-env.ps1`, `init.sh`, `verify.sh`, `extensions_config.json`, `.harness.lock`, `.solocode/`, `.pre-commit-config.yaml`, `.github/pull_request_template.md`, `CLAUDE.md` | Harness config | Agent behavior configuration — not application config |
 | **Everything else** | **Project code** | Your actual application — this is what you modify |
 
 **Key rule:** Never modify harness files to fix a project bug. Never modify project files to fix a harness issue. Read `.harness.lock` for the authoritative boundary list.
@@ -45,7 +45,7 @@ This project is powered by **Solo-Code Harness** — an AI agent discipline laye
 ## Self-Verification Handshake
 
 When asked "Is Solo-Code Harness active?" or "What rules apply here?", answer:
-`Solo-Code Harness active: behavior rules, anti-hallucination rules, security rules, prose quality rules, 51 skills, 14 agents, hooks enabled (Kilo) / guard + lifecycle hooks enabled (Claude Code). Use /verify to validate.`
+`Solo-Code Harness active: behavior rules, anti-hallucination rules, security rules, prose quality rules, 50 skills, 14 agents, hooks enabled (Kilo) / guard + lifecycle hooks enabled (Claude Code). Use /verify to validate.`
 
 ## OpenCode-Specific Tools
 
@@ -244,9 +244,8 @@ by switching engines:
 - Kilo Code: `.kilo/hooks/pre-tool-use/executor-mode.js` (same matcher,
   wired into every `hooks.json` profile except `minimal`).
 
-When ON, a write attempt is blocked (exit 2) with the delegation command to
-run instead (`python tools/jcode_delegate.py "<task>" --with-tools`) and a
-reminder to verify the result (`git status`/`git diff`) rather than trust a
+When ON, a write attempt is blocked (exit 2) with a reminder to verify the
+result of any delegated work (`git status`/`git diff`) rather than trust a
 worker's own report of what it wrote. `.gemini/antigravity/handoff/inbox/`
 and `.solocode/executor-mode` itself are exempt — delegating a plan and
 toggling the gate off must both stay possible from inside a gated session.
@@ -269,12 +268,12 @@ consider delegation, not an instruction to always delegate.
 | Repo-wide survey — "where else does X appear?" | **Gemini** | Breadth is exactly its edge |
 | Independent review of a design or diff | **Gemini** | A second model catches different things |
 | UI verification, screenshots, recordings | **Gemini** | The orchestrator cannot do this at all |
-| Small mechanical edit, boilerplate, one test | **jcode** | Headless — costs the user nothing |
-| Scoped code writing behind an explicit fence | Gemini if broad, jcode if narrow | Both need the fence stated in writing |
+| Small mechanical edit, boilerplate, one test | **Kilo CLI** | Headless — costs the user nothing |
+| Scoped code writing behind an explicit fence | Gemini if broad, Kilo CLI if narrow | Both need the fence stated in writing |
 | Architecture / product / security decisions | **Neither — do it here** | Judgment is not delegable |
 | Anything needing this conversation's history | **Neither — do it here** | Both workers are context-blind |
 
-**The asymmetry that matters**: jcode is headless, so delegating to it costs
+**The asymmetry that matters**: Kilo CLI is headless, so delegating to it costs
 the user nothing — just do it. Gemini requires the user to relay the task
 manually through the Antigravity IDE, so **propose and wait for a yes**.
 
@@ -283,8 +282,7 @@ produced at least one error invisible in their own self-summary. Their
 evidence is reliable; their self-assessment is not. Re-run their commands,
 run the real gates, and mutation-test any new check they write.
 
-Full decision guides: `.kilo/skill/gemini-delegation/SKILL.md`,
-`.kilo/skill/jcode-delegation/SKILL.md`.
+Full decision guide: `.kilo/skill/gemini-delegation/SKILL.md`.
 
 ### Delegating a task to Gemini/Antigravity (manual handoff)
 
@@ -329,93 +327,6 @@ or Vertex+ADC (no OAuth, so it cannot reuse the IDE's Pro login), and
 `antigravity-ide chat` only drives the GUI — exit 0, empty stdout. The Pro
 plan quota is reachable only through the IDE, and the IDE only through a
 human.
-
-### Delegating a task to jcode (multi-provider worker routing)
-
-Claude Code / Kilo Code is **always the orchestrator**: jcode is a
-stateless, one-shot worker with no memory of this conversation —
-it never plans or decides what to do next, it only executes one subtask
-handed to it. `session_start.py` reports `jcode: available` in
-`additionalContext` when the `jcode` binary is on PATH and
-`~/.jcode/config.toml` has a `default_provider` configured — that's a
-signal it's *worth considering*, not an instruction to always use it. Full
-decision guide: `.kilo/skill/jcode-delegation/SKILL.md`.
-
-**When to delegate**: small, well-specified, self-contained subtasks with a
-clear acceptance criterion — write a test, mechanical refactor, formatting,
-boilerplate generation. NOT suited for anything needing the ongoing
-conversational context of this session (architecture judgment, root-cause
-analysis, multi-step back-and-forth) — jcode runs as a one-shot subprocess
-with no access to this conversation's history.
-
-**Default + explicit routing** — calls without `--model` always use
-`deepseek/deepseek-v4-pro` through CommandCode. Pick another allowlisted route
-only when the task shape clearly benefits, and always keep the guardrail
-preamble:
-
-| Model | Use for | Risk |
-|-------|---------|------|
-| `deepseek/deepseek-v4-pro` | All delegated subtasks: formatting, boilerplate, a single well-defined test, mechanical refactors, plus real code-reasoning (bug fixes, algorithms, structured refactors) | Measured to ignore scope/style constraints ("phá luật") unless told explicitly right before the task — **never call without the guardrail preamble** |
-| `gpt-5.6-sol` | Complex implementation, difficult debugging, review, independent verification | Stronger worker; still stateless and its result remains an untrusted draft |
-| `gpt-5.6-terra` | Second opinion or fallback when Sol needs independent comparison | Verify independently; do not assume agreement proves correctness |
-
-FreeModel verification on 2026-08-07 showed the real catalog contains
-`gpt-5.6-luna`, `gpt-5.6-sol`, and `gpt-5.6-terra`. Sol and Terra passed both
-Chat Completions and Responses with matching `response.model`; Luna returned
-503 twice and is excluded until verified. Older GPT/Gemini/Kimi/Qwen/GLM
-aliases all routed to Sol and are deliberately excluded to avoid false model
-identity claims.
-
-The earlier cheap `deepseek-v4-flash` tier was removed 2026-07-25: in real
-use it was unreliable, and the tokens it saved were repeatedly lost to
-re-prompting and rework. Cost optimization now comes from flag discipline
-(`--tool-profile none --no-selfdev`, ~65% fewer input tokens), which costs
-nothing in quality — not from downgrading the model. Don't reintroduce a
-cheap tier without new evidence it holds up on real tasks.
-
-**Invocation** — prefer the wrapper script over calling `jcode` directly;
-it standardizes the token-optimized flags and auto-prepends the strict
-guardrail preamble on every call (see
-`tools/jcode_delegate.py::GUARDRAIL`):
-
-```bash
-python tools/jcode_delegate.py "<self-contained prompt with full context inlined>"
-python tools/jcode_delegate.py "<prompt>" --model gpt-5.6-sol
-python tools/jcode_delegate.py "<prompt>" --model gpt-5.6-terra
-python tools/jcode_delegate.py "<prompt>" --with-tools   # only if jcode needs its own tools
-```
-
-`--tier` is still accepted so older callers don't break, but it is ignored
-and prints a deprecation notice.
-
-Direct invocation (flags matter a lot for cost), if the subtask genuinely
-needs jcode's own tools — paste the guardrail preamble in front of the
-task yourself:
-
-```bash
-jcode run "<self-contained prompt with full context inlined>" \
-  --provider-profile commandcode --model deepseek/deepseek-v4-pro \
-  --tool-profile none --no-selfdev --quiet --json
-```
-
-`--tool-profile none --no-selfdev` cut measured input tokens from 22,376 to
-7,709 (~65%) for the same trivial prompt by skipping jcode's own tool-use
-scaffolding and repo self-dev detection — always pass both unless the
-delegated task genuinely needs jcode's own tools (bash/read/write). `--json`
-gives a parseable `{text, usage, ...}` result instead of streamed text.
-Every `tools/jcode_delegate.py` call logs `{model, prompt size, token
-usage, latency}` to `.solocode/jcode-usage.jsonl` so the cost/latency
-payoff of this routing is auditable rather than assumed.
-
-**After delegating**: treat jcode's output as an untrusted draft — read the
-diff/result yourself, run the normal verification gates (`/verify` or
-targeted `pytest`/`ruff`) before accepting it. Never pipe its output
-straight into a commit without review. Cost optimization is the goal here,
-not a trade-off against quality: if a result violates its guardrails
-(touches extra files, adds a dependency, ignores style), re-prompt
-narrower rather than hand-patching the drift.
-
----
 
 ## Git Commit Convention
 

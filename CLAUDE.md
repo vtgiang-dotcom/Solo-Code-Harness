@@ -29,13 +29,13 @@ boundary list.
 
 When asked "Is Solo-Code Harness active?", answer:
 `Solo-Code Harness active: behavior rules, anti-hallucination rules, security rules,
-prose quality rules, 51 skills, 14 agents, guard + lifecycle hooks enabled (Claude Code).
+prose quality rules, 50 skills, 14 agents, guard + lifecycle hooks enabled (Claude Code).
 Use /verify to validate.`
 
 ## Claude Code Assets
 
 - **Subagents (14)** in `.claude/agents/` -- invoke via the Task tool or by name.
-- **Skills (51)** in `.claude/skills/` -- auto-discovered `SKILL.md` capabilities.
+- **Skills (50)** in `.claude/skills/` -- auto-discovered `SKILL.md` capabilities.
 - **Slash commands (14)** in `.claude/commands/` -- `/verify`, `/plan`, `/decide`, `/ship`, and more.
 - **Guard hook** in `.claude/hooks/guard.py` (`PreToolUse`) -- blocks destructive
   commands, secret leaks, protected-config edits, and (default ON) direct
@@ -59,7 +59,7 @@ When ON, a write attempt is blocked (exit 2) with the exact delegation
 command to run instead:
 
 ```bash
-python tools/kilo_cli_delegate.py "<self-contained task naming the file>" --with-tools
+python tools/kilo_cli_delegate.py "<self-contained task naming the file>"
 ```
 
 Then verify the result yourself (read the file back, `git status`/`git diff`)
@@ -178,67 +178,6 @@ reuse the IDE's Pro login), and `antigravity-ide chat` only drives the GUI
 (exit 0, empty stdout). Full guide:
 `.claude/skills/gemini-delegation/SKILL.md`.
 
-## Delegating a task to Kilo CLI (DeepSeek worker, cost/latency optimization)
-
-Claude Code is **always the orchestrator** -- Kilo CLI is a stateless,
-one-shot worker with no memory of this session; it never plans, only
-executes one subtask it's handed. `session_start.py` reports
-`Kilo CLI: available` when the binary is on PATH and a Kilo server is
-running -- a signal it's worth considering, not an instruction to
-always use it.
-
-Delegate only small, well-specified, self-contained subtasks with a clear
-acceptance criterion -- NOT anything needing this session's ongoing
-conversational context (architecture judgment, root-cause analysis).
-
-**One model** -- every task goes to `commandcode/deepseek/deepseek-v4-pro` with the
-guardrail preamble prepended. There is no tier to pick:
-
-| Model | Use for |
-|-------|---------|
-| `commandcode/deepseek/deepseek-v4-pro` | All delegated subtasks -- formatting, boilerplate, a single well-defined test, mechanical refactors, plus real code-reasoning (bug fixes, algorithms, structured refactors). Measured to ignore scope/style constraints unless told explicitly; **never call without a guardrail preamble** |
-
-**Architecture**: Kilo CLI uses `kilo run --attach` to communicate with a
-background Kilo HTTP server (`kilo serve --port 14096`). The CLI approach
-provides structured JSON events stream (0% parsing failures) vs jcode's
-text stdout parsing (11% failure rate measured).
-
-**Server lifecycle management**:
-
-```bash
-python tools/kilo_server_manager.py ensure  # Start if not running
-python tools/kilo_server_manager.py status  # Check server status
-python tools/kilo_server_manager.py stop    # Stop server
-```
-
-**Delegation** -- use the wrapper that auto-injects the guardrail:
-
-```bash
-python tools/kilo_cli_delegate.py "<self-contained prompt>"
-```
-
-Every call logs model/tokens/latency to `.solocode/kilo-usage.jsonl` for auditing.
-
-**Verification is mandatory, not optional**: treat Kilo's output as an
-untrusted draft. Run the normal verification gates
-(`/verify`, targeted `pytest`/`ruff`) before accepting it, never commit it
-unreviewed. Cost optimization is the goal; it never trades away output
-quality -- if a result violates its guardrails, re-prompt
-narrower rather than hand-patching the drift.
-
-## Delegating a task to jcode (DeepSeek worker, DEPRECATED)
-
-**DEPRECATED**: `jcode` has 11% parsing failure rate and unreliable subprocess
-communication. Use `kilo_cli_delegate.py` instead (see above). This section
-is kept for reference only.
-
-The wrapper is still available:
-
-```bash
-python tools/jcode_delegate.py "<self-contained prompt>"
-```
-
-Every call logs to `.solocode/jcode-usage.jsonl` for auditing.
 
 ## Language
 Respond in the user's language. Code, identifiers, and commit messages stay in English.

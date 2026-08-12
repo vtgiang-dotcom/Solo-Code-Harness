@@ -4,7 +4,7 @@
 
 ## Tại sao cần file này?
 
-Khi triển khai bộ harness vào một dự án mới (`python tools/deploy.py deploy ./target-project`), các thư mục `.kilo/`, `.copilot/`, `.gemini/`, `.claude/`, `.contracts/` được copy nguyên khối vào project đích (dạng runtime-only, không mang theo dev tooling của Solo-Code-CLI). Riêng `.github/`, `.vscode/`, `tools/` là **thư mục dùng chung** — harness chỉ đặt thêm file vào đó, dự án vẫn giữ file riêng của mình. Các file như `AGENTS.md`, `kilo.jsonc`, `jcode.ps1` cũng được copy. (`.opencode/` đã bị gỡ ở v4.0.0 — xem `.harness.lock`.)
+Khi triển khai bộ harness vào một dự án mới (`python tools/deploy.py deploy ./target-project`), các thư mục `.kilo/`, `.copilot/`, `.gemini/`, `.claude/`, `.contracts/` được copy nguyên khối vào project đích (dạng runtime-only, không mang theo dev tooling của Solo-Code-CLI). Riêng `.github/`, `.vscode/`, `tools/` là **thư mục dùng chung** — harness chỉ đặt thêm file vào đó, dự án vẫn giữ file riêng của mình. Các file như `AGENTS.md`, `kilo.jsonc` cũng được copy. (`.opencode/` đã bị gỡ ở v4.0.0 — xem `.harness.lock`.)
 
 **Agent có thể nhầm lẫn theo CẢ HAI chiều:** thấy file harness trong project đích và tưởng là code dở dang của dự án; hoặc thấy CI workflow / script dev của chính dự án nằm trong `.github/`, `tools/` rồi tưởng là harness và không dám đụng. Tra `[shared_files]` trong `.harness.lock` để biết chính xác file nào là harness.
 
@@ -25,7 +25,7 @@ Thư mục này là marker dành riêng cho harness, chứa config nội bộ (k
 | Bắt đầu bằng `.kilo/`, `.copilot/`, `.gemini/`, `.claude/` | **Harness engine** | KHÔNG sửa, KHÔNG phân tích như code dự án |
 | Bắt đầu bằng `.contracts/` | **Harness contracts** | Sub-agent status contracts |
 | Bắt đầu bằng `.github/`, `.vscode/`, `tools/` | **DÙNG CHUNG** — harness *và* dự án | Harness có đặt file ở đây, nhưng dự án CŨNG sở hữu file riêng (CI workflow, `CODEOWNERS`, dependabot, cấu hình editor, script dev). Chỉ các đường dẫn liệt kê trong `[shared_files]` của `.harness.lock` là harness; **mọi file khác ở đây là code dự án** — đọc/sửa bình thường. |
-| Là `AGENTS.md`, `kilo.jsonc`, `.mcp.json`, `.ruff.toml`, `.gitleaks.toml`, `Makefile`, `jcode.ps1`, `verify.sh`, `extensions_config.json`, `.harness.lock`, `.solocode/`, `.pre-commit-config.yaml`, `.github/pull_request_template.md`, `agent.yaml`, `pyproject.toml`, `eslint.config.js` | **Harness config** | File cấu hình agent — không phải config dự án |
+| Là `AGENTS.md`, `kilo.jsonc`, `.mcp.json`, `.ruff.toml`, `.gitleaks.toml`, `Makefile`, `verify.sh`, `extensions_config.json`, `.harness.lock`, `.solocode/`, `.pre-commit-config.yaml`, `.github/pull_request_template.md`, `agent.yaml`, `pyproject.toml`, `eslint.config.js` | **Harness config** | File cấu hình agent — không phải config dự án |
 | **Tất cả các file/thư mục khác** | **Project code** | Đây là code của dự án thực — được phép sửa |
 
 ## Quy tắc bắt buộc

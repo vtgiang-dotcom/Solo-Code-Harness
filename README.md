@@ -2,18 +2,15 @@
 
 AI coding agent harness — rules, skills, hooks, and verification gates for disciplined Solo-Code engineering.
 
-Engine support: **Kilo Code** (`.kilo/`, source of truth — all other engine artifacts are generated from or kept in parity with it), **Claude Code** (`.claude/` + `CLAUDE.md`, orchestrator, generated from `.kilo/`), **jcode** (worker engine, DeepSeek v4 via CommandCode gateway — no dedicated dir, reads `AGENTS.md` + `.claude/skills/` + `.mcp.json` natively), **GitHub Copilot** (`.copilot/`, manually kept in parity with `.kilo/`), **Gemini/Antigravity** (`.gemini/`).
+Engine support: **Kilo Code** (`.kilo/`, source of truth — all other engine artifacts are generated from or kept in parity with it), **Claude Code** (`.claude/` + `CLAUDE.md`, orchestrator, generated from `.kilo/`), **GitHub Copilot** (`.copilot/`, manually kept in parity with `.kilo/`), **Gemini/Antigravity** (`.gemini/`).
 
-> **v4.0.0:** OpenCode engine removed. It was a 100%-parity generated mirror of `.kilo/` (verified via diff — zero content difference in agents/skills) with no unique capability once Claude Code (full agent/command parity) and jcode (faster, ~15-60x lighter RAM for concurrent DeepSeek workers) covered its runtime role. Full history in `.kilo/memory/MEMORY.md` → "Decisions".
+> **v4.0.0:** OpenCode engine removed. It was a 100%-parity generated mirror of `.kilo/` (verified via diff — zero content difference in agents/skills) with no unique capability once Claude Code reached full agent/command parity. Full history in `.kilo/memory/MEMORY.md` → "Decisions".
 
 ## Quick Start
 
 ```bash
 # Launch Claude Code (orchestrator) — see claude-env.ps1
 ./claude-env.ps1
-
-# Launch jcode (DeepSeek worker, cost-saving)
-./jcode.ps1
 
 # Regenerate the Claude engine from .kilo/ source
 python tools/generate_harness.py --harness claude
@@ -92,18 +89,17 @@ python tools/deploy.py
 
 | Directory | Purpose |
 |---|---|
-| `.claude/` | **Orchestrator** — Claude Code: agents (14), skills (51), commands (14, incl. `ship`), instruction (10), guard + lifecycle hooks + `settings.json`; rulebook `CLAUDE.md` at root. Generated from `.kilo/` via `tools/generate_harness.py --harness claude`. |
-| `.copilot/` | GitHub Copilot: agents (14), skills (51), commands (14), instruction (10), memory (4). Manually kept in parity with `.kilo/`; checked (not generated) by `tools/garden.py`. |
-| `.kilo/` | **Source of truth** — Kilo Code: agents (14), skills (51), commands (14, incl. `ship`), hooks, memory, instruction. Edit here first. |
-| *(jcode)* | **Worker engine** — no dedicated dir; auto-loads `AGENTS.md` + `.claude/skills/` (fallback) + `.mcp.json` natively. Launcher: `jcode.ps1`. Used for cheap/fast concurrent DeepSeek sub-tasks delegated by Claude Code. |
-| `.gemini/` | Gemini/Antigravity: agents (14), skills (51), commands (12), knowledge. Manually kept in parity with `.kilo/`; checked by `tools/garden.py`. |
+| `.claude/` | **Orchestrator** — Claude Code: agents (14), skills (50), commands (14, incl. `ship`), instruction (10), guard + lifecycle hooks + `settings.json`; rulebook `CLAUDE.md` at root. Generated from `.kilo/` via `tools/generate_harness.py --harness claude`. |
+| `.copilot/` | GitHub Copilot: agents (14), skills (50), commands (14), instruction (10), memory (4). Manually kept in parity with `.kilo/`; checked (not generated) by `tools/garden.py`. |
+| `.kilo/` | **Source of truth** — Kilo Code: agents (14), skills (50), commands (14, incl. `ship`), hooks, memory, instruction. Edit here first. |
+| `.gemini/` | Gemini/Antigravity: agents (14), skills (50), commands (12), knowledge. Manually kept in parity with `.kilo/`; checked by `tools/garden.py`. |
 | `.github/` | Shared scripts: `security_scan.py`, `checklist.py`, `check_skips.py`, `eval_harness.py`, `boundary_audit.py`, `security-allowlist.txt` + `copilot-instructions.md`, `prompts/` |
 | `tools/` | Generator (`generate_harness.py`, `claude_engine.py`), validator, drift detector (`garden.py`), integration tests, `shared_state.py` (runtime dep of Claude session hooks) |
 | `.vscode/` | VS Code settings + MCP config for Copilot |
 
 ## Shared State (Cross-Engine, Local-Only)
 
-All 5 engines share a single SQLite file at `.solocode/shared-state.db` — **local-only, không commit git** (thư mục `.solocode/` đã bị `.gitignore` chặn):
+All 4 engines share a single SQLite file at `.solocode/shared-state.db` — **local-only, không commit git** (thư mục `.solocode/` đã bị `.gitignore` chặn):
 
 - **`features`** — status + ownership (not-started / in-progress / completed / blocked)
 - **`session_log`** — mỗi session được ghi lại: engine, model, files changed, verification (giữ tối đa 1000 dòng gần nhất)
@@ -175,7 +171,7 @@ python tools/generate_harness.py --harness claude
 |---|---|---|
 | Rulebook | `CLAUDE.md` | Auto-loaded project memory (boundaries + rules) |
 | Subagents (14) | `.claude/agents/*.md` | Invoke via Task tool or by name |
-| Skills (51) | `.claude/skills/<name>/SKILL.md` | Auto-discovered capabilities |
+| Skills (50) | `.claude/skills/<name>/SKILL.md` | Auto-discovered capabilities |
 | Slash commands (14) | `.claude/commands/*.md` | `/verify`, `/plan`, `/decide`, `/ship`, `/debug`, `/commit`, … |
 | Guard hook | `.claude/hooks/guard.py` + `.claude/settings.json` | `PreToolUse` — blocks destructive commands, secret leaks, protected-config edits |
 | Quality-gate hook | `.claude/hooks/quality_gate.py` | `PostToolUse` (Edit/Write) — advisory ruff/prettier/biome/gofmt format check |
@@ -225,66 +221,12 @@ Copy-Item .env.template .env
 ```
 
 `.env.template` ships with 3 FreeModel VIP tiers (`cc.freemodel.dev`, `api-cc.freemodel.dev`, `cc-t2.freemodel.dev`)
-alongside a `COMMANDCODE_API_KEY` entry shared with jcode. Your real `.env` is gitignored and never deployed. The default `gateway` profile restores `CLAUDE.md` discovery with `--add-dir .`, but Claude Code still skips hooks and auto-memory in `--bare` mode.
-
-## jcode Setup (DeepSeek Worker Engine)
-
-`jcode.ps1` launches [jcode](https://github.com/1jehuang/jcode) as a stateless
-worker orchestrated by Claude Code. CommandCode is restricted to
-`deepseek/deepseek-v4-pro`; GPT workers use the FreeModel OpenAI-compatible
-gateway through Chat Completions.
-
-```powershell
-# 1. Make sure .env has COMMANDCODE_API_KEY set (see FreeModel setup above)
-
-# 2. Launch jcode
-./jcode.ps1
-
-# 3. DeepSeek remains the default worker
-./jcode.ps1 "your task"
-
-# 4. Stronger workers selected by Claude Code
-./jcode.ps1 gpt-5.6-sol "review this complex implementation"
-./jcode.ps1 gpt-5.6-terra "provide an independent second opinion"
-
-# 5. If the launcher warns that ~/.jcode/config.toml still pins the retired
-#    deepseek-v4-flash tier (any `jcode run` without --model would use it),
-#    this rewrites it to the supported model, backing up to config.toml.bak
-./jcode.ps1 -RepairConfig
-```
-
-Supported FreeModel choices: `gpt-5.6-sol` and `gpt-5.6-terra`. Set
-`OPENAI_API_KEY` and one
-host-root `OPENAI_BASE_URL` in `.env`: `work.freemodel.dev`,
-`api.freemodel.dev`, or `api-t2-sg.freemodel.dev`. Do not append
-`/v1/chat/completions` or `/v1/responses`; the launcher normalizes the host and
-configures jcode's `freemodel-openai` profile at `/v1`.
-
-Recommended Claude Code worker routing:
-
-| Task | Worker model | Provider path |
-|---|---|---|
-| Routine, small, well-scoped coding | `deepseek/deepseek-v4-pro` | CommandCode (default) |
-| Complex implementation, difficult debugging, review, verification | `gpt-5.6-sol` | FreeModel |
-| Independent second opinion / fallback | `gpt-5.6-terra` | FreeModel |
-
-Examples:
-
-```powershell
-./jcode.ps1 gpt-5.6-sol "analyze and verify this difficult change"
-./jcode.ps1 gpt-5.6-terra "independently challenge this conclusion"
-```
-
-jcode has no dedicated harness directory — it auto-loads `AGENTS.md` (project
-rules) and falls back to `.claude/skills/` for skill discovery, and reads
-`.mcp.json` for MCP servers natively. No porting/mirroring needed.
-
-Connects to [Command Code](https://commandcode.ai) — single API key for Claude, GPT, Gemini, DeepSeek, Qwen, Kimi, GLM, MiniMax, Step, and other models.
+alongside a `COMMANDCODE_API_KEY` entry shared with Kilo CLI. Your real `.env` is gitignored and never deployed. The default `gateway` profile restores `CLAUDE.md` discovery with `--add-dir .`, but Claude Code still skips hooks and auto-memory in `--bare` mode.
 
 ## Gemini/Antigravity Handoff (manual, file-based)
 
 Antigravity IDE has no headless CLI, so Claude Code cannot invoke it
-directly (unlike jcode). Instead of copy-pasting plan/result text through
+directly. Instead of copy-pasting plan/result text through
 chat, use the file-based protocol in `.gemini/antigravity/handoff/`:
 Claude writes a plan to `handoff/inbox/<slug>-plan.md`, you relay one line
 to Antigravity ("read this plan, write your report to
@@ -304,19 +246,18 @@ engine's availability at session start.
 | Repo-wide survey — "where else does X appear?" | **Gemini** | Breadth is its edge |
 | Independent review of a design or diff | **Gemini** | A second model catches different things |
 | UI verification, screenshots, recordings | **Gemini** | Claude Code cannot do this at all |
-| Small mechanical edit, boilerplate, one test | **jcode** | Headless — costs you nothing |
+| Small mechanical edit, boilerplate, one test | **Kilo CLI** | Headless — costs you nothing |
 | Architecture / product / security decisions | **Neither** | Judgment is not delegable |
 | Anything needing the session's history | **Neither** | Both workers are context-blind |
 
-jcode is headless, so Claude just uses it. Gemini needs you to relay the
+Kilo CLI is headless, so Claude just uses it. Gemini needs you to relay the
 task through the IDE, so Claude asks first.
 
 **Everything both workers return is verified.** In controlled tests each
 shipped an error that was invisible in its own summary — a wrong finding
 marked "Confident: Yes", and two false positives reported as "unsure
 about: nothing". Their evidence is reliable; their self-assessment is not.
-Full guides: `.kilo/skill/gemini-delegation/SKILL.md`,
-`.kilo/skill/jcode-delegation/SKILL.md`.
+Full guide: `.kilo/skill/gemini-delegation/SKILL.md`.
 
 ## MCP Servers
 
@@ -331,18 +272,15 @@ Full guides: `.kilo/skill/gemini-delegation/SKILL.md`,
 
 Bộ harness (dây cương) cho AI coding agent — rules, skills, hooks và verification gates dành cho kỹ thuật Solo-Code có kỷ luật.
 
-Hỗ trợ engine: **Kilo Code** (`.kilo/`, nguồn gốc — mọi engine khác được sinh ra từ đây hoặc giữ song song), **Claude Code** (`.claude/` + `CLAUDE.md`, điều phối, sinh từ `.kilo/`), **jcode** (worker chạy DeepSeek v4 qua CommandCode — không cần thư mục riêng), **GitHub Copilot** (`.copilot/`, giữ song song thủ công với `.kilo/`), **Gemini/Antigravity** (`.gemini/`).
+Hỗ trợ engine: **Kilo Code** (`.kilo/`, nguồn gốc — mọi engine khác được sinh ra từ đây hoặc giữ song song), **Claude Code** (`.claude/` + `CLAUDE.md`, điều phối, sinh từ `.kilo/`), **GitHub Copilot** (`.copilot/`, giữ song song thủ công với `.kilo/`), **Gemini/Antigravity** (`.gemini/`).
 
-> **v4.0.0:** đã gỡ engine OpenCode. Nó từng là bản mirror sinh 100% từ `.kilo/` (đã verify bằng diff, không khác biệt nội dung), không còn giá trị riêng khi Claude Code (parity đầy đủ agent/command) và jcode (nhanh hơn, nhẹ RAM hơn ~15-60x cho worker DeepSeek đồng thời) đã lấp vai trò runtime của nó. Lịch sử đầy đủ trong `.kilo/memory/MEMORY.md` → "Decisions".
+> **v4.0.0:** đã gỡ engine OpenCode. Nó từng là bản mirror sinh 100% từ `.kilo/` (đã verify bằng diff, không khác biệt nội dung), không còn giá trị riêng khi Claude Code đã đạt parity đầy đủ agent/command. Lịch sử đầy đủ trong `.kilo/memory/MEMORY.md` → "Decisions".
 
 ## Bắt đầu nhanh
 
 ```bash
 # Mở Claude Code (điều phối) — xem claude-env.ps1
 ./claude-env.ps1
-
-# Mở jcode (worker DeepSeek, tiết kiệm chi phí)
-./jcode.ps1
 
 # Sinh lại engine Claude từ nguồn .kilo/
 python tools/generate_harness.py --harness claude
@@ -420,11 +358,10 @@ python tools/deploy.py
 
 | Thư mục | Mục đích |
 |---|---|
-| `.claude/` | **Điều phối** — Claude Code: agents (14), skills (51), commands (14, gồm `ship`), instruction (10), guard + lifecycle hooks + `settings.json`; rulebook `CLAUDE.md` ở root. Sinh từ `.kilo/` qua `tools/generate_harness.py --harness claude`. |
-| `.copilot/` | GitHub Copilot: agents (14), skills (51), commands (14), instruction (10), memory (4). Giữ song song thủ công với `.kilo/`; `tools/garden.py` chỉ kiểm tra, không tự sinh. |
-| `.kilo/` | **Nguồn gốc** — Kilo Code: agents (14), skills (51), commands (14, gồm `ship`), hooks, memory, instruction. Sửa ở đây trước tiên. |
-| *(jcode)* | **Worker engine** — không có thư mục riêng; tự load `AGENTS.md` + `.claude/skills/` (fallback) + `.mcp.json`. Launcher: `jcode.ps1`. |
-| `.gemini/` | Gemini/Antigravity: agents (14), skills (51), commands (12), knowledge. Manually kept in parity with `.kilo/`; checked by `tools/garden.py`. |
+| `.claude/` | **Điều phối** — Claude Code: agents (14), skills (50), commands (14, gồm `ship`), instruction (10), guard + lifecycle hooks + `settings.json`; rulebook `CLAUDE.md` ở root. Sinh từ `.kilo/` qua `tools/generate_harness.py --harness claude`. |
+| `.copilot/` | GitHub Copilot: agents (14), skills (50), commands (14), instruction (10), memory (4). Giữ song song thủ công với `.kilo/`; `tools/garden.py` chỉ kiểm tra, không tự sinh. |
+| `.kilo/` | **Nguồn gốc** — Kilo Code: agents (14), skills (50), commands (14, gồm `ship`), hooks, memory, instruction. Sửa ở đây trước tiên. |
+| `.gemini/` | Gemini/Antigravity: agents (14), skills (50), commands (12), knowledge. Manually kept in parity with `.kilo/`; checked by `tools/garden.py`. |
 | `.github/` | Script dùng chung: `security_scan.py`, `checklist.py`, `check_skips.py`, `eval_harness.py`, `boundary_audit.py` + `copilot-instructions.md`, `prompts/` |
 | `tools/` | Generator (`generate_harness.py`, `claude_engine.py`), validator, drift detector (`garden.py`), integration tests, `shared_state.py` (runtime dep của Claude session hooks) |
 | `.vscode/` | VS Code settings + MCP config cho Copilot |
@@ -486,31 +423,10 @@ Copy-Item .env.template .env
 ./claude-env.ps1
 ```
 
-## jcode Setup (Worker DeepSeek)
-
-`jcode.ps1` chạy [jcode](https://github.com/1jehuang/jcode) như một worker tối
-ưu chi phí/độ trễ, do Claude Code điều phối cho các sub-task chạy đồng thời.
-Tự đồng bộ `COMMANDCODE_API_KEY` từ `.env` vào provider profile của jcode mỗi lần chạy.
-
-```powershell
-# 1. Đảm bảo .env đã có COMMANDCODE_API_KEY
-
-# 2. Chạy jcode
-./jcode.ps1
-
-# 3. Hoặc chạy 1 task không tương tác (Claude Code dùng khi điều phối)
-jcode run --provider-profile commandcode --model deepseek/deepseek-v4-pro "task của bạn"
-```
-
-jcode không có thư mục harness riêng — tự load `AGENTS.md` + fallback sang
-`.claude/skills/` + đọc `.mcp.json` — không cần port/mirror gì thêm.
-
-Kết nối tới [Command Code](https://commandcode.ai) — một API key dùng được Claude, GPT, Gemini, DeepSeek, Qwen, Kimi, GLM, MiniMax, Step và nhiều model khác.
-
 ## Handoff Gemini/Antigravity (thủ công, qua file)
 
 Antigravity IDE không có CLI headless nên Claude Code không thể gọi trực
-tiếp như jcode. Thay vì copy-paste kế hoạch/kết quả qua chat, dùng giao thức
+tiếp. Thay vì copy-paste kế hoạch/kết quả qua chat, dùng giao thức
 file trong `.gemini/antigravity/handoff/`: Claude ghi kế hoạch vào
 `handoff/inbox/<slug>-plan.md`, bạn chỉ cần chuyển 1 dòng cho Antigravity
 ("đọc plan này, ghi report vào `handoff/outbox/<slug>-report.md`"), và
@@ -529,11 +445,11 @@ mỗi phiên.
 | Khảo sát toàn repo — "chỗ nào khác dùng X?" | **Gemini** | Bề rộng là thế mạnh của nó |
 | Review độc lập một thiết kế hoặc diff | **Gemini** | Model khác bắt được lỗi khác |
 | Kiểm chứng UI, chụp màn hình, quay video | **Gemini** | Claude Code hoàn toàn không làm được |
-| Sửa cơ học nhỏ, boilerplate, một test | **jcode** | Headless — không tốn công bạn |
+| Sửa cơ học nhỏ, boilerplate, một test | **Kilo CLI** | Headless — không tốn công bạn |
 | Quyết định kiến trúc / sản phẩm / bảo mật | **Không giao** | Phán đoán không ủy quyền được |
 | Việc cần lịch sử hội thoại của phiên | **Không giao** | Cả hai worker đều mù ngữ cảnh |
 
-jcode chạy headless nên Claude dùng luôn. Gemini cần bạn chuyển đề bài qua
+Kilo CLI chạy headless nên Claude dùng luôn. Gemini cần bạn chuyển đề bài qua
 IDE nên Claude sẽ hỏi trước.
 
 **Mọi kết quả từ cả hai worker đều được kiểm chứng.** Trong các bài test có

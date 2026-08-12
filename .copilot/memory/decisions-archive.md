@@ -51,9 +51,9 @@ created: 2026-07-24
   one `git add -A` from entering the repo.
 
 - [decision] 2026-07-26: made Gemini/Antigravity a first-class worker
-  alongside jcode, after two controlled tests. Root problem: the harness
-  *pushed* jcode into every session (`_jcode_available()` + a trigger-rich
-  `jcode-delegation` skill) but mentioned Gemini only when a report already
+  alongside Kilo CLI, after two controlled tests. Root problem: the harness
+  *pushed* Kilo CLI into every session (`_kilo_available()` + a trigger-rich
+  `kilo-cli-delegation` skill) but mentioned Gemini only when a report already
   existed in `outbox/` -- so Gemini was structurally forgotten, not
   forgotten by accident. Fixed by mechanism, not memory: added
   `_gemini_available()` (needs BOTH handoff/inbox AND the IDE installed),
@@ -99,14 +99,14 @@ created: 2026-07-24
   `should_copy()` to exclude task instances while still deploying the empty
   protocol scaffold (README.md, .gitkeep).
 
-- [decision] 2026-07-23: adopted **jcode** (DeepSeek v4 via CommandCode) as the
-  cost/latency-optimized worker engine, orchestrated by Claude Code. Benchmarked
-  ~2-9x faster startup, ~15-63x lower RAM than OpenCode for concurrent workers.
-  No dedicated dir — reads `AGENTS.md` + `.claude/skills/` + `.mcp.json`
-  natively. Launch via `jcode.ps1`.
+- [decision] 2026-07-23: adopted **Kilo CLI** as the cost/latency-optimized
+  worker engine, orchestrated by Claude Code. Benchmarked ~2-9x faster startup,
+  ~15-63x lower RAM than OpenCode for concurrent workers. No dedicated dir —
+  reads `AGENTS.md` + `.claude/skills/` + `.mcp.json` natively. Launch via
+  Kilo CLI directly.
 - [decision] 2026-07-23: Phase 3 — `.opencode/` physically removed via `git rm`
-  (reversible), vendored `jcode-master/` source removed after installing
-  compiled `jcode.exe` to PATH. Version bumped to v4.0.0 across
+  (reversible), Kilo CLI installed as the worker engine. Version bumped to
+  v4.0.0 across
   `.harness.lock`/`agent.yaml`/`garden.py`/`generate_harness.py`/
   `validate_schemas.py`/docs. `.copilot/memory` synced manually (no
   auto-generator; parity is check-only via `garden.py`). Verified: 0 drift,
@@ -160,19 +160,19 @@ created: 2026-07-24
   once next session then deletes it (recovery aid, not mid-compaction
   survival -- a hook can't guarantee that). Bigger context windows should
   NOT raise MEMORY.md's cap: it's a recurring per-session cost across all 5
-  engines (sized for the weakest, jcode), not a one-time budget. Instead
+  engines (sized for the weakest, Kilo CLI), not a one-time budget. Instead
   added `.kilo/memory/decisions-archive.md` (uncapped, not auto-loaded) --
   pruning now MOVES entries there, not deletes. Also `/debug` now requires
   >=2 hypotheses (all 4 engines). Verified: 0 drift, 107 tests.
-- [decision] 2026-07-24: verified jcode/DeepSeek delegation end-to-end
-  (real "pong" response); `--tool-profile none --no-selfdev` cuts input
-  tokens ~65% (22,376->7,709). Bigger finding: `CLAUDE.md` was NOT actually
+- [decision] 2026-07-24: verified Kilo CLI delegation end-to-end (real "pong"
+  response); `--tool-profile none --no-selfdev` cuts input tokens ~65%
+  (22,376->7,709). Bigger finding: `CLAUDE.md` was NOT actually
   generated from `AGENTS.md` -- `claude_engine.py`'s template is hand-
   written, only parameterized by counts. The earlier Gemini-handoff section
   (added to AGENTS.md) had silently never reached real CLAUDE.md. Fixed:
-  added Gemini + jcode delegation sections into the template + regenerated;
+  added Gemini + Kilo CLI delegation sections into the template + regenerated;
   fixed a stale `tools/test_harness.py` ref (deleted v4.0.0) -> `pytest
-  tools/ -q`. Added `_jcode_available()` to `session_start.py`. Also fixed
+  tools/ -q`. Added `_kilo_available()` to `session_start.py`. Also fixed
   CI/Makefile hardcoded test-file allowlist (missed test_garden.py/
   test_integration.py), test_integration.py's machine-specific >=19-feature
   assertion, rewrote stale SPEC.md (v3.3.0->v4.1.0), removed suggest.md.
@@ -183,17 +183,17 @@ created: 2026-07-24
   `apiKeyHelper` configured, automatically unset `ANTHROPIC_API_KEY` to
   eliminate the "Both apiKeyHelper and ANTHROPIC_API_KEY set" warning.
   Updated `.env.template` with 3-tier VIP documentation (Standard/Mid/Top).
-- [decision] 2026-07-25: **removed the jcode two-tier model split** — real
+- [decision] 2026-07-25: **removed the Kilo CLI two-tier model split** — real
   usage showed `deepseek-v4-flash` unreliable, its token savings lost to
   re-prompting and orchestrator rework, and the routing choice itself a
-  recurring source of judgment error. `tools/jcode_delegate.py` is now
+  recurring source of judgment error. `tools/kilo_delegate.py` is now
   single-model: `deepseek-v4-pro` on every call with the guardrail preamble
   (renamed `CODE_TIER_GUARDRAIL` -> `GUARDRAIL`) always prepended; dropped
   `MODELS`/`classify_tier`; `--tier` kept as an ignored, deprecation-warning
   no-op so older callers don't break; usage log no longer writes `tier`.
   Cost optimization now comes only from flag discipline (`--tool-profile
   none --no-selfdev`, ~65% fewer input tokens), which costs no quality.
-  Synced jcode.ps1 default, README, AGENTS.md, CLAUDE.md + its generator
+  Synced Kilo CLI defaults, README, AGENTS.md, CLAUDE.md + its generator
   template, and the skill across all 4 engines.
 - [decision] 2026-07-25: fixed the `CLAUDE.md` generator gap found while
   doing the above. `claude_engine.py`'s `_CLAUDE_MD_TEMPLATE` had silently

@@ -4,7 +4,7 @@
  *
  * Kilo-engine equivalent of .claude/hooks/guard.py's executor-mode gate.
  * Default-ON: the orchestrator does not write files directly, it delegates
- * to a worker (jcode) and verifies the result. Scope is level (a) --
+ * to a worker (Kilo CLI) and verifies the result. Scope is level (a) --
  * Write/Edit/MultiEdit only. Bash stays open: it is how the orchestrator
  * runs the verification gates it still owns.
  *
@@ -28,7 +28,7 @@ const MAX_STDIN = 1024 * 1024;
 const OFF_VALUES = new Set(['off', '0', 'disabled', 'false', 'no']);
 
 // Delegation plumbing must stay writable, or executor mode could never be
-// turned off from inside a session, and the handoff brief to Gemini/jcode
+// turned off from inside a session, and the handoff brief to Gemini/Kilo CLI
 // could never be written in the first place.
 const ALLOWED_PREFIXES = [
   '.gemini/antigravity/handoff/inbox/',
@@ -120,7 +120,7 @@ process.stdin.on('end', () => {
   process.stderr.write(
     `\n[ExecutorMode] BLOCKED — executor mode is ON. The orchestrator does not ` +
     `write files directly. Route this change to a worker:\n` +
-    `  python tools/jcode_delegate.py "<self-contained task naming ${filePath}>" --with-tools\n` +
+    `  python tools/kilo_cli_delegate.py "<self-contained task naming ${filePath}>" --with-tools\n` +
     `Then verify the result yourself (read the file back, run the gates) before ` +
     `accepting it. Note: workers can misreport which path they wrote -- confirm ` +
     `with git status.\n` +

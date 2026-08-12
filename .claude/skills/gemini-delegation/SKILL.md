@@ -52,10 +52,10 @@ Poor fit:
 - Anything needing this conversation's history — the handoff file is the
   **only** context Gemini receives.
 - Architecture and product decisions. Those stay with the orchestrator.
-- Small mechanical edits — use jcode instead; it is headless and does not
+- Small mechanical edits — use Kilo CLI instead; it is headless and does not
   cost the user a relay step.
 
-Rule of thumb: if the task is small enough that jcode can do it, **use jcode**.
+Rule of thumb: if the task is small enough that Kilo CLI can do it, **use Kilo CLI**.
 Gemini earns its relay cost only on breadth.
 
 ## Invocation
@@ -146,7 +146,7 @@ channel. The report file in `outbox/` is.
 
 | Don't | Do Instead |
 |-------|------------|
-| Delegate a small mechanical edit to Gemini | Use jcode — headless, no relay cost to the user |
+| Delegate a small mechanical edit to Gemini | Use Kilo CLI — headless, no relay cost to the user |
 | Trust its "Confident: Yes" / "unsure about: nothing" | Re-run its evidence commands yourself |
 | Write a brief without an explicit writable-file list | Fence the scope; name every path it may touch |
 | Put the expected answer in the brief | Give the measurement command, not the number |

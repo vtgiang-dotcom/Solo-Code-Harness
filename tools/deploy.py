@@ -57,7 +57,6 @@ ROOT_FILES = [
     "eslint.config.js",
     "pyproject.toml",
     "Makefile",
-    "jcode.ps1",
     "claude-env.ps1",
     "init.sh",
     ".env.template",
@@ -196,7 +195,7 @@ EXCLUDE_FILES = {
 # Default README template for scaffolded projects
 README_TEMPLATE = """# {project_name}
 
-> Scaffolded from [Solo-Code-CLI](https://github.com/Solo-Code-CLI) — AI agent harness with Kilo Code + Claude Code + jcode + Copilot + Gemini engines. This is a RUNTIME-ONLY copy: Solo-Code-CLI's own dev tooling, tests, and internal docs were intentionally excluded (see "Harness Boundaries" below).
+> Scaffolded from [Solo-Code-CLI](https://github.com/Solo-Code-CLI) — AI agent harness with Kilo Code + Claude Code + Copilot + Gemini engines. This is a RUNTIME-ONLY copy: Solo-Code-CLI's own dev tooling, tests, and internal docs were intentionally excluded (see "Harness Boundaries" below).
 
 {description}
 
@@ -231,7 +230,6 @@ python .github/scripts/boundary_audit.py .
 
 - **[Kilo Code](https://kilo.ai)** — source-of-truth: agents, skills, commands, hooks, memory, orchestrators
 - **[Claude Code](https://claude.com/claude-code)** — orchestrator: subagents, skills, commands, hooks, `CLAUDE.md`
-- **jcode** — cost/latency-optimized worker engine (no dedicated dir; reads `AGENTS.md` + `.claude/skills/` + `.mcp.json` natively). Launch via `jcode.ps1`.
 - **[Copilot](https://github.com/features/copilot)** — agents, skills, commands, prompts
 - **[Gemini](https://gemini.google.com)** — additional AI assistant config
 
@@ -316,7 +314,6 @@ files = [
     ".gitleaks.toml",
     "Makefile",
     "pyproject.toml",
-    "jcode.ps1",
     "claude-env.ps1",
     "init.sh",
     "verify.sh",

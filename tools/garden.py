@@ -1135,7 +1135,7 @@ def check_launcher_defaults(root: Path = ROOT) -> list[str]:
                 continue
             lowered = line.lower()
             # Only care about lines that actually invoke the engine.
-            if not re.search(r'(?:^|[&|;\s])(?:claude|jcode)\b', lowered):
+            if not re.search(r'(?:^|[&|;\s])claude\b', lowered):
                 continue
             if any(m in lowered for m in _LAUNCHER_OPTIN_MARKERS):
                 continue

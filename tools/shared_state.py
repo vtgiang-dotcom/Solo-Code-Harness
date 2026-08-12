@@ -3,8 +3,8 @@
 shared_state.py — Cross-engine shared state reader/writer (SQLite backend).
 
 Single source of truth at .solocode/shared-state.db (LOCAL ONLY — not committed to git,
-directory already excluded via .gitignore). All engines (Claude Code, Kilo, Copilot, Gemini,
-jcode) read/write this file when running on the same machine/workspace.
+directory already excluded via .gitignore). All engines (Claude Code, Kilo, Copilot, Gemini)
+read/write this file when running on the same machine/workspace.
 ("opencode" remains a VALID_ENGINES value for backward-compat reads of
 historical rows -- OpenCode engine was removed in v4.0.0, see .harness.lock.)
 

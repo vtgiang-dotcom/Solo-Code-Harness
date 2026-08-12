@@ -117,8 +117,8 @@ def _pid_is_alive(pid: int) -> bool:
     import ctypes.wintypes
 
     kernel32 = ctypes.windll.kernel32
-    SYNCHRONIZE = 0x00100000
-    handle = kernel32.OpenProcess(SYNCHRONIZE, False, pid)
+    synchronize = 0x00100000
+    handle = kernel32.OpenProcess(synchronize, False, pid)
     if handle:
         kernel32.CloseHandle(handle)
         return True
@@ -133,10 +133,7 @@ def _write_pid(pid: int) -> None:
 
 def _remove_pid() -> None:
     """Remove the PID file if it exists."""
-    try:
-        PID_FILE.unlink(missing_ok=True)
-    except OSError:
-        pass
+    PID_FILE.unlink(missing_ok=True)
 
 
 # ---------------------------------------------------------------------------
@@ -269,8 +266,8 @@ def stop_server() -> bool:
     import ctypes
 
     kernel32 = ctypes.windll.kernel32
-    PROCESS_TERMINATE = 0x0001
-    handle = kernel32.OpenProcess(PROCESS_TERMINATE, False, pid)
+    process_terminate = 0x0001
+    handle = kernel32.OpenProcess(process_terminate, False, pid)
     if not handle:
         _stderr(f"cannot open process {pid} — cleaning up PID file")
         _remove_pid()
