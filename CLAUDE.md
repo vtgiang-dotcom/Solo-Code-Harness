@@ -73,6 +73,31 @@ To disable: `echo off > .solocode/executor-mode` (accepted off-values:
 the same default via `.kilo/hooks/pre-tool-use/executor-mode.js`.
 
 
+## Orchestrator-Executor Workflow (MANDATORY)
+
+**Default mode: Executor ON** - Claude Code orchestrates, OpenCode CLI executes.
+
+When executor mode is enabled ( = 'on'), you MUST:
+
+1. **Plan first** - analyze the task, identify files to change
+2. **Write brief** - create self-contained task with file paths and spec
+3. **Delegate** - route to worker:
+   ```bash
+   python tools/opencode_delegate.py "<task>" --free
+   ```
+4. **Verify result** - read files back, run `git diff`, check gates
+5. **Never trust self-summary** - workers misreport, verify every claim
+
+**Executor selection** (from `.solocode/executor-config.json`):
+- **Primary: OpenCode CLI** - free models, 80% success rate, cache tracking
+- **Fallback: Kilo CLI** - use only if OpenCode fails
+- **Test result**: Both executors working reliably in current network conditions
+
+**Allowed direct writes** (bypasses gate):
+- `.gemini/antigravity/handoff/inbox/*` - delegation briefs
+- `.solocode/executor-mode` - toggle itself
+
+
 ## Behavior Rules (MANDATORY)
 
 ### Safety

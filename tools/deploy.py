@@ -880,6 +880,28 @@ def scaffold(
     print("\n--- Project Memory (blank templates) ---")
     total_new += _write_blank_memory_templates(target_path, dirs, dry_run)
 
+    # ── Step 2.46: Setup executor mode config ─────────────────
+    print("\n--- .solocode/ (executor config) ---")
+    solocode_dir = target_path / ".solocode"
+    if not dry_run:
+        solocode_dir.mkdir(exist_ok=True)
+
+    # Copy executor config templates
+    executor_config_src = ROOT / ".solocode" / "executor-config.json"
+    executor_mode_src = ROOT / ".solocode" / "executor-mode"
+
+    if executor_config_src.exists():
+        status = copy_file(executor_config_src, solocode_dir / "executor-config.json", dry_run, base=target_path)
+        print(status)
+        if "[NEW]" in status:
+            total_new += 1
+
+    if executor_mode_src.exists():
+        status = copy_file(executor_mode_src, solocode_dir / "executor-mode", dry_run, base=target_path)
+        print(status)
+        if "[NEW]" in status:
+            total_new += 1
+
     # ── Step 2.5: Generate .harness.lock ─────────────────────────
     print("\n--- .harness.lock ---")
     _generate_harness_lock(target_path, dry_run, dirs)

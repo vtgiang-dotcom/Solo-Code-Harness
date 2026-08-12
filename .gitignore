@@ -19,8 +19,12 @@ node_modules/
 .env.*
 !.env.template
 
-# Harness per-project config (generated locally, not committed)
+# Harness per-project config
 .solocode/
+# But allow executor config templates to be committed
+!.solocode/executor-config.json
+!.solocode/executor-mode
+!.solocode/.gitkeep
 
 # Claude Code personal overrides (generated locally, not committed)
 .claude/settings.local.json

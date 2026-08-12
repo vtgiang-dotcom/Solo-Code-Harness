@@ -1,0 +1,11 @@
+# Executor mode: orchestrator (Claude Code) delegates writes to worker engines
+# Valid states: on, enabled, 1, true, yes (case-insensitive) | off, disabled, 0, false, no
+# Default when absent: ON (fail-closed)
+
+on
+
+# Recommended executor: OpenCode CLI
+# - Free models available (opencode/deepseek-v4-flash-free)
+# - Cache + reasoning token tracking
+# - 80% success rate in testing
+# Command: python tools/opencode_delegate.py "<task>" --free
