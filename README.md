@@ -246,12 +246,11 @@ engine's availability at session start.
 | Repo-wide survey — "where else does X appear?" | **Gemini** | Breadth is its edge |
 | Independent review of a design or diff | **Gemini** | A second model catches different things |
 | UI verification, screenshots, recordings | **Gemini** | Claude Code cannot do this at all |
-| Small mechanical edit, boilerplate, one test | **Kilo CLI** | Headless — costs you nothing |
+| Small mechanical edit, boilerplate, one test | **OpenCode CLI** | Headless — costs you nothing |
 | Architecture / product / security decisions | **Neither** | Judgment is not delegable |
 | Anything needing the session's history | **Neither** | Both workers are context-blind |
 
-Kilo CLI is headless, so Claude just uses it. Gemini needs you to relay the
-task through the IDE, so Claude asks first.
+OpenCode CLI and Kilo CLI are both headless, so Claude delegates directly. OpenCode CLI is the primary executor (reasoning depth + cache tracking); Kilo CLI is fallback. Gemini needs manual relay through the IDE, so Claude asks first.
 
 **Everything both workers return is verified.** In controlled tests each
 shipped an error that was invisible in its own summary — a wrong finding
@@ -445,11 +444,11 @@ mỗi phiên.
 | Khảo sát toàn repo — "chỗ nào khác dùng X?" | **Gemini** | Bề rộng là thế mạnh của nó |
 | Review độc lập một thiết kế hoặc diff | **Gemini** | Model khác bắt được lỗi khác |
 | Kiểm chứng UI, chụp màn hình, quay video | **Gemini** | Claude Code hoàn toàn không làm được |
-| Sửa cơ học nhỏ, boilerplate, một test | **Kilo CLI** | Headless — không tốn công bạn |
+| Sửa cơ học nhỏ, boilerplate, một test | **OpenCode CLI** | Headless — không tốn công bạn |
 | Quyết định kiến trúc / sản phẩm / bảo mật | **Không giao** | Phán đoán không ủy quyền được |
 | Việc cần lịch sử hội thoại của phiên | **Không giao** | Cả hai worker đều mù ngữ cảnh |
 
-Kilo CLI chạy headless nên Claude dùng luôn. Gemini cần bạn chuyển đề bài qua
+OpenCode CLI và Kilo CLI đều chạy headless nên Claude ủy quyền trực tiếp. OpenCode CLI là executor chính (chiều sâu suy luận + cache tracking); Kilo CLI là dự phòng. Gemini cần bạn chuyển đề bài qua
 IDE nên Claude sẽ hỏi trước.
 
 **Mọi kết quả từ cả hai worker đều được kiểm chứng.** Trong các bài test có

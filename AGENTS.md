@@ -1,5 +1,5 @@
 ---
-description: "Solo-Code AI Agent Harness — root rulebook for dual-engine (Kilo + OpenCode) development"
+description: "Solo-Code AI Agent Harness — root rulebook for multi-engine (Kilo + Claude Code + Copilot + Gemini) development"
 mode: primary
 color: "#166534"
 permissions:
@@ -46,21 +46,6 @@ This project is powered by **Solo-Code Harness** — an AI agent discipline laye
 
 When asked "Is Solo-Code Harness active?" or "What rules apply here?", answer:
 `Solo-Code Harness active: behavior rules, anti-hallucination rules, security rules, prose quality rules, 50 skills, 14 agents, hooks enabled (Kilo) / guard + lifecycle hooks enabled (Claude Code). Use /verify to validate.`
-
-## OpenCode-Specific Tools
-
-| Command | Purpose |
-|---------|---------|
-| `/verify` | Run all 6 verification gates (lint, schema, garden, test, security, guard) |
-| `/plan` | Delegate to planner agent — create implementation plan |
-| `/decide` | Delegate to architect agent — evaluate trade-offs, make decision |
-| `/ship` | Pre-launch checklist: security, tests, lint, schema, garden, guard |
-
-OpenCode also has access to:
-- **Custom tool `harness-verify`** — structured verification results without bash parsing
-- **MCP servers** — context7 (docs lookup), playwright (browser testing, disabled by default)
-- **References** — Effect-TS source and OpenCode source for plugin development
-- **Guard plugin v2.3** — destructive command blocking + secret detection in bash output
 
 ## Escape Hatch (Meta-Principle)
 
@@ -268,13 +253,13 @@ consider delegation, not an instruction to always delegate.
 | Repo-wide survey — "where else does X appear?" | **Gemini** | Breadth is exactly its edge |
 | Independent review of a design or diff | **Gemini** | A second model catches different things |
 | UI verification, screenshots, recordings | **Gemini** | The orchestrator cannot do this at all |
-| Small mechanical edit, boilerplate, one test | **Kilo CLI** | Headless — costs the user nothing |
-| Scoped code writing behind an explicit fence | Gemini if broad, Kilo CLI if narrow | Both need the fence stated in writing |
+| Small mechanical edit, boilerplate, one test | **OpenCode CLI** | Headless — costs the user nothing |
+| Scoped code writing behind an explicit fence | Gemini if broad, OpenCode CLI if narrow | Both need the fence stated in writing |
 | Architecture / product / security decisions | **Neither — do it here** | Judgment is not delegable |
 | Anything needing this conversation's history | **Neither — do it here** | Both workers are context-blind |
 
-**The asymmetry that matters**: Kilo CLI is headless, so delegating to it costs
-the user nothing — just do it. Gemini requires the user to relay the task
+**The asymmetry that matters**: OpenCode CLI and Kilo CLI are both headless, so delegating to them costs
+the user nothing — just do it. OpenCode CLI is the primary executor (tools/opencode_delegate.py, DeepSeek V4 Pro, reasoning + cache tracking); Kilo CLI is fallback. Gemini requires the user to relay the task
 manually through the Antigravity IDE, so **propose and wait for a yes**.
 
 **Verification is mandatory for both.** Every controlled test of both engines
