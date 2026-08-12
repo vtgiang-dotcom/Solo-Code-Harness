@@ -3,7 +3,7 @@
   "executors": {
     "opencode": {
       "command": "python tools/opencode_delegate.py",
-      "default_model": "opencode/deepseek-v4-flash-free",
+      "default_model": "commandcode/deepseek-v4-pro",
       "paid_model": "commandcode/deepseek-v4-pro",
       "usage_log": ".solocode/opencode-usage.jsonl",
       "success_rate": 0.8,

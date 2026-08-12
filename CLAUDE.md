@@ -89,7 +89,7 @@ When executor mode is enabled ( = 'on'), you MUST:
 5. **Never trust self-summary** - workers misreport, verify every claim
 
 **Executor selection** (from `.solocode/executor-config.json`):
-- **Primary: OpenCode CLI** - free models, 80% success rate, cache tracking
+- **Primary: OpenCode CLI** - DeepSeek V4 Pro (reasoning depth + cost tracking, purchased quota)
 - **Fallback: Kilo CLI** - use only if OpenCode fails
 - **Test result**: Both executors working reliably in current network conditions
 
