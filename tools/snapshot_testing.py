@@ -17,8 +17,7 @@ import sys
 from datetime import datetime
 from difflib import unified_diff
 from pathlib import Path
-from typing import Any, Dict, Optional
-
+from typing import Any
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
@@ -28,7 +27,7 @@ FIXTURES_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── Core Functions ───────────────────────────────────────────────────────────
 
-def normalize_output(data: Dict[str, Any]) -> Dict[str, Any]:
+def normalize_output(data: dict[str, Any]) -> dict[str, Any]:
     """
     Normalize output data by stripping timestamps, absolute paths, and
     other non-deterministic fields.
@@ -62,7 +61,7 @@ def normalize_output(data: Dict[str, Any]) -> Dict[str, Any]:
     return normalized
 
 
-def record_snapshot(test_name: str, output_data: Dict[str, Any]) -> Path:
+def record_snapshot(test_name: str, output_data: dict[str, Any]) -> Path:
     """
     Record a snapshot fixture to disk.
 
@@ -83,7 +82,7 @@ def record_snapshot(test_name: str, output_data: Dict[str, Any]) -> Path:
     return fixture_path
 
 
-def replay_snapshot(test_name: str) -> Optional[Dict[str, Any]]:
+def replay_snapshot(test_name: str) -> dict[str, Any] | None:
     """
     Load a snapshot fixture from disk.
 
@@ -99,7 +98,7 @@ def replay_snapshot(test_name: str) -> Optional[Dict[str, Any]]:
         print(f"[FAIL] Snapshot not found: {fixture_path}", file=sys.stderr)
         return None
 
-    with open(fixture_path, "r", encoding="utf-8") as f:
+    with open(fixture_path, encoding="utf-8") as f:
         data = json.load(f)
 
     print(f"[OK] Loaded snapshot: {fixture_path}")
@@ -107,8 +106,8 @@ def replay_snapshot(test_name: str) -> Optional[Dict[str, Any]]:
 
 
 def compare_snapshots(
-    expected: Dict[str, Any],
-    actual: Dict[str, Any],
+    expected: dict[str, Any],
+    actual: dict[str, Any],
     test_name: str
 ) -> bool:
     """

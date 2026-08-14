@@ -25,14 +25,13 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict
 
 ROOT = Path(__file__).resolve().parent.parent
 BUDGET_FILE = ROOT / "tools" / "config" / "coverage-budget.json"
 COVERAGE_FILE = ROOT / ".coverage"
 
 
-def load_budget(budget_file: Path = BUDGET_FILE) -> Dict[str, float]:
+def load_budget(budget_file: Path = BUDGET_FILE) -> dict[str, float]:
     """Read per-file coverage budget.
 
     Returns empty dict if file doesn't exist (first run).
@@ -61,7 +60,7 @@ def load_budget(budget_file: Path = BUDGET_FILE) -> Dict[str, float]:
         raise ValueError(f"Malformed budget file: {exc}") from exc
 
 
-def save_budget(coverage_data: Dict[str, float], budget_file: Path = BUDGET_FILE) -> None:
+def save_budget(coverage_data: dict[str, float], budget_file: Path = BUDGET_FILE) -> None:
     """Save per-file coverage budget to JSON."""
     budget_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -75,7 +74,7 @@ def save_budget(coverage_data: Dict[str, float], budget_file: Path = BUDGET_FILE
     )
 
 
-def run_coverage() -> Dict[str, float]:
+def run_coverage() -> dict[str, float]:
     """Run pytest with coverage and return per-file coverage percentages.
 
     Returns dict mapping file path to coverage percentage.
@@ -148,7 +147,7 @@ def run_coverage() -> Dict[str, float]:
     return files_coverage
 
 
-def check_ratchet(budget: Dict[str, float], current: Dict[str, float]) -> tuple[bool, list[str]]:
+def check_ratchet(budget: dict[str, float], current: dict[str, float]) -> tuple[bool, list[str]]:
     """Check if coverage decreased for any file.
 
     Returns:
@@ -241,8 +240,8 @@ def main() -> int:
         for violation in violations:
             print(violation)
         print(
-            f"\nFix the coverage regressions, or run with --update to accept "
-            f"the new baseline (requires justification in review)."
+            "\nFix the coverage regressions, or run with --update to accept "
+            "the new baseline (requires justification in review)."
         )
         return 1
 
@@ -260,7 +259,7 @@ def main() -> int:
             print(imp)
         if len(improvements) > 5:
             print(f"  ... and {len(improvements) - 5} more")
-        print(f"\nRun with --update to lock in these gains.")
+        print("\nRun with --update to lock in these gains.")
         return 0
 
     print("\n[OK] Coverage maintained.")
