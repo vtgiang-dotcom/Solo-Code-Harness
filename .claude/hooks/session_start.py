@@ -75,24 +75,25 @@ def _detect_package_manager(cwd: Path) -> str:
 
 
 def _recent_sessions(cwd: Path, limit: int = 3) -> list[str]:
-    """Best-effort read of recent shared-state sessions. Silent on any failure."""
+    """Best-effort read of recent session persistence records. Silent on any failure."""
     tools_dir = cwd / "tools"
-    if not (tools_dir / "shared_state.py").exists():
+    if not (tools_dir / "session_persistence.py").exists():
         return []
-    if not (cwd / ".solocode" / "shared-state.db").exists():
+    if not (cwd / ".solocode" / "sessions.db").exists():
         return []
     added = False
     try:
         if str(tools_dir) not in sys.path:
             sys.path.insert(0, str(tools_dir))
             added = True
-        import shared_state  # type: ignore[import-not-found]
+        import session_persistence  # type: ignore[import-not-found]
 
-        with shared_state.SharedState() as state:
-            rows = state.get_recent_sessions(limit)
+        sessions = session_persistence.list_sessions(limit)
         return [
-            f"[{r['engine']}] {str(r['timestamp'])[:16]} — {str(r['summary'])[:70]}"
-            for r in rows
+            f"[claude] {s['start_time'][:16]} — {s.get('branch', 'unknown')}@{s.get('commit_hash', 'unknown')[:7]}, {s['files_changed']} uncommit"
+            if s['end_time'] else
+            f"[claude] {s['start_time'][:16]} — [pre-compact checkpoint, trigger={'auto' if s.get('metadata', {}).get('trigger') == 'auto' else 'unknown'}] branch={s.get('branch', 'unknown')}@{s.get('commit_hash', 'unknown')[:7]}, {s['files_changed']} uncommit"
+            for s in sessions
         ]
     except Exception:  # noqa: BLE001 — advisory only
         return []
@@ -204,14 +205,50 @@ def _gemini_available(cwd: Path) -> bool:
     return ide.is_dir()
 
 
+def _record_session_start(cwd: Path, session_id: str, branch: str, sha: str) -> bool:
+    """Record session start via tools/session_persistence.py."""
+    tools_dir = cwd / "tools"
+    if not (tools_dir / "session_persistence.py").exists():
+        return False
+    added = False
+    try:
+        if str(tools_dir) not in sys.path:
+            sys.path.insert(0, str(tools_dir))
+            added = True
+        import session_persistence  # type: ignore[import-not-found]
+
+        session_persistence.record_session_start(
+            session_id=session_id,
+            branch=branch,
+            commit=sha,
+        )
+        return True
+    except Exception:  # noqa: BLE001 — advisory only
+        return False
+    finally:
+        if added:
+            with suppress(ValueError):
+                sys.path.remove(str(tools_dir))
+
+
 def main() -> int:
     # Consume stdin if present (SessionStart payload) — we don't require it.
+    payload: dict = {}
     with suppress(Exception):
-        sys.stdin.read()
+        raw = sys.stdin.read()
+        if raw.strip():
+            payload = json.loads(raw)
+
+    session_id = str(payload.get("session_id", "") or "")
 
     cwd = Path.cwd()
     try:
         git = _git_info()
+
+        # Record session start if we have a session_id
+        if session_id:
+            _record_session_start(cwd, session_id, git["branch"], git["sha"])
+
         pm = _detect_package_manager(cwd)
         sessions = _recent_sessions(cwd)
         new_reports = _new_gemini_reports(cwd)
