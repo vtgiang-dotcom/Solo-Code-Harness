@@ -333,8 +333,8 @@ def main() -> int:
         success = run_self_test()
         return 0 if success else 1
 
-    print(f"E2E Testing Framework for OpenCode CLI and Kilo CLI", file=sys.stderr)
-    print(f"\nUsage:", file=sys.stderr)
+    print("E2E Testing Framework for OpenCode CLI and Kilo CLI", file=sys.stderr)
+    print("\nUsage:", file=sys.stderr)
     print(f"  python -m pytest {__file__} -v", file=sys.stderr)
     print(f"  python {__file__} --self-test", file=sys.stderr)
     return 1

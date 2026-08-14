@@ -6,17 +6,18 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / ".claude" / "hooks"))
 import guard
 
+
 def test_normalize_command():
     """Test command normalization strips wrappers."""
     assert guard.normalize_command("sudo ls") == "ls"
     assert guard.normalize_command("env FOO=bar ls") == "ls"
-    
+
 def test_protected_files():
     """Test protected config files list."""
     assert ".ruff.toml" in guard.PROTECTED_FILES
     assert "eslint.config.js" in guard.PROTECTED_FILES
     assert "biome.json" in guard.PROTECTED_FILES
-    
+
 def test_executor_mode():
     """Test executor mode exemptions."""
     assert guard.executor_mode_exempt(".solocode/executor-mode")
@@ -31,7 +32,7 @@ def run_self_test():
         ("Protected files", test_protected_files),
         ("Executor mode", test_executor_mode),
     ]
-    
+
     passed = 0
     for name, fn in tests:
         try:
@@ -40,7 +41,7 @@ def run_self_test():
             passed += 1
         except Exception as e:
             print(f"  [FAIL] {name}: {e}")
-    
+
     print(f"\n{passed}/{len(tests)} passed")
     return passed == len(tests)
 
