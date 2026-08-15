@@ -105,9 +105,9 @@ Sai cả hai chiều — dấu hiệu số liệu ước lượng chứ không �
 
 ### `docs/capability-seams.md` — dẫn tới 5 file không tồn tại
 
-`tools/capability_seam.py`, `tool_registry_impl.py`, `bash_tool_provider.py`, `agent_loop.py`, `bootstrap.py` — tất cả đều **không có trên đĩa**. Code mẫu `from tools.capability_seam import ToolDefinition` không khớp thực tế (`ToolDefinition` nằm trong `tools/agent_scope.py`).
+~~5 file ảo (`tool_registry_impl.py`, `bash_tool_provider.py`, `agent_loop.py`, `bootstrap.py`) — tất cả đều **không có trên đĩa**. Code mẫu `from tools.capability_seam import ToolDefinition` không khớp thực tế (`ToolDefinition` nằm trong `tools/agent_scope.py`).~~
 
-**Yêu cầu:** Sửa số liệu theo `git show --stat`; bỏ 5 file ảo khỏi `capability-seams.md` (hoặc ghi rõ "minh họa").
+**Đã khắc phục:** Tất cả các file ảo đã được thay bằng `tools/agent_scope.py` (thực tế tồn tại). Import paths đã được sửa.
 
 ---
 
