@@ -97,6 +97,27 @@ python tools/deploy.py
 | `tools/` | Generator (`generate_harness.py`, `claude_engine.py`), validator, drift detector (`garden.py`), integration tests, `shared_state.py` (runtime dep of Claude session hooks) |
 | `.vscode/` | VS Code settings + MCP config for Copilot |
 
+## DeepSeek Harness Port (Tier A)
+
+Ports architecture patterns from the upstream reference
+[`deepseek-harness-master/`](docs/dsh-port-map.md) (226 npm packages, MIT) as
+capability seams — Service Definition / Provider / Consumer — without pulling in
+Cordis or the TypeScript runtime.
+
+| Module | Role | Ports from |
+|---|---|---|
+| `tools/agent_scope.py` | Scoped tool registry (global + per-agent shadow + dispose) | `core/scope` |
+| `tools/subagent_seam.py` | Subagent Service Definition (`SubagentRequest`/`Result`/`Runtime` Protocol), splits evidence from self-assessment | `subagent` |
+| `tools/compaction.py` | Byte/char budget policy | `compaction` |
+| `tools/compaction_pruner.py` | Prunes oversized tool results to a byte budget (standalone tool, not a hook) | `compaction-tool-result-pruner` |
+
+Decision record: [`docs/dsh-port-plan.md`](docs/dsh-port-plan.md) (scope),
+[`docs/dsh-port-map.md`](docs/dsh-port-map.md) (49-package map + postmortem
+lessons). Tier B/C (running the dsh SDK/runtime as a third executor) is blocked:
+the runtime's single-file executable is a Linux/macOS-only non-goal, and
+`deepseek-v4-pro` is already reachable via OpenCode CLI + CommandCode — no
+harness change required.
+
 ## Shared State (Cross-Engine, Local-Only)
 
 All 4 engines share a single SQLite file at `.solocode/shared-state.db` — **local-only, không commit git** (thư mục `.solocode/` đã bị `.gitignore` chặn):
@@ -364,6 +385,27 @@ python tools/deploy.py
 | `.github/` | Script dùng chung: `security_scan.py`, `checklist.py`, `check_skips.py`, `eval_harness.py`, `boundary_audit.py` + `copilot-instructions.md`, `prompts/` |
 | `tools/` | Generator (`generate_harness.py`, `claude_engine.py`), validator, drift detector (`garden.py`), integration tests, `shared_state.py` (runtime dep của Claude session hooks) |
 | `.vscode/` | VS Code settings + MCP config cho Copilot |
+
+## DeepSeek Harness Port (Tầng A)
+
+Port các mẫu kiến trúc từ nguồn tham khảo
+[`deepseek-harness-master/`](docs/dsh-port-map.md) (226 npm package, MIT) dưới
+dạng capability seam — Service Definition / Provider / Consumer — mà không kéo
+theo Cordis hay TypeScript runtime.
+
+| Module | Vai trò | Port từ |
+|---|---|---|
+| `tools/agent_scope.py` | Scoped tool registry (global + shadow theo agent + dispose) | `core/scope` |
+| `tools/subagent_seam.py` | Service Definition cho subagent (`SubagentRequest`/`Result`/`Runtime` Protocol), tách evidence khỏi self-assessment | `subagent` |
+| `tools/compaction.py` | Budget policy theo byte/ký tự | `compaction` |
+| `tools/compaction_pruner.py` | Cắt kết quả tool quá dài theo byte budget (tool độc lập, không phải hook) | `compaction-tool-result-pruner` |
+
+Ghi chép quyết định: [`docs/dsh-port-plan.md`](docs/dsh-port-plan.md) (phạm vi),
+[`docs/dsh-port-map.md`](docs/dsh-port-map.md) (bản đồ 49 package + bài học
+postmortem). Tầng B/C (chạy dsh SDK/runtime làm executor thứ ba) bị chặn:
+binary đóng gói của runtime chỉ hỗ trợ Linux/macOS (Windows là non-goal), và
+`deepseek-v4-pro` đã gọi được trực tiếp qua OpenCode CLI + CommandCode — không
+cần đổi harness.
 
 ## Verification Gates
 
