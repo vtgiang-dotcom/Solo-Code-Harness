@@ -1,9 +1,8 @@
 """Tests for tools/validate_schemas.py"""
 import tempfile
 from pathlib import Path
-import pytest
-from tools.validate_schemas import parse_frontmatter, validate_agent, validate_skill
 
+from tools.validate_schemas import parse_frontmatter, validate_agent, validate_skill
 
 # ── parse_frontmatter ──────────────────────────────────────────────────────────
 

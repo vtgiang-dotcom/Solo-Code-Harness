@@ -95,6 +95,8 @@ def run_coverage() -> dict[str, float]:
     proc = subprocess.run(
         [
             "python", "-m", "pytest",
+            "tools/",
+            "--ignore=deepseek-harness-master",
             "--cov=tools",
             "--cov=.claude",
             "--cov=.github/scripts",

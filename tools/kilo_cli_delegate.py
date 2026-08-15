@@ -10,7 +10,7 @@ read and verify every result.
 CLI APPROACH (Kilo run --attach):
   kilo run "prompt" --attach http://server --format json --auto --model provider/model
 
-IMPROVEMENTS OVER jcode (subprocess pattern):
+IMPROVEMENTS OVER kilo_delegate.py (subprocess-based, no structured events):
   1. Stable API — JSON events stream with typed schemas vs parsing stdout
   2. Structured JSON — every event has type, timestamp, sessionID, structured data
   3. Observable state — events include step_start, text, tool_use, step_finish

@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -73,9 +74,15 @@ def _format_duration(seconds: float) -> str:
     return f"{hours}h {mins}m"
 
 
-def overall_stats() -> dict[str, Any]:
-    """Compute overall session statistics."""
-    sessions = sp.list_sessions(limit=1000)  # Large limit for all sessions
+def overall_stats(*, path: Path | None = None) -> dict[str, Any]:
+    """Compute overall session statistics.
+
+    Args:
+        path: SQLite database path. Defaults to the production ``DB_PATH``
+            when omitted; pass an explicit temp path in tests to avoid
+            touching production data.
+    """
+    sessions = sp.list_sessions(limit=1000, path=path)  # Large limit for all sessions
 
     if not sessions:
         return {
@@ -136,9 +143,9 @@ def overall_stats() -> dict[str, Any]:
     }
 
 
-def by_branch_stats() -> dict[str, dict[str, Any]]:
+def by_branch_stats(*, path: Path | None = None) -> dict[str, dict[str, Any]]:
     """Group sessions by branch with statistics."""
-    sessions = sp.list_sessions(limit=1000)  # Large limit for all sessions
+    sessions = sp.list_sessions(limit=1000, path=path)  # Large limit for all sessions
 
     branch_data: dict[str, list[dict]] = {}
     for s in sessions:
@@ -170,9 +177,9 @@ def by_branch_stats() -> dict[str, dict[str, Any]]:
     return result
 
 
-def by_status_stats() -> dict[str, dict[str, Any]]:
+def by_status_stats(*, path: Path | None = None) -> dict[str, dict[str, Any]]:
     """Group sessions by status with statistics."""
-    sessions = sp.list_sessions(limit=1000)  # Large limit for all sessions
+    sessions = sp.list_sessions(limit=1000, path=path)  # Large limit for all sessions
 
     status_data: dict[str, list[dict]] = {}
     for s in sessions:
@@ -192,9 +199,9 @@ def by_status_stats() -> dict[str, dict[str, Any]]:
     return result
 
 
-def recent_sessions_detail(limit: int = 10) -> list[dict[str, Any]]:
+def recent_sessions_detail(limit: int = 10, *, path: Path | None = None) -> list[dict[str, Any]]:
     """Get recent sessions with computed duration."""
-    sessions = sp.list_sessions(limit)
+    sessions = sp.list_sessions(limit, path=path)
 
     result = []
     for s in sessions:
@@ -272,39 +279,51 @@ def print_recent(sessions: list[dict[str, Any]]) -> None:
 
 
 def run_self_test() -> bool:
-    """Self-test: validate analytics framework."""
+    """Self-test: validate analytics framework against a throwaway DB.
+
+    Never touches the production ``.solocode/sessions.db`` — seeds a temp DB
+    with two known sessions and asserts concrete numbers, not just structure.
+    """
     print("Running session analytics self-test...")
 
-    # Test 1: overall_stats with empty DB
-    print("\n1. Testing overall_stats()...")
     try:
-        stats = overall_stats()
-        assert "total" in stats
-        assert "by_status" in stats
-        assert "duration" in stats
-        print("[OK] overall_stats() structure valid")
-    except Exception as e:  # noqa: BLE001
-        print(f"[FAIL] overall_stats(): {e}", file=sys.stderr)
-        return False
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Path(tmp) / "sessions.db"
 
-    # Test 2: by_branch_stats
-    print("\n2. Testing by_branch_stats()...")
-    try:
-        branch_stats = by_branch_stats()
-        assert isinstance(branch_stats, dict)
-        print("[OK] by_branch_stats() returns dict")
-    except Exception as e:  # noqa: BLE001
-        print(f"[FAIL] by_branch_stats(): {e}", file=sys.stderr)
-        return False
+            # Seed a known dataset: one completed session on main, one active
+            # session on feature/x.
+            sp.record_session_start("ana-test-1", "main", "abc1234", path=db)
+            sp.record_session_start("ana-test-2", "feature/x", "def5678", path=db)
+            sp.record_session_end("ana-test-1", 3, "completed", path=db)
 
-    # Test 3: recent_sessions_detail
-    print("\n3. Testing recent_sessions_detail()...")
-    try:
-        recent = recent_sessions_detail(5)
-        assert isinstance(recent, list)
-        print(f"[OK] recent_sessions_detail() returns list ({len(recent)} sessions)")
+            # Test 1: overall_stats against the seeded DB
+            print("\n1. Testing overall_stats()...")
+            stats = overall_stats(path=db)
+            assert stats["total"] == 2, stats
+            assert stats["by_status"] == {"completed": 1, "active": 1}, stats
+            assert stats["files_changed"]["avg"] == 1.5, stats
+            assert len(stats["top_branches"]) == 2, stats
+            assert all(count == 1 for _, count in stats["top_branches"]), stats
+            print("[OK] overall_stats() computes concrete values")
+
+            # Test 2: by_branch_stats against the seeded DB
+            print("\n2. Testing by_branch_stats()...")
+            branch_stats = by_branch_stats(path=db)
+            assert branch_stats["main"]["count"] == 1, branch_stats
+            assert branch_stats["main"]["completed"] == 1, branch_stats
+            assert branch_stats["feature/x"]["active"] == 1, branch_stats
+            print("[OK] by_branch_stats() computes concrete values")
+
+            # Test 3: recent_sessions_detail against the seeded DB
+            print("\n3. Testing recent_sessions_detail()...")
+            recent = recent_sessions_detail(5, path=db)
+            assert len(recent) == 2, recent
+            assert recent[0]["status"] == "active", recent
+            assert recent[1]["status"] == "completed", recent
+            print("[OK] recent_sessions_detail() returns concrete sessions")
+
     except Exception as e:  # noqa: BLE001
-        print(f"[FAIL] recent_sessions_detail(): {e}", file=sys.stderr)
+        print(f"[FAIL] {e}", file=sys.stderr)
         return False
 
     # Test 4: duration formatting

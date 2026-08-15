@@ -56,7 +56,7 @@ def _now() -> str:
 
 # ── Core Functions ───────────────────────────────────────────────────────────
 
-def init_db(path: Path = DB_PATH) -> sqlite3.Connection:
+def init_db(path: Path | None = None) -> sqlite3.Connection:
     """Open (creating if needed) the sessions SQLite database.
 
     Creates the parent directory and the ``sessions`` table on first run.
@@ -64,8 +64,9 @@ def init_db(path: Path = DB_PATH) -> sqlite3.Connection:
     other, matching the pattern in tools/shared_state.py.
 
     Args:
-        path: Path to the SQLite database file. Defaults to
-            ``.solocode/sessions.db`` under the project root.
+        path: Path to the SQLite database file. Defaults to the module-level
+            ``DB_PATH`` (``.solocode/sessions.db``). Pass an explicit path in
+            tests to avoid touching production data.
 
     Returns:
         An open :class:`sqlite3.Connection` with the schema guaranteed to exist.
@@ -74,18 +75,19 @@ def init_db(path: Path = DB_PATH) -> sqlite3.Connection:
         sqlite3.Error: If the database cannot be opened or the schema cannot
             be created (e.g. the parent path is a file, or the file is corrupt).
     """
-    path.parent.mkdir(parents=True, exist_ok=True)
+    resolved = path if path is not None else DB_PATH
+    resolved.parent.mkdir(parents=True, exist_ok=True)
     try:
-        conn = sqlite3.connect(path, isolation_level=None, timeout=30)
+        conn = sqlite3.connect(resolved, isolation_level=None, timeout=30)
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")
         conn.executescript(SCHEMA_SQL)
     except sqlite3.Error as exc:
-        raise sqlite3.Error(f"Failed to initialize sessions database at {path}: {exc}") from exc
+        raise sqlite3.Error(f"Failed to initialize sessions database at {resolved}: {exc}") from exc
     return conn
 
 
-def record_session_start(session_id: str, branch: str, commit: str) -> None:
+def record_session_start(session_id: str, branch: str, commit: str, *, path: Path | None = None) -> None:
     """Record the start of a session.
 
     Inserts a new row with ``status`` = ``active`` and the current UTC time
@@ -101,7 +103,7 @@ def record_session_start(session_id: str, branch: str, commit: str) -> None:
         sqlite3.Error: If the write fails (including a duplicate ``session_id``,
             which surfaces as a ``sqlite3.IntegrityError``).
     """
-    conn = init_db()
+    conn = init_db(path)
     try:
         conn.execute(
             """
@@ -114,7 +116,7 @@ def record_session_start(session_id: str, branch: str, commit: str) -> None:
         conn.close()
 
 
-def record_session_end(session_id: str, files_changed: int, status: str) -> None:
+def record_session_end(session_id: str, files_changed: int, status: str, *, path: Path | None = None) -> None:
     """Record the end of a session.
 
     Sets ``end_time``, ``files_changed``, and ``status`` on the row created
@@ -130,7 +132,7 @@ def record_session_end(session_id: str, files_changed: int, status: str) -> None
         ValueError: If ``session_id`` does not exist in the database.
         sqlite3.Error: If the update itself fails.
     """
-    conn = init_db()
+    conn = init_db(path)
     try:
         existing = conn.execute(
             "SELECT 1 FROM sessions WHERE id = ?", (session_id,)
@@ -174,7 +176,7 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     return result
 
 
-def list_sessions(limit: int = 10) -> list[dict[str, Any]]:
+def list_sessions(limit: int = 10, *, path: Path | None = None) -> list[dict[str, Any]]:
     """List the most recent sessions, newest first.
 
     Args:
@@ -188,7 +190,7 @@ def list_sessions(limit: int = 10) -> list[dict[str, Any]]:
     """
     if limit < 1:
         raise ValueError(f"limit must be >= 1, got {limit}")
-    conn = init_db()
+    conn = init_db(path)
     try:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
@@ -204,16 +206,17 @@ def list_sessions(limit: int = 10) -> list[dict[str, Any]]:
     return [_row_to_dict(row) for row in rows]
 
 
-def get_session(session_id: str) -> dict[str, Any] | None:
+def get_session(session_id: str, *, path: Path | None = None) -> dict[str, Any] | None:
     """Fetch a single session by id.
 
     Args:
         session_id: Session id previously passed to :func:`record_session_start`.
+        path: Path to the SQLite database file. Defaults to ``DB_PATH``.
 
     Returns:
         The session dict, or ``None`` if no such session exists.
     """
-    conn = init_db()
+    conn = init_db(path)
     try:
         conn.row_factory = sqlite3.Row
         row = conn.execute(
@@ -229,7 +232,7 @@ def get_session(session_id: str) -> dict[str, Any] | None:
     return _row_to_dict(row) if row is not None else None
 
 
-def search_sessions(branch: str | None = None, status: str | None = None) -> list[dict[str, Any]]:
+def search_sessions(branch: str | None = None, status: str | None = None, *, path: Path | None = None) -> list[dict[str, Any]]:
     """Search sessions by git branch and/or closing status.
 
     Filters are combined with AND; omitted filters match everything. Both
@@ -252,7 +255,7 @@ def search_sessions(branch: str | None = None, status: str | None = None) -> lis
         params.append(status)
 
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-    conn = init_db()
+    conn = init_db(path)
     try:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(  # noqa: S608
@@ -280,23 +283,13 @@ def run_self_test() -> bool:
     Returns:
         True if all checks pass, False otherwise.
     """
-    global DB_PATH
-    original_db_path = DB_PATH
     print("Running self-test...")
 
-    try:
-        with tempfile.TemporaryDirectory() as tmp:
-            DB_PATH = Path(tmp) / "sessions.db"
+    with tempfile.TemporaryDirectory() as tmp:
+        db = Path(tmp) / "sessions.db"
 
-            try:
-                record_session_start("sess-test-1", "main", "abc1234")
-                record_session_start("sess-test-2", "feature/x", "def5678")
-            except sqlite3.Error as exc:
-                print(f"[FAIL] record_session_start: {exc}", file=sys.stderr)
-                return False
-
-        # init_db must be idempotent and expose our temp file
-        conn = init_db()
+        # init_db must be idempotent
+        conn = init_db(db)
         tables = [r[0] for r in conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table'"
         ).fetchall()]
@@ -305,22 +298,29 @@ def run_self_test() -> bool:
             print("[FAIL] schema not created", file=sys.stderr)
             return False
 
+        try:
+            record_session_start("sess-test-1", "main", "abc1234", path=db)
+            record_session_start("sess-test-2", "feature/x", "def5678", path=db)
+        except sqlite3.Error as exc:
+            print(f"[FAIL] record_session_start: {exc}", file=sys.stderr)
+            return False
+
         # End only the first session
         try:
-            record_session_end("sess-test-1", 3, "completed")
+            record_session_end("sess-test-1", 3, "completed", path=db)
         except (ValueError, sqlite3.Error) as exc:
             print(f"[FAIL] record_session_end: {exc}", file=sys.stderr)
             return False
 
         # Ending an unknown session must raise
         try:
-            record_session_end("sess-ghost", 0, "completed")
+            record_session_end("sess-ghost", 0, "completed", path=db)
             print("[FAIL] expected ValueError for unknown session", file=sys.stderr)
             return False
         except ValueError:
             pass
 
-        listed = list_sessions(limit=5)
+        listed = list_sessions(limit=5, path=db)
         if len(listed) != 2:
             print(f"[FAIL] list_sessions returned {len(listed)} rows", file=sys.stderr)
             return False
@@ -328,39 +328,37 @@ def run_self_test() -> bool:
             print(f"[FAIL] list_sessions not newest-first: {listed[0]['id']}", file=sys.stderr)
             return False
 
-        got = get_session("sess-test-1")
+        got = get_session("sess-test-1", path=db)
         if got is None:
             print("[FAIL] get_session returned None for existing session", file=sys.stderr)
             return False
         if got["status"] != "completed" or got["files_changed"] != 3:
             print(f"[FAIL] get_session fields wrong: {got}", file=sys.stderr)
             return False
-        if get_session("sess-ghost") is not None:
+        if get_session("sess-ghost", path=db) is not None:
             print("[FAIL] get_session should be None for unknown session", file=sys.stderr)
             return False
 
-        by_branch = search_sessions(branch="feature/x")
+        by_branch = search_sessions(branch="feature/x", path=db)
         if len(by_branch) != 1 or by_branch[0]["id"] != "sess-test-2":
             print(f"[FAIL] search by branch: {by_branch}", file=sys.stderr)
             return False
 
-        by_status = search_sessions(status="completed")
+        by_status = search_sessions(status="completed", path=db)
         if len(by_status) != 1 or by_status[0]["id"] != "sess-test-1":
             print(f"[FAIL] search by status: {by_status}", file=sys.stderr)
             return False
 
-        if search_sessions(branch="main", status="completed") != by_status:
+        if search_sessions(branch="main", status="completed", path=db) != by_status:
             print("[FAIL] combined branch+status search", file=sys.stderr)
             return False
 
-            if search_sessions() != listed:
-                print("[FAIL] unfiltered search should match list", file=sys.stderr)
-                return False
+        if search_sessions(path=db) != listed:
+            print("[FAIL] unfiltered search should match list", file=sys.stderr)
+            return False
 
-        print("[OK] All self-tests passed!")
-        return True
-    finally:
-        DB_PATH = original_db_path
+    print("[OK] All self-tests passed!")
+    return True
 
 
 # ── CLI ──────────────────────────────────────────────────────────────────────

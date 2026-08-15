@@ -14,10 +14,10 @@
 
 | Task | File | Lines | Commit | Status |
 |------|------|-------|--------|--------|
-| 1.1 Snapshot Testing | `tools/snapshot_testing.py` | 359 | 8c4acf1 | ✅ |
-| 1.2 Coverage Gate | `tools/coverage_gate.py` | 327 | 886756d | ✅ |
+| 1.1 Snapshot Testing | `tools/snapshot_testing.py` | 284 | 8c4acf1 | ✅ |
+| 1.2 Coverage Gate | `tools/coverage_gate.py` | 271 | 886756d | ✅ |
 | 1.3 E2E Testing | `tools/test_e2e.py` | 344 | 2194ddc | ✅ |
-| Guard Tests | `tools/test_guard.py` | 412 | 2d4ae27 | ✅ |
+| Guard Tests | `tools/test_guard.py` | 48 | 2d4ae27 | ✅ |
 
 **Key Features**:
 - Snapshot testing with record/replay mechanism
@@ -35,7 +35,7 @@
 |------|------|-------|--------|--------|
 | 2.1 Guard Hooks | `.claude/hooks/guard.py` | existing | verified | ✅ |
 | 2.2 Security Post-Hook | `.claude/hooks/security_post.py` | existing | verified | ✅ |
-| 2.3 Defensive Patterns | `docs/defensive-patterns.md` | 497 | a3e1c8f | ✅ |
+| 2.3 Defensive Patterns | `docs/defensive-patterns.md` | 293 | a3e1c8f | ✅ |
 
 **Key Features**:
 - Destructive command blocking
@@ -68,7 +68,7 @@
 
 | Task | File | Lines | Commit | Status |
 |------|------|-------|--------|--------|
-| 4.1 Persistence | `tools/session_persistence.py` | 329 | 97bbbbf | ✅ |
+| 4.1 Persistence | `tools/session_persistence.py` | 427 | 97bbbbf | ✅ |
 | 4.2 Analytics | `tools/session_analytics.py` | 375 | bb86874 | ✅ |
 | 4.3 Integration | `.claude/hooks/session_*.py` | - | eb243f3 | ✅ |
 
@@ -105,18 +105,18 @@
 **Files Created**:
 ```
 tools/
-├── snapshot_testing.py      (359 lines)
-├── coverage_gate.py         (327 lines)
+├── snapshot_testing.py      (284 lines)
+├── coverage_gate.py         (271 lines)
 ├── test_e2e.py             (344 lines)
-├── test_guard.py           (412 lines)
-├── session_persistence.py   (329 lines)
+├── test_guard.py           (48 lines)
+├── session_persistence.py   (427 lines)
 └── session_analytics.py     (375 lines)
 
 .claude/hooks/
-└── pre_push.py             (124 lines)
+└── pre_push.py             (123 lines)
 
 docs/
-├── defensive-patterns.md    (497 lines)
+├── defensive-patterns.md    (293 lines)
 └── code-review-checklist.md (157 lines)
 ```
 

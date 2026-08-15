@@ -3,8 +3,6 @@ import json
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
-import pytest
-
 
 # Patch FIXTURES_DIR before importing to avoid creating dirs in CWD during tests
 _tmp_fixtures = tempfile.mkdtemp()

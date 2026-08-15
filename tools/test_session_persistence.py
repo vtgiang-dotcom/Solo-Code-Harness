@@ -1,13 +1,12 @@
 """Tests for tools/session_persistence.py"""
-import tempfile
-from pathlib import Path
 import pytest
+
 from tools.session_persistence import (
-    init_db,
-    record_session_start,
-    record_session_end,
-    list_sessions,
     get_session,
+    init_db,
+    list_sessions,
+    record_session_end,
+    record_session_start,
     search_sessions,
 )
 
