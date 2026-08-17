@@ -85,6 +85,7 @@ DEV_ONLY_ROOT_FILES = {
 RETIRED_ROOT_FILES = {
     "opencode.json",   # removed v4.0.0 (Phase 3, OpenCode engine deleted)
     "opencode.ps1",    # removed v4.0.0
+    "jcode.ps1",       # removed v4.1.0 (jcode engine retired)
 }
 
 # The complete set of root-level filenames the harness is permitted to
