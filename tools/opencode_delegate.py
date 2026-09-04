@@ -318,7 +318,11 @@ def main(argv: list[str] | None = None) -> int:
         _stderr(f"Error: {result['error']}")
         return 2
 
-    # Print the concatenated text response
+    # Print the concatenated text response (handle Unicode on Windows)
+    import sys
+    if sys.platform == "win32":
+        # Force UTF-8 output on Windows
+        sys.stdout.reconfigure(encoding='utf-8')
     print(result["text"])
 
     _stderr(f"session={result.get('session_id')}  elapsed={elapsed:.1f}s")

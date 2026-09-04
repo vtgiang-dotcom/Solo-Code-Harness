@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT))
 SKIP_FILE = ROOT / "tools" / "opencode-skip-skills.txt"
 
 _SCAN_SKIP_DIRS = {".git", "node_modules", ".venv", ".pytest_cache",
-                   ".ruff_cache", ".solocode", "__pycache__"}
+                   ".pytest_temp", ".ruff_cache", ".solocode", "__pycache__"}
 
 
 def _doc_scan_skip_dirs(root: Path) -> set[str]:
@@ -55,6 +55,12 @@ def _doc_scan_skip_dirs(root: Path) -> set[str]:
     except (OSError, subprocess.SubprocessError):
         return skip
     if proc.returncode != 0:
+        return skip
+
+    # If git returned success but zero output, we're in a gitignored subdir
+    # (e.g., .pytest_temp/ inside the main repo). Treat as non-git: don't
+    # skip directories based on tracking status, use static set only.
+    if not proc.stdout.strip():
         return skip
 
     tracked_top_level = {
@@ -490,6 +496,66 @@ def check_gemini(src: Path, dst: Path, *, skip_set: set[str] | None = None) -> l
     return issues
 
 
+def check_opencode(src: Path, dst: Path, *, skip_set: set[str] | None = None) -> list[str]:
+    """Parity checks for the OpenCode engine (.opencode/).
+
+    OpenCode mirrors .kilo/ with near-identity transforms (see
+    tools/opencode_engine.py): agents keep their frontmatter except dropped
+    permission keys, commands/instructions/skills are copied verbatim.
+      .kilo/agents      -> .opencode/agents
+      .kilo/skill       -> .opencode/skills   (plural)
+      .kilo/command     -> .opencode/commands (plural)
+      .kilo/instruction -> .opencode/instruction
+    Plus opencode.json (model default + native permission guard).
+    """
+    issues: list[str] = []
+    skip_set = skip_set or set()
+
+    # Agents (same subdir name; frontmatter drops unknown keys, so name parity only)
+    issues.extend(_check_parity_dir(src, dst, ".opencode", "agents"))
+
+    # Skills: .kilo/skill/* dirs must exist in .opencode/skills/*
+    src_skills = src / "skill"
+    dst_skills = dst / "skills"
+    if src_skills.is_dir():
+        src_names = {p.name for p in src_skills.iterdir() if p.is_dir()} - skip_set
+        dst_names = {p.name for p in dst_skills.iterdir() if p.is_dir()} if dst_skills.is_dir() else set()
+        for name in sorted(src_names - dst_names):
+            issues.append(f"Missing skill: .opencode/skills/{name}/")
+        for name in sorted(dst_names - src_names):
+            issues.append(f"Stale skill (no source): .opencode/skills/{name}/")
+        if dst_skills.is_dir():
+            for entry in sorted(dst_skills.iterdir()):
+                if entry.is_dir() and not (entry / "SKILL.md").exists():
+                    issues.append(f"Skill missing SKILL.md: .opencode/skills/{entry.name}")
+
+    # Commands: .kilo/command/*.md must exist in .opencode/commands/*.md
+    src_cmd = src / "command"
+    dst_cmd = dst / "commands"
+    if src_cmd.is_dir():
+        src_names = {f.name for f in src_cmd.iterdir() if f.suffix == ".md"}
+        dst_names = {f.name for f in dst_cmd.iterdir()} if dst_cmd.is_dir() else set()
+        for name in sorted(src_names - dst_names):
+            issues.append(f"Missing command: .opencode/commands/{name}")
+        for name in sorted(dst_names - src_names):
+            issues.append(f"Stale command (no source): .opencode/commands/{name}")
+
+    # Instructions (direct copy, same filename + identical content)
+    issues.extend(check_instructions(src, dst, ".opencode"))
+    issues.extend(check_instruction_content(src, dst, ".opencode"))
+
+    # Skill body content (verbatim copy, so body must match exactly)
+    issues.extend(check_skill_content(src, dst_skills, ".opencode"))
+
+    # Static engine config
+    if not (ROOT / "opencode.json").exists():
+        issues.append(
+            "Missing config: opencode.json (run 'python tools/generate_harness.py --harness opencode')"
+        )
+
+    return issues
+
+
 def run_engine_checks(
     src: Path, dst: Path, dst_label: str,
     *,
@@ -629,13 +695,14 @@ _ENGINE_LAYOUT = {
     ".claude": {"skill": "skills", "agent": "agents", "command": "commands", "instruction": "instruction"},
     ".copilot": {"skill": "skill", "agent": "agents", "command": "command", "instruction": "instruction"},
     ".gemini": {"skill": "skills", "agent": "agents", "command": "commands", "instruction": "instruction"},
+    ".opencode": {"skill": "skills", "agent": "agents", "command": "commands", "instruction": "instruction"},
 }
 
 # .gemini/ nests its harness one level deeper.
 _ENGINE_ROOT = {".gemini": Path(".gemini") / "antigravity"}
 
 # Matches an engine mention anywhere on the line, e.g. "`.gemini/` commands (12)".
-_ENGINE_MENTION = re.compile(r'`?(\.(?:kilo|claude|copilot|gemini))/')
+_ENGINE_MENTION = re.compile(r'`?(\.(?:kilo|claude|copilot|gemini|opencode))/')
 
 
 def _measure_engine(root: Path, engine: str) -> dict[str, int]:
@@ -763,7 +830,12 @@ def check_doc_paths(root: Path = ROOT) -> list[str]:
     top_level = {p.name for p in root.iterdir() if p.name not in skip_dirs}
 
     for md in sorted(root.rglob("*.md")):
-        if any(part in skip_dirs for part in md.parts):
+        # Check relative path parts from root, not absolute path
+        try:
+            rel_parts = md.relative_to(root).parts
+        except ValueError:
+            continue
+        if any(part in skip_dirs for part in rel_parts):
             continue
         # Archives and plan snapshots describe history; paths may be gone by design.
         posix = md.as_posix()
@@ -853,7 +925,12 @@ def check_doc_flags(root: Path = ROOT) -> list[str]:
     help_cache: dict[str, str] = {}
 
     for md in sorted(root.rglob("*.md")):
-        if any(part in skip_dirs for part in md.parts):
+        # Check relative path parts from root, not absolute path
+        try:
+            rel_parts = md.relative_to(root).parts
+        except ValueError:
+            continue
+        if any(part in skip_dirs for part in rel_parts):
             continue
         posix = md.as_posix()
         if "decisions-archive" in md.name or "/plans/" in posix:
@@ -931,7 +1008,12 @@ def check_enforcement_claims(root: Path = ROOT) -> list[str]:
     verdict: dict[str, bool] = {}
 
     for md in sorted(root.rglob("*.md")):
-        if any(part in skip_dirs for part in md.parts):
+        # Check relative path parts from root, not absolute path
+        try:
+            rel_parts = md.relative_to(root).parts
+        except ValueError:
+            continue
+        if any(part in skip_dirs for part in rel_parts):
             continue
         posix = md.as_posix()
         if "decisions-archive" in md.name or "/plans/" in posix:
@@ -948,10 +1030,18 @@ def check_enforcement_claims(root: Path = ROOT) -> list[str]:
                 continue
             for script in _SCRIPT_IN_BACKTICKS.findall(line):
                 if script not in verdict:
-                    hits = [p for p in root.rglob(script.split("/")[-1])
-                            if p.is_file()
-                            and not any(d in p.parts for d in skip_dirs)
-                            and p.as_posix().endswith(script)]
+                    hits = []
+                    for p in root.rglob(script.split("/")[-1]):
+                        if not p.is_file():
+                            continue
+                        try:
+                            rel_parts = p.relative_to(root).parts
+                        except ValueError:
+                            continue
+                        if any(d in rel_parts for d in skip_dirs):
+                            continue
+                        if p.as_posix().endswith(script):
+                            hits.append(p)
                     verdict[script] = bool(hits) and any(
                         _CAN_BLOCK.search(
                             p.read_text(encoding="utf-8", errors="ignore")
@@ -1301,6 +1391,17 @@ def main() -> int:
         all_issues.extend(gemini_issues)
     else:
         print("[OK] Gemini engine (.gemini)")
+
+    # .opencode/ engine — primary agent engine (agents/commands/skills plural)
+    print("\n--- .opencode/ ---")
+    opencode_issues = check_opencode(kilo, ROOT / ".opencode", skip_set=skip_skills)
+    if opencode_issues:
+        print("[DRIFT] OpenCode engine (.opencode):")
+        for i in opencode_issues:
+            print(f"  {i}")
+        all_issues.extend(opencode_issues)
+    else:
+        print("[OK] OpenCode engine (.opencode)")
 
     # Shared state health (không thuộc riêng engine nào)
     print("\n--- Shared State ---")

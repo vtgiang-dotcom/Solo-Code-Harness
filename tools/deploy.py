@@ -50,6 +50,7 @@ ROOT_FILES = [
     "AGENTS.md",
     "CLAUDE.md",
     "kilo.jsonc",
+    "opencode.json",
     ".mcp.json",
     ".gitleaks.toml",
     ".ruff.toml",
@@ -75,7 +76,7 @@ ROOT_FILES = [
 DEV_ONLY_ROOT_FILES = {
     "SPEC.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "SECURITY.md",
     "LICENSE",  # Solo-Code-CLI's own license, not the target project's
-    "opencode.json", "opencode.ps1",  # deprecated engine, see .harness.lock
+    "opencode.ps1",  # deprecated launcher, see .harness.lock
 }
 
 # Root files the harness deployed in EARLIER versions and no longer ships.
@@ -83,8 +84,7 @@ DEV_ONLY_ROOT_FILES = {
 # beyond the current ROOT_FILES, because a previous deploy is what put them
 # there. Append here whenever a file is dropped from ROOT_FILES.
 RETIRED_ROOT_FILES = {
-    "opencode.json",   # removed v4.0.0 (Phase 3, OpenCode engine deleted)
-    "opencode.ps1",    # removed v4.0.0
+    "opencode.ps1",    # removed v4.0.0 (launcher superseded by opencode.json)
     "jcode.ps1",       # removed v4.1.0 (jcode engine retired)
 }
 
@@ -102,6 +102,7 @@ EXCLUSIVE_HARNESS_DIRS = {
     ".gemini",
     ".claude",
     ".claude-plugin",
+    ".opencode",
     ".contracts",
 }
 
@@ -120,14 +121,13 @@ RETIRED_SHARED_FILES = {
 }
 
 # Directories to copy (relative to ROOT)
-# .opencode/ intentionally omitted — deprecated as of v3.7.0 (100% content
-# mirror of .kilo/, no unique runtime value; see .harness.lock).
 DIRS_ALL = [
     ".kilo",
     ".copilot",
     ".gemini",
     ".claude",
     ".claude-plugin",
+    ".opencode",
     ".github",
     ".vscode",
     ".contracts",
@@ -157,6 +157,13 @@ DIRS_CLAUDE = [
     "tools",
 ]
 
+DIRS_OPENCODE = [
+    ".opencode",
+    ".github",
+    ".contracts",
+    "tools",
+]
+
 # Patterns to exclude from copy
 EXCLUDE_DIRS = {
     ".pytest_cache", ".ruff_cache", "node_modules", ".git",
@@ -179,7 +186,8 @@ EXCLUDE_FILES = {
     # Solo-Code-CLI dev tooling under tools/ — builds/tests/deploys THIS repo,
     # not needed to just RUN the harness in a target project.
     "deploy.py", "garden.py", "generate_harness.py", "claude_engine.py",
-    "validate_schemas.py", "migrate_to_shared_state.py", "harness_config.py",
+    "opencode_engine.py", "validate_schemas.py", "migrate_to_shared_state.py",
+    "harness_config.py",
     # NOTE: individual tools/test_*.py files are NOT listed here — they are
     # excluded by rule in should_copy(). Listing them by hand meant every new
     # test file silently leaked into deployed projects until someone
@@ -196,7 +204,7 @@ EXCLUDE_FILES = {
 # Default README template for scaffolded projects
 README_TEMPLATE = """# {project_name}
 
-> Scaffolded from [Solo-Code-CLI](https://github.com/Solo-Code-CLI) — AI agent harness with Kilo Code + Claude Code + Copilot + Gemini engines. This is a RUNTIME-ONLY copy: Solo-Code-CLI's own dev tooling, tests, and internal docs were intentionally excluded (see "Harness Boundaries" below).
+> Scaffolded from [Solo-Code-CLI](https://github.com/Solo-Code-CLI) — AI agent harness with Kilo Code + OpenCode + Claude Code + Copilot + Gemini engines. This is a RUNTIME-ONLY copy: Solo-Code-CLI's own dev tooling, tests, and internal docs were intentionally excluded (see "Harness Boundaries" below).
 
 {description}
 
@@ -230,6 +238,7 @@ python .github/scripts/boundary_audit.py .
 ## Engines
 
 - **[Kilo Code](https://kilo.ai)** — source-of-truth: agents, skills, commands, hooks, memory, orchestrators
+- **[OpenCode](https://opencode.ai)** — primary agent engine: agents, skills, commands, `opencode.json`
 - **[Claude Code](https://claude.com/claude-code)** — orchestrator: subagents, skills, commands, hooks, `CLAUDE.md`
 - **[Copilot](https://github.com/features/copilot)** — agents, skills, commands, prompts
 - **[Gemini](https://gemini.google.com)** — additional AI assistant config
@@ -829,6 +838,8 @@ def scaffold(
         dirs = DIRS_COPILOT
     elif engine == "claude":
         dirs = DIRS_CLAUDE
+    elif engine == "opencode":
+        dirs = DIRS_OPENCODE
     else:
         dirs = DIRS_ALL
 
@@ -1217,6 +1228,8 @@ def deploy(
         dirs = DIRS_COPILOT
     elif engine == "claude":
         dirs = DIRS_CLAUDE
+    elif engine == "opencode":
+        dirs = DIRS_OPENCODE
     else:
         dirs = DIRS_ALL
 
@@ -1347,13 +1360,13 @@ def interactive() -> int:
 
     # Ask engine
     while True:
-        engine = input("Engine (all/kilo/copilot/claude) [all]: ").strip().lower()
+        engine = input("Engine (all/kilo/copilot/claude/opencode) [all]: ").strip().lower()
         if not engine:
             engine = "all"
             break
-        if engine in ("all", "kilo", "copilot", "claude"):
+        if engine in ("all", "kilo", "copilot", "claude", "opencode"):
             break
-        print("  Please enter 'all', 'kilo', 'copilot', or 'claude'.")
+        print("  Please enter 'all', 'kilo', 'copilot', 'claude', or 'opencode'.")
 
     # Ask dry-run
     dry_run_input = input("Dry run? (y/N): ").strip().lower()
@@ -1416,7 +1429,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--engine",
-        choices=["all", "kilo", "copilot", "claude"],
+        choices=["all", "kilo", "copilot", "claude", "opencode"],
         default="all",
         help="Which engine harness to deploy (default: all)",
     )

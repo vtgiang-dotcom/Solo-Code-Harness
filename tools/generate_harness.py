@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """
-Solo-Code Harness Generator — Claude Code engine
+Solo-Code Harness Generator — Claude Code + OpenCode engines
 
 Reads .kilo/ (source of truth) and regenerates .claude/ (agents, skills,
-commands, instructions, memory, CLAUDE.md) plus the .copilot/ and
-.gemini/antigravity/ instruction mirrors.
+commands, instructions, memory, CLAUDE.md) plus the .opencode/ engine
+(agents, commands, skills, instructions, opencode.json) and the .copilot/
+and .gemini/antigravity/ instruction mirrors.
 
 History: this script used to ALSO generate a .opencode/ mirror. OpenCode
 was deprecated in v3.7.0 (100% content-parity mirror of .kilo/, zero unique
-capability) and physically removed in v4.0.0 — see .harness.lock and
-.kilo/memory/MEMORY.md "Decisions" section.
+capability) and physically removed in v4.0.0. It is reintroduced (2026-08)
+as a first-class primary engine alongside Claude Code: OpenCode v1.18+ has a
+stable native format that Kilo's frontmatter already follows, so the
+transform (tools/opencode_engine.py) is near-identity.
 
 .copilot/ and .gemini/ instruction/ files used to be "manually kept in
 parity with .kilo/ and verified by tools/garden.py". That left garden
@@ -21,7 +24,9 @@ here and that advice is true.
 
 Usage:
     python tools/generate_harness.py --harness claude
-    python tools/generate_harness.py --harness claude --include-all
+    python tools/generate_harness.py --harness opencode
+    python tools/generate_harness.py --harness all
+    python tools/generate_harness.py --harness all --include-all
 """
 
 from __future__ import annotations
@@ -45,6 +50,14 @@ def _load_claude_engine():
     return claude_engine
 
 
+def _load_opencode_engine():
+    """Import the sibling opencode_engine module (tools/ may not be on sys.path)."""
+    if str(TOOLS_DIR) not in sys.path:
+        sys.path.insert(0, str(TOOLS_DIR))
+    import opencode_engine
+    return opencode_engine
+
+
 def load_skip_list(skip_file: Path) -> set[str]:
     """Read skill names to skip (one per line). Returns empty set on error."""
     if not skip_file.is_file():
@@ -60,14 +73,14 @@ def load_skip_list(skip_file: Path) -> set[str]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Generate the Claude Code harness engine from .kilo/ source.",
+        description="Generate the Claude Code + OpenCode harness engines from .kilo/ source.",
     )
     parser.add_argument(
         "--harness",
-        choices=["all", "claude"],
+        choices=["all", "claude", "opencode"],
         default="all",
-        help="Both values do the same thing now (claude is the only generated "
-             "engine) — kept for backward-compatible scripts/CI.",
+        help="Which engine to generate. 'all' emits claude + opencode + the "
+             ".copilot/.gemini instruction mirrors.",
     )
     parser.add_argument(
         "--include-all",
@@ -147,9 +160,21 @@ def main() -> int:
 
     kilo_root = Path(args.kilo_root) if args.kilo_root else ROOT_DIR / ".kilo"
     skip_names = set() if args.include_all else load_skip_list(SKIP_FILE)
-    rc = _load_claude_engine().generate_all(
-        kilo_root, ROOT_DIR / ".claude", ROOT_DIR, skip_names=skip_names
-    )
+
+    rc = 0
+    if args.harness in ("all", "claude"):
+        rc = _load_claude_engine().generate_all(
+            kilo_root, ROOT_DIR / ".claude", ROOT_DIR, skip_names=skip_names
+        )
+    if args.harness in ("all", "opencode"):
+        print("\n--- OpenCode engine ---")
+        oc_rc = _load_opencode_engine().generate_all(
+            kilo_root, ROOT_DIR / ".opencode", ROOT_DIR, skip_names=skip_names
+        )
+        rc = rc or oc_rc
+    if args.harness != "all":
+        return rc
+
     print("\n--- Instruction mirrors (.copilot, .gemini) ---")
     sync_instruction_mirrors(kilo_root, ROOT_DIR)
     print("\n--- Memory mirrors (.copilot) ---")

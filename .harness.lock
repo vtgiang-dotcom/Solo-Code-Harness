@@ -7,16 +7,17 @@
 # Không sửa, không phân tích như logic nghiệp vụ.
 
 [harness]
-version = "4.0.0"
+version = "4.2.0"
 source = "solo-code-io/solo-code-cli"
-generated_at = "2026-07-23T00:00:00Z"
+generated_at = "2026-08-24T00:00:00Z"
 
-# --- ENGINE STATUS (v4.0.0) ---
-# .opencode/  -> REMOVED (was: 100%-parity generated mirror of .kilo/, zero
-#                unique capability; its one non-mirrored asset, command/
-#                ship.md, was ported to .kilo/command/ + .claude/commands/
-#                before removal). Full history: .kilo/memory/MEMORY.md
-#                "Decisions" section, 2026-07-23.
+# --- ENGINE STATUS (v4.2.0) ---
+# .opencode/  -> REINTRODUCED as a first-class primary agent engine (2026-08).
+#                Removed in v4.0.0 as a 100%-parity mirror with no unique
+#                capability; OpenCode v1.18+ has a stable native format that
+#                Kilo's frontmatter already follows, so tools/opencode_engine.py
+#                regenerates it near-identity. opencode.json carries the model
+#                default + native permission guard.
 # jcode       -> Cost/latency-optimized worker engine for scriptable,
 #                high-concurrency sub-tasks (DeepSeek v4 via CommandCode
 #                gateway). No dedicated harness dir needed: reads AGENTS.md,
@@ -33,6 +34,7 @@ dirs = [
     ".gemini",
     ".claude",
     ".claude-plugin",
+    ".opencode",
     ".github",
     ".contracts",
     ".vscode",
@@ -45,6 +47,7 @@ files = [
     "CLAUDE.md",
     "agent.yaml",
     "kilo.jsonc",
+    "opencode.json",
     ".mcp.json",
     ".ruff.toml",
     ".gitleaks.toml",

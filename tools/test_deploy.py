@@ -91,14 +91,14 @@ def test_dry_run_does_not_touch_disk(tmp_path):
 def test_retired_harness_file_is_removed(tmp_path):
     """Cleanup must still do its job for files the harness once deployed."""
     proj = _make_project(tmp_path)
-    _write(proj / "opencode.json")   # shipped pre-v4.0.0, now retired
-    _write(proj / "opencode.ps1")
+    _write(proj / "opencode.json")   # now ACTIVE (reintroduced v4.2.0) — must survive
+    _write(proj / "opencode.ps1")   # retired launcher — must be removed
 
     removed = deploy._cleanup_stale_files(proj, deploy.DIRS_ALL, dry_run=False)
 
-    assert not (proj / "opencode.json").exists(), "retired harness file not cleaned"
+    assert (proj / "opencode.json").exists(), "active harness file must not be cleaned"
     assert not (proj / "opencode.ps1").exists(), "retired harness file not cleaned"
-    assert removed == 2, f"expected 2 removals, got {removed}"
+    assert removed == 1, f"expected 1 removal, got {removed}"
     # ...and the project's own files are still untouched.
     assert (proj / "package.json").exists()
     assert (proj / "tsconfig.json").exists()
