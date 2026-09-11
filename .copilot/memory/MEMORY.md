@@ -15,7 +15,7 @@
 - [tech] Bash — init.sh, verify.sh, Makefile (Git Bash on Windows)
 - [tech] Ruff — Python linter (config in .ruff.toml, NOT pyproject.toml)
 - [tech] Gitleaks — secret scanner (.gitleaks.toml with allowlist)
-- [tech] pytest — test runner (not in pyproject.toml; manual `pip install pytest` into .venv)
+- [tech] pytest + ruff — dev tools in pyproject.toml `[project.optional-dependencies] dev`; install with `pip install -e ".[dev]"` (runtime deps stay empty)
 
 ## Config System
 - [config] `tools/harness_config.py` — hierarchical config loader (global > project > env)
@@ -91,3 +91,17 @@
   generated `opencode.json`. 10 skills carry the flag; no tooling previously
   consumed it. #2 done: deleted the unused `@opencode-ai/plugin` dep from the
   untracked `.opencode/package.json` + node_modules (local-only).
+- [decision] 2026-09-11: harness-consistency audit (F1-F10); full write-up in
+  `docs/audit-2026-09-11.md`. Policy call to carry forward: skill data assets
+  (`.xml`) are allowed only inside a `skill*/` directory — NOT added to
+  `boundary_audit.HARNESS_ALLOWED_EXTENSIONS`, because a global extension
+  entry would blind the audit to a stray file anywhere in a harness dir, which
+  is the leak it exists to catch. Second call: the root `.harness.lock` is a
+  SUPERSET of what deploy ships (this repo IS the harness), so it declares
+  `.agents` (Antigravity's local junction) via a new
+  `deploy.LOCAL_ONLY_HARNESS_DIRS` set — deliberately NOT in
+  `EXCLUSIVE_HARNESS_DIRS`, whose members are eligible for full stale-cleanup
+  and a locally-created junction at a target is not safe to wipe. `DIRS_ALL`
+  still never includes `.agents`. **This supersedes the `--bare`-default
+  described in the 2026-08-06 entry**: every launcher profile runs full mode by
+  default since 2026-08-08; `--bare` is explicit opt-in.
