@@ -113,6 +113,23 @@ EXCLUSIVE_HARNESS_DIRS = {
 # "everything not in the current manifest".
 SHARED_DIRS = {".github", ".vscode", "tools"}
 
+# Harness directories that exist in THIS repo but are deliberately NOT
+# deployed, because the machine creates them locally rather than the harness
+# shipping them.
+#
+# `.agents/skills` is a junction the Antigravity IDE creates on the developer's
+# machine (see garden.py's check for it). It is harness-controlled, so the root
+# .harness.lock must keep declaring it — but deploy never writes it, so it must
+# stay out of EXCLUSIVE_HARNESS_DIRS. That set means "safe to wipe anything not
+# in the current manifest", and handing a locally-created junction to full
+# stale-cleanup would delete it at a target.
+#
+# The root lock is a SUPERSET of what deploy ships (same rule as [shared_files]:
+# this repo IS the harness, a target receives a subset). A test asserts
+# root_lock_dirs == EXCLUSIVE_HARNESS_DIRS | LOCAL_ONLY_HARNESS_DIRS, so a new
+# engine dir cannot be silently omitted when the lock is regenerated.
+LOCAL_ONLY_HARNESS_DIRS = {".agents"}
+
 # Files the harness shipped into SHARED_DIRS in earlier versions and no
 # longer ships. These are the only shared-dir paths cleanup may delete
 # beyond the current manifest. Append here whenever such a file is dropped.

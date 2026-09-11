@@ -358,6 +358,44 @@ def test_root_lock_version_matches_pyproject_fallback():
     )
 
 
+def test_root_lock_dirs_cover_exclusive_dirs_plus_declared_local_only():
+    """The committed lock's dirs must equal the exclusive set plus the
+    explicitly-declared local-only dirs -- no more, no less.
+
+    The root lock is a SUPERSET of what deploy ships (this repo IS the
+    harness; a target receives a subset), so it is NOT required to match the
+    template's dirs exactly. But the difference must be exactly the declared
+    local-only set: an engine dir silently dropped when the lock is
+    regenerated is the failure this catches, and an undeclared extra dir
+    means someone added a boundary without saying so.
+    """
+    lock = (deploy.ROOT / ".harness.lock").read_text(encoding="utf-8")
+    declared = set(_parse_template_list(lock, "dirs"))
+
+    expected = deploy.EXCLUSIVE_HARNESS_DIRS | deploy.LOCAL_ONLY_HARNESS_DIRS
+
+    assert declared == expected, (
+        f"root .harness.lock dirs drifted from "
+        f"EXCLUSIVE_HARNESS_DIRS | LOCAL_ONLY_HARNESS_DIRS: "
+        f"missing={expected - declared}, phantom={declared - expected}"
+    )
+
+
+def test_local_only_dirs_are_not_deployed():
+    """A local-only harness dir must stay out of the cleanup-owns-everything
+    set — otherwise a target's locally-created copy (e.g. the .agents/skills
+    junction Antigravity makes) becomes eligible for full stale-cleanup."""
+    overlap = deploy.LOCAL_ONLY_HARNESS_DIRS & deploy.EXCLUSIVE_HARNESS_DIRS
+    assert not overlap, (
+        f"local-only dirs must not be exclusive (cleanup would wipe them): "
+        f"{overlap}"
+    )
+    for d in deploy.LOCAL_ONLY_HARNESS_DIRS:
+        assert d not in deploy.DIRS_ALL, (
+            f"{d} is declared local-only but DIRS_ALL would deploy it"
+        )
+
+
 def test_harness_test_files_are_never_deployed(tmp_path):
     """tools/test_*.py test THIS repo, not the target project.
 
