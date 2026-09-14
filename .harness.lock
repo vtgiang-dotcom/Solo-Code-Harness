@@ -21,6 +21,9 @@ generated_at = "2026-09-11T00:00:00Z"
 #                guard.
 # .copilot/   -> NOT auto-generated. Manually kept in parity with .kilo/
 #                (source of truth); verified by tools/garden.py drift checks.
+# codex       -> direct CLI integration via codex-env.ps1 and tools/codex_*.py.
+#                Codex has no project lifecycle hooks, so lifecycle and gates
+#                run through the launcher/explicit verification entrypoints.
 # jcode       -> RETIRED in v4.1.0. Launcher jcode.ps1 removed; no dedicated
 #                harness dir. Older deploys are cleaned via the
 #                RETIRED_ROOT_FILES entry in tools/deploy.py.
@@ -28,6 +31,7 @@ generated_at = "2026-09-11T00:00:00Z"
 [boundaries]
 # Thư mục harness — toàn bộ nội dung là harness, KHÔNG chứa code dự án
 dirs = [
+    ".codex",
     ".kilo",
     ".copilot",
     ".gemini",
@@ -109,6 +113,7 @@ paths = [
     "tools/test_claude_engine.py",
     "tools/test_claude_guard.py",
     "tools/test_claude_hooks.py",
+    "tools/test_codex_guard.py",
     "tools/test_deploy.py",
     "tools/test_e2e.py",
     "tools/test_garden.py",
@@ -125,6 +130,10 @@ paths = [
     "tools/test_subagent_seam.py",
     "tools/test_validate_schemas.py",
     "tools/validate_schemas.py",
+    "tools/codex_guard.py",
+    "tools/claude_guard_compat.py",
+    "tools/codex_session.py",
+    "tools/codex_verify.py",
 ]
 
 # File gốc harness — KHÔNG phải code dự án

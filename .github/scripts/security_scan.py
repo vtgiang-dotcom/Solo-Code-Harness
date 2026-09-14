@@ -144,7 +144,7 @@ def untracked_top_level_dirs(root: Path) -> set[str]:
 def should_skip(file_path: Path, extra_skip_dirs: frozenset[str] = frozenset()) -> bool:
     # Skip files that intentionally contain mock secrets for testing
     name = file_path.name.lower()
-    if name in {"eval_harness.py", "secret-scan.test.js", "guard.test.js", "test_claude_guard.py", "test_secret_patterns.py"}:
+    if name in {"eval_harness.py", "secret-scan.test.js", "guard.test.js", "test_claude_guard.py", "test_codex_guard.py", "test_secret_patterns.py"}:
         return True
     if name in SKIP_NAMES:
         return True

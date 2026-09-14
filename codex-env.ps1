@@ -70,5 +70,20 @@ if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-& codex @codexArgs
-exit $LASTEXITCODE
+$sessionId = [guid]::NewGuid().ToString()
+$sessionTool = Join-Path (Get-Location) "tools/codex_session.py"
+if (Test-Path -LiteralPath $sessionTool) {
+    & python $sessionTool start --session-id $sessionId
+}
+
+$exitCode = 1
+try {
+    & codex @codexArgs
+    $exitCode = $LASTEXITCODE
+}
+finally {
+    if (Test-Path -LiteralPath $sessionTool) {
+        & python $sessionTool end --session-id $sessionId --summary "Codex CLI exited with code $exitCode"
+    }
+}
+exit $exitCode

@@ -60,6 +60,7 @@ ROOT_FILES = [
     "pyproject.toml",
     "Makefile",
     "claude-env.ps1",
+    "codex-env.ps1",
     "init.sh",
     ".env.template",
     "verify.sh",
@@ -98,6 +99,7 @@ HARNESS_OWNED_ROOT_FILES = set(ROOT_FILES) | RETIRED_ROOT_FILES | {".harness.loc
 # the harness no longer ships is by definition a leftover from an older
 # deploy, so full stale-cleanup is safe here.
 EXCLUSIVE_HARNESS_DIRS = {
+    ".codex",
     ".kilo",
     ".copilot",
     ".gemini",
@@ -140,6 +142,7 @@ RETIRED_SHARED_FILES = {
 
 # Directories to copy (relative to ROOT)
 DIRS_ALL = [
+    ".codex",
     ".kilo",
     ".copilot",
     ".gemini",
@@ -182,6 +185,14 @@ DIRS_OPENCODE = [
     # would register every skill twice). Ship that location so an OpenCode-only
     # deploy still has a skills source.
     ".claude/skills",
+    ".github",
+    ".contracts",
+    "tools",
+]
+
+DIRS_CODEX = [
+    ".codex",
+    ".claude/hooks",
     ".github",
     ".contracts",
     "tools",
@@ -310,6 +321,7 @@ generated_at = "{timestamp}"
 [boundaries]
 # Thư mục harness — TOÀN BỘ nội dung là harness, KHÔNG chứa code dự án
 dirs = [
+    ".codex",
     ".kilo",
     ".copilot",
     ".gemini",
@@ -352,6 +364,7 @@ files = [
     "Makefile",
     "pyproject.toml",
     "claude-env.ps1",
+    "codex-env.ps1",
     "init.sh",
     ".env.template",
     "verify.sh",
@@ -886,6 +899,8 @@ def scaffold(
         dirs = DIRS_CLAUDE
     elif engine == "opencode":
         dirs = DIRS_OPENCODE
+    elif engine == "codex":
+        dirs = DIRS_CODEX
     else:
         dirs = DIRS_ALL
 
@@ -1278,6 +1293,8 @@ def deploy(
         dirs = DIRS_CLAUDE
     elif engine == "opencode":
         dirs = DIRS_OPENCODE
+    elif engine == "codex":
+        dirs = DIRS_CODEX
     else:
         dirs = DIRS_ALL
 
@@ -1479,7 +1496,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--engine",
-        choices=["all", "kilo", "copilot", "claude", "opencode"],
+        choices=["all", "kilo", "copilot", "claude", "opencode", "codex"],
         default="all",
         help="Which engine harness to deploy (default: all)",
     )
