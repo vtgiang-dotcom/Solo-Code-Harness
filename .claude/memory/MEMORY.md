@@ -16,6 +16,7 @@
 - [tech] Ruff — Python linter (config in .ruff.toml, NOT pyproject.toml)
 - [tech] Gitleaks — secret scanner (.gitleaks.toml with allowlist)
 - [tech] pytest + ruff — dev tools in pyproject.toml `[project.optional-dependencies] dev`; install with `pip install -e ".[dev]"` (runtime deps stay empty)
+- [tech] Codex CLI 0.154.0 (`@openai/codex`, npm global) — harness consumer via `AGENTS.md`; launcher `codex-env.ps1`, metering `tools/codex_usage.py`. Config lives at `~/.codex/config.toml` (user-level only: project `.codex/config.toml` may not set `model_provider`/`model_providers`/`openai_base_url`)
 
 ## Config System
 - [config] `tools/harness_config.py` — hierarchical config loader (global > project > env)
@@ -35,6 +36,9 @@
 - [gotcha] E501 globally ignored in .ruff.toml [lint]; no per-file E501 needed
 - [gotcha] Dead dir refs: ECC-main, agents-main, hermes-agent-main, etc. are stale — never restore
 - [gotcha] jsonschema not in .venv; schema validation via tools/validate_schemas.py
+- [gotcha] Codex CLI does NOT read `.env` — run `codex-env.ps1`, never bare `codex`
+- [gotcha] Codex needs `code_mode.enabled = false` or it never calls a tool (prose only)
+- [gotcha] TOML: bare keys must precede the first `[table]` in ~/.codex/config.toml
 
 
 ## Decisions
@@ -105,3 +109,74 @@
   still never includes `.agents`. **This supersedes the `--bare`-default
   described in the 2026-08-06 entry**: every launcher profile runs full mode by
   default since 2026-08-08; `--bare` is explicit opt-in.
+- [decision] 2026-09-14: Codex CLI added as a harness-consumer engine
+  (NOT a harness mirror — Codex reads `AGENTS.md` natively, so no `.codex/`
+  engine dir is generated). Installed `@openai/codex` 0.154.0 (npm, global).
+  Added `codex-env.ps1` (launcher) and `tools/codex_usage.py` (metering).
+  Four findings, each verified by experiment, that a future session must not
+  re-derive:
+  1. **Codex never reads `.env`.** It resolves the key from the env var named
+     by `env_key` in `~/.codex/config.toml`, and its base URL is a static
+     config value. `codex-env.ps1` therefore loads `.env`, exports
+     `OPENAI_API_KEY`, and passes the URL via
+     `-c model_providers.freemodel.base_url=...`.
+  2. **`${VAR}` interpolation does NOT work in `base_url`** — setting
+     `base_url = "${OPENAI_BASE_URL}/v1"` fails with "stream disconnected
+     before completion: builder error". Hence the `-c` override above.
+  3. **Codex's "code mode" must be OFF.** With it on, the model is asked to
+     emit free-form JS (`const r = await tools.exec_command({...})`), which the
+     gateway's models do not understand: they reply in prose, no tool ever
+     runs, and the turn ends having done nothing. Fix is
+     `[features] code_mode.enabled = false` + `unified_exec = false`. This
+     looks identical to "provider lacks function calling", but it is not —
+     calling `/v1/responses` directly with a `tools` array returns a proper
+     `function_call` item, so the provider is fine and the wire format was the
+     problem.
+  4. **Windows sandbox blocks every shell command** ("rejected: blocked by
+     policy") even under `workspace-write`, leaving the agent unable to run
+     tests or git. Set `sandbox_mode = "danger-full-access"` +
+     `approval_policy = "never"` (same trust model Claude Code/Kilo run under).
+  Two smaller traps: `wire_api = "chat"` was **removed** in 0.154 (only
+  `responses` remains), and TOML bare keys must precede the first `[table]`
+  header — `sandbox_mode` placed after `[features]` lands inside it and Codex
+  refuses to start.
+- [decision] 2026-09-14: FreeModel gateway routing is NOT stable per model
+  name — only `gpt-5.6-terra` is usable. This was measured objectively from
+  API-side data (`usage.input_tokens` and the response's own `model` field),
+  never by asking the model what it is. Method that produced the result:
+  send one fixed 600-char string repeatedly and compare token counts; a stable
+  backend returns identical counts and the same `model` id every time.
+  Results: `gpt-5.6-terra` STABLE (150/150/150/150, and 150/181/94 for
+  en/vi/code text across two passes each, always `served=gpt-5.6-terra`);
+  `gpt-5.6-sol` UNSTABLE (150 vs 820 for identical text); `gpt-5.5` and
+  `gpt-5.4` do not exist as distinct models — 4/4 requests for each were
+  answered by `gpt-5.6-sol`, and both returned 150-vs-820 token spreads;
+  `gpt-5.6-luna` is dead (HTTP 502 on 3 attempts spaced 5s apart).
+  Tokenizer fingerprint for terra matches OpenAI's `o200k_base`
+  (zh/en chars-per-token ratio 0.32; English 4.55 chars/token, Chinese 1.44,
+  emoji 0.56), i.e. NOT a CJK-optimised tokenizer. Conclusion recorded for the
+  pricing question: the gateway is a router over a pool ("routes each request
+  to the best open model"), so "cheaper than buying direct" is not a
+  like-for-like claim — the underlying model is anonymous and, for every alias
+  except terra, changes between calls. Use terra for bulk mechanical work; do
+  not use this gateway for work that needs reproducibility.
+  **Measurement traps, do not repeat:** (a) asking the model to identify
+  itself proves nothing; (b) four calls inside a few seconds do not
+  demonstrate stability over time — vary the text and space the calls out
+  (the sol/gpt-5.5 spread only shows up across repeats); (c) the response's
+  `model` field is not a claim by the model, it is routing metadata, which is
+  exactly why it is admissible evidence.
+- [decision] 2026-09-14: Cost/metering path for Codex + FreeModel. FreeModel
+  returns no cost field (its `/v1/responses` usage block carries tokens only,
+  and `/api/billing` needs a browser session, not an API key), so
+  `tools/codex_usage.py` computes cost from token counts times reference
+  prices, and reads token/cache data from Codex's own rollout log —
+  `~/.codex/sessions/**/rollout-*.jsonl`, event type `token_usage_record`,
+  which breaks out `cached_input_tokens` per API call with `usage` /
+  `turn_token_usage` / `thread_token_usage` variants. No extra Codex config is
+  needed to get this data. Cached input is 10x cheaper ($0.2/M vs $2/M on
+  terra), so cache hit rate is the dominant cost lever; long sessions hold
+  cache (measured 40-47%), many short sessions do not (0%). Plan arithmetic:
+  $20/month buys a $20 allowance per rolling 5h window capped at $132/week
+  (~$572/month of list-price value), so break-even is $4.62/week of value.
+  Terra list prices used: $2/M in, $12/M out, $0.2/M cached.
