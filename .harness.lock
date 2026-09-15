@@ -151,6 +151,7 @@ files = [
     "pyproject.toml",
     "claude-env.ps1",
     "codex-env.ps1",
+    "opencode-env.ps1",
     "init.sh",
     ".env.template",
     "verify.sh",
