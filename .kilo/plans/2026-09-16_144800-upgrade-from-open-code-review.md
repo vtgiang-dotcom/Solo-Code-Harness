@@ -1,7 +1,8 @@
 # Kế hoạch nâng cấp Solo-Code-Harness từ review `open-code-review-main`
 
-> **Trạng thái:** Phase 1 đang thực hiện. Task 6 đã commit (`dc1f773`); Task 1
-> được thay bằng fix idempotent-write sau khi byte comparison bác bỏ chẩn đoán EOL.
+> **Trạng thái:** Phase 1 đã hoàn tất. Task 6 đã commit (`dc1f773`); Task 1
+> được thay bằng fix idempotent-write và đã commit (`37ae42c`) sau khi byte
+> comparison bác bỏ chẩn đoán EOL.
 > **Người soạn:** Kilo (deepseek-v4.1-flash)
 > **Ngày:** 2026-09-16
 > **Yêu cầu:** review bởi model cấp cao trước khi thực hiện.

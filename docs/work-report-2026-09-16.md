@@ -7,7 +7,7 @@
 | **Kế hoạch nguồn** | `.kilo/plans/2026-09-16_144800-upgrade-from-open-code-review.md` |
 | **Báo cáo review nguồn** | `docs/review-open-code-review-2026-09-16.md` |
 | **Phạm vi session** | Phase 1 — Task 6 và Task 1 |
-| **Trạng thái** | Task 6 đã commit; **Task 1 hoàn thành, CHƯA commit** |
+| **Trạng thái** | Task 6 đã commit; **Task 1 đã commit (`37ae42c`)** |
 
 ---
 
@@ -41,7 +41,7 @@ git check-ignore -v open-code-review-main
 
 ---
 
-### 2.2 Task 1 — fix churn sau mỗi lần generate (**chưa commit**)
+### 2.2 Task 1 — fix churn sau mỗi lần generate (đã commit `37ae42c`)
 
 #### Triệu chứng
 
@@ -189,7 +189,7 @@ Không liên quan tới thay đổi trong session này — tôi chỉ đụng v�
 
 | # | Việc | Ghi chú |
 |---|---|---|
-| 1 | **Commit Task 1** | `claude_engine.py`, `opencode_engine.py`, `test_generator_idempotency.py`, `.gitattributes`, và ba báo cáo/plan |
+| 1 | Task 1 | Đã commit: `37ae42c fix(generator): avoid rewriting unchanged artifacts` |
 | 2 | Không ship `.gitattributes` sang project đích | Đã chốt: file chỉ điều chỉnh checkout của repo harness, nên không thêm vào `ROOT_FILES` hay lock template |
 | 3 | Điều tra test flaky ở §5 | Tách riêng |
 | 4 | Task 2 (`verify_prose.py`) và phần còn lại | Chưa bắt đầu; Task 2 trong plan cần rà lại vì vài chỗ dựa trên giả định cũ |
@@ -223,7 +223,9 @@ Nếu chọn ship, **phải sửa cả `ROOT_FILES` và `HARNESS_LOCK_TEMPLATE`*
 ## 7. Trạng thái git
 
 ```
-HEAD: dc1f773  chore(git): ignore open-code-review reference checkout
+HEAD trước Task 1: dc1f773  chore(git): ignore open-code-review reference checkout
+
+Task 1 sau đó đã được commit: 37ae42c  fix(generator): avoid rewriting unchanged artifacts
 
  M tools/claude_engine.py                              (idempotent text, file, and skill-tree writes)
  M tools/opencode_engine.py                            (idempotent text and file writes)
