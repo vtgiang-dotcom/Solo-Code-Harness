@@ -49,7 +49,12 @@ Thumbs.db
 !.vscode/settings.json
 !.vscode/mcp.json
 .idea/
+
+# Reference checkouts of upstream projects — read for review, never part of the
+# harness. They have no .git of their own, so without these entries a plain
+# `git add -A` would swallow them into harness history.
 deepseek-harness-master/
+open-code-review-main/
 
 # Antigravity IDE custom root junction (mirrors .gemini/antigravity/skills locally)
 /.agents/skills/
