@@ -36,6 +36,7 @@ Transform rules (source -> OpenCode):
 
 from __future__ import annotations
 
+import contextlib
 import json
 import shutil
 from pathlib import Path
@@ -53,6 +54,31 @@ _DROP_PERMISSION_KEYS = {"codesearch", "mcp"}
 # user-only skill invocation, so "ask" is the closest faithful mapping: the
 # model may request the skill, but the user approves before it loads.
 _DISABLED_SKILL_PERMISSION = "ask"
+
+
+def _write_if_changed(path: Path, content: str) -> None:
+    """Write `content` as LF text, but only when it differs from what is there.
+
+    An unconditional write bumps mtime, and `git status` then reports every
+    generated artifact as modified while `git diff` shows nothing at all -- it
+    compares stat first and only reads content on `git diff`. Mirrors the guard
+    in claude_engine._write_lf.
+    """
+    if path.exists():
+        with contextlib.suppress(OSError, UnicodeDecodeError):
+            if path.read_text(encoding="utf-8") == content:
+                return
+    path.write_text(content, encoding="utf-8", newline="")
+
+
+def _copy_if_changed(src: Path, dst: Path) -> None:
+    """Copy `src` over `dst` only when the bytes actually differ."""
+    data = src.read_bytes()
+    if dst.exists():
+        with contextlib.suppress(OSError):
+            if dst.read_bytes() == data:
+                return
+    dst.write_bytes(data)
 
 
 def _frontmatter_block(text: str) -> str | None:
@@ -157,7 +183,7 @@ def generate_agents(kilo_root: Path, opencode_root: Path) -> int:
         fm = _normalize_agent_frontmatter(split[1].strip("\n"))
         body = split[2].lstrip("\n")
         new_content = f"---\n{fm}\n---\n{body}"
-        (dst_dir / agent_file.name).write_text(new_content, encoding="utf-8", newline="")
+        _write_if_changed(dst_dir / agent_file.name, new_content)
         copied += 1
         print(f"  [GEN] agents/{agent_file.name}")
     print(f"OpenCode agents generated: {copied}")
@@ -174,7 +200,7 @@ def generate_commands(kilo_root: Path, opencode_root: Path) -> int:
     copied = 0
     for cmd_file in sorted(src_dir.glob("*.md")):
         content = cmd_file.read_text(encoding="utf-8")
-        (dst_dir / cmd_file.name).write_text(content, encoding="utf-8", newline="")
+        _write_if_changed(dst_dir / cmd_file.name, content)
         copied += 1
         print(f"  [GEN] commands/{cmd_file.name}")
     print(f"OpenCode commands generated: {copied}")
@@ -208,8 +234,7 @@ def generate_instructions(kilo_root: Path, opencode_root: Path) -> int:
     dst_dir.mkdir(parents=True, exist_ok=True)
     copied = 0
     for f in sorted(src_dir.glob("*.md")):
-        dst = dst_dir / f.name
-        dst.write_bytes(f.read_bytes())
+        _copy_if_changed(f, dst_dir / f.name)
         copied += 1
     print(f"OpenCode instructions copied: {copied}")
     return 0
@@ -268,7 +293,7 @@ def generate_opencode_json(
         "permission": permission,
     }
     dst = root_dir / "opencode.json"
-    dst.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8", newline="")
+    _write_if_changed(dst, json.dumps(config, indent=2) + "\n")
     note = f" ({len(disabled_skills)} skill permission rule(s))" if disabled_skills else ""
     print(f"OpenCode config generated: opencode.json{note}")
     return 0

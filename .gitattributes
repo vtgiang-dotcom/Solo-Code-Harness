@@ -1,0 +1,22 @@
+# Normalise every text file to LF in the working tree and the index.
+#
+# Why this file exists: the harness repository keeps text files in LF form on
+# every platform. Generators also write LF, so a checkout uses the same line
+# ending regardless of the local core.autocrlf setting.
+* text=auto eol=lf
+
+# Binary formats must never be line-ending converted.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.zip binary
+*.gz binary
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary

@@ -49,9 +49,63 @@ def _write_lf(path: Path, content: str) -> None:
     copies these files verbatim into target projects that may not be git
     repos at all, where the inconsistency is real and visible.
     newline="" disables the translation.
+
+    Skips the write when the file already holds `content`. Rewriting an
+    unchanged file bumps its mtime, and `git status` then reports every
+    generated artifact as modified while `git diff` shows nothing at all --
+    it compares stat first and only reads content on `git diff`. Measured at
+    28 files per run before this guard.
     """
+    if path.exists():
+        with contextlib.suppress(OSError, UnicodeDecodeError):
+            if path.read_text(encoding="utf-8") == content:
+                return
     with path.open("w", encoding="utf-8", newline="") as fh:
         fh.write(content)
+
+
+def _copy_if_changed(src: Path, dst: Path) -> None:
+    """Copy `src` over `dst` only when the bytes actually differ.
+
+    Same reason as _write_lf. The unconditional version also dragged the mtime
+    over with copystat, which still disagrees with the stat git has cached, so
+    unchanged mirrors showed up as modified after every generator run.
+    """
+    data = src.read_bytes()
+    if dst.exists():
+        with contextlib.suppress(OSError):
+            if dst.read_bytes() == data:
+                return
+    dst.write_bytes(data)
+    with contextlib.suppress(Exception):
+        shutil.copystat(src, dst)
+
+
+def _copy_tree_if_changed(src: Path, dst: Path) -> None:
+    """Synchronize a generated directory without rewriting an identical tree."""
+    source_paths = {path.relative_to(src) for path in src.rglob("*")}
+    source_files = {
+        path.relative_to(src): path.read_bytes()
+        for path in src.rglob("*")
+        if path.is_file()
+    }
+    if dst.is_dir():
+        destination_paths = {path.relative_to(dst) for path in dst.rglob("*")}
+        destination_files = {
+            path.relative_to(dst): path.read_bytes()
+            for path in dst.rglob("*")
+            if path.is_file()
+        }
+        if destination_paths == source_paths and destination_files == source_files:
+            return
+
+    if dst.exists():
+        if dst.is_dir():
+            shutil.rmtree(dst)
+        else:
+            dst.unlink()
+    shutil.copytree(src, dst)
+
 
 # Kilo permission tool -> Claude Code tool name(s).
 # `edit` maps to both Edit and Write (Claude splits file mutation into two tools).
@@ -242,10 +296,7 @@ def generate_skills(kilo_root: Path, claude_root: Path, *, skip_names: set[str] 
         if not (skill_dir / "SKILL.md").is_file():
             print(f"  [SKIP] skills/{name} (no SKILL.md)")
             continue
-        dest = dst_dir / name
-        if dest.exists():
-            shutil.rmtree(dest)
-        shutil.copytree(skill_dir, dest)
+        _copy_tree_if_changed(skill_dir, dst_dir / name)
         copied += 1
     print(f"Claude skills generated: {copied}")
     return 0
@@ -301,10 +352,7 @@ def generate_instructions(kilo_root: Path, claude_root: Path) -> int:
     dst_dir.mkdir(parents=True, exist_ok=True)
     copied = 0
     for f in sorted(src_dir.glob("*.md")):
-        dst = dst_dir / f.name
-        dst.write_bytes(f.read_bytes())
-        with contextlib.suppress(Exception):
-            shutil.copystat(f, dst)
+        _copy_if_changed(f, dst_dir / f.name)
         copied += 1
     print(f"Claude instructions copied: {copied}")
     return 0
@@ -326,10 +374,7 @@ def generate_memory(kilo_root: Path, claude_root: Path) -> int:
     dst_dir.mkdir(parents=True, exist_ok=True)
     copied = 0
     for f in sorted(src_dir.glob("*.md")):
-        dst = dst_dir / f.name
-        dst.write_bytes(f.read_bytes())
-        with contextlib.suppress(Exception):
-            shutil.copystat(f, dst)
+        _copy_if_changed(f, dst_dir / f.name)
         copied += 1
     print(f"Claude memory copied: {copied}")
     return 0
