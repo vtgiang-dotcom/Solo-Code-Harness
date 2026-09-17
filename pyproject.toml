@@ -49,4 +49,5 @@ include = ["/tools", "/.kilo", "/.claude", "/.github", "/README.md", "/LICENSE",
 
 [tool.pytest.ini_options]
 addopts = "--basetemp=.pytest_temp"
+testpaths = ["tools"]
 

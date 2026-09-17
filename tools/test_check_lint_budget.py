@@ -109,6 +109,16 @@ def test_count_findings_zero_on_clean_tree(tmp_path):
     assert count == 0, raw
 
 
+def test_count_findings_uses_the_root_ruff_configuration(tmp_path):
+    """Fixture config files must not change the repository-wide lint budget."""
+    (tmp_path / ".ruff.toml").write_text("{}", encoding="utf-8")
+    (tmp_path / "m.py").write_text("x = 1\n", encoding="utf-8")
+
+    count, raw = budget.count_findings(tmp_path)
+
+    assert (count, raw) == (0, "")
+
+
 # --- main (the ratchet itself) -----------------------------------------------
 
 
